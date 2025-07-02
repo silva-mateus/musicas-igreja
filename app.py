@@ -76,21 +76,87 @@ def sanitize_filename(text):
     text = re.sub(r'\s+', ' ', text.strip())
     return text
 
-def generate_filename(song_name, artist, original_filename):
-    """Gerar nome de arquivo baseado na música e artista."""
+def format_camel_case(text):
+    """Formatar texto em camel case: primeira letra de cada palavra maiúscula, 
+    exceto palavras de 1-2 letras que não sejam a primeira palavra."""
+    if not text:
+        return ""
+    
+    # Lista de palavras que devem permanecer em minúscula (exceto se forem a primeira palavra)
+    small_words = ['a', 'e', 'o', 'as', 'os', 'da', 'de', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 
+                   'com', 'por', 'para', 'que', 'se', 'te', 'me', 'lhe', 'la', 'le', 'lo', 'um', 'uma', 'uns', 'umas']
+    
+    words = text.split()
+    formatted_words = []
+    
+    for i, word in enumerate(words):
+        # Remove caracteres especiais temporariamente para análise
+        clean_word = re.sub(r'[^\w]', '', word.lower())
+        
+        # Primeira palavra sempre com inicial maiúscula
+        # Palavras com mais de 2 letras sempre com inicial maiúscula
+        # Palavras de 1-2 letras só em minúscula se não forem a primeira e estiverem na lista
+        if i == 0 or len(clean_word) > 2 or clean_word not in small_words:
+            formatted_words.append(word.capitalize())
+        else:
+            formatted_words.append(word.lower())
+    
+    return ' '.join(formatted_words)
+
+def generate_unique_filename(base_filename, target_directory):
+    """Gerar nome de arquivo único, adicionando índice entre parênteses se necessário."""
+    if not os.path.exists(target_directory):
+        return base_filename
+    
+    base_name = os.path.splitext(base_filename)[0]
+    extension = os.path.splitext(base_filename)[1]
+    
+    # Verificar se arquivo base já existe
+    full_path = os.path.join(target_directory, base_filename)
+    if not os.path.exists(full_path):
+        return base_filename
+    
+    # Gerar nomes com índices
+    counter = 1
+    while True:
+        new_filename = f"{base_name} ({counter}){extension}"
+        full_path = os.path.join(target_directory, new_filename)
+        if not os.path.exists(full_path):
+            return new_filename
+        counter += 1
+
+def generate_filename(song_name, artist, original_filename, musical_key=None):
+    """Gerar nome de arquivo baseado no padrão 'Música - Tom - Artista'."""
     print(f"    [FILENAME] Gerando nome do arquivo:")
     print(f"    [FILENAME] - song_name: '{song_name}'")
     print(f"    [FILENAME] - artist: '{artist}'")
+    print(f"    [FILENAME] - musical_key: '{musical_key}'")
     print(f"    [FILENAME] - original_filename: '{original_filename}'")
     
-    if song_name and artist:
-        filename = f"{sanitize_filename(song_name)} - {sanitize_filename(artist)}.pdf"
-        print(f"    [FILENAME] - Usando padrão 'Música - Artista': '{filename}'")
-    elif song_name:
-        filename = f"{sanitize_filename(song_name)}.pdf"
-        print(f"    [FILENAME] - Usando apenas música: '{filename}'")
-    elif artist:
-        filename = f"{sanitize_filename(artist)}.pdf"
+    # Aplicar formatação camel case
+    formatted_song = format_camel_case(song_name) if song_name else ""
+    formatted_artist = format_camel_case(artist) if artist else ""
+    
+    print(f"    [FILENAME] - song_name formatado: '{formatted_song}'")
+    print(f"    [FILENAME] - artist formatado: '{formatted_artist}'")
+    
+    # Gerar nome no novo padrão: "Música - Tom - Artista"
+    if formatted_song and formatted_artist:
+        if musical_key:
+            filename = f"{sanitize_filename(formatted_song)} - {musical_key} - {sanitize_filename(formatted_artist)}.pdf"
+            print(f"    [FILENAME] - Usando padrão completo 'Música - Tom - Artista': '{filename}'")
+        else:
+            filename = f"{sanitize_filename(formatted_song)} - {sanitize_filename(formatted_artist)}.pdf"
+            print(f"    [FILENAME] - Usando padrão 'Música - Artista' (sem tom): '{filename}'")
+    elif formatted_song:
+        if musical_key:
+            filename = f"{sanitize_filename(formatted_song)} - {musical_key}.pdf"
+            print(f"    [FILENAME] - Usando 'Música - Tom': '{filename}'")
+        else:
+            filename = f"{sanitize_filename(formatted_song)}.pdf"
+            print(f"    [FILENAME] - Usando apenas música: '{filename}'")
+    elif formatted_artist:
+        filename = f"{sanitize_filename(formatted_artist)}.pdf"
         print(f"    [FILENAME] - Usando apenas artista: '{filename}'")
     else:
         # Fallback para nome original
@@ -109,85 +175,32 @@ def move_file_to_category(file_path, old_category, new_category, filename):
         print(f"    [MOVE] - Categoria nova: {new_category}")
         print(f"    [MOVE] - Nome desejado: {filename}")
         
-        old_category_folder = os.path.join(ORGANIZED_FOLDER, old_category)
         new_category_folder = os.path.join(ORGANIZED_FOLDER, new_category)
-        
-        print(f"    [MOVE] - Pasta antiga: {old_category_folder}")
-        print(f"    [MOVE] - Pasta nova: {new_category_folder}")
         
         # Criar novo diretório se não existir
         if not os.path.exists(new_category_folder):
             print(f"    [MOVE] - Criando diretório: {new_category_folder}")
             os.makedirs(new_category_folder, exist_ok=True)
-        else:
-            print(f"    [MOVE] - Diretório já existe: {new_category_folder}")
         
-        # Caminhos completos
-        old_path = file_path
-        new_path = os.path.join(new_category_folder, filename)
-        
-        print(f"    [MOVE] - Caminho origem: {old_path}")
-        print(f"    [MOVE] - Caminho destino: {new_path}")
-        print(f"    [MOVE] - Arquivo origem existe: {os.path.exists(old_path)}")
-        
-        # Verificar se arquivo precisa ser movido
-        if os.path.normpath(os.path.dirname(old_path)) != os.path.normpath(new_category_folder):
-            print(f"    [MOVE] - Arquivo precisa ser movido")
-            
-            # Garantir nome único no destino
-            counter = 1
-            base_name = os.path.splitext(filename)[0]
-            final_filename = filename
-            final_path = new_path
-            
-            while os.path.exists(final_path):
-                print(f"    [MOVE] - Arquivo {final_path} já existe, tentando nome alternativo...")
-                final_filename = f"{base_name}_{counter}.pdf"
-                final_path = os.path.join(new_category_folder, final_filename)
-                counter += 1
-            
-            print(f"    [MOVE] - Nome final: {final_filename}")
-            print(f"    [MOVE] - Caminho final: {final_path}")
-            
-            # Verificar se o arquivo origem realmente existe antes de mover
-            if not os.path.exists(old_path):
-                print(f"    [MOVE] - ERRO: Arquivo origem não existe!")
-                return file_path, os.path.basename(file_path)
-            
-            # Mover arquivo
-            print(f"    [MOVE] - Executando movimentação...")
-            shutil.move(old_path, final_path)
-            print(f"    [MOVE] - Arquivo movido com sucesso!")
-            
-            return final_path, final_filename
-        else:
-            print(f"    [MOVE] - Arquivo já está no diretório correto")
-            
-            # Mesmo no diretório correto, pode precisar renomear
-            if os.path.basename(old_path) != filename:
-                print(f"    [MOVE] - Renomeando no mesmo diretório...")
-                new_path_rename = os.path.join(new_category_folder, filename)
-                
-                # Verificar se nome já existe
-                counter = 1
-                base_name = os.path.splitext(filename)[0]
-                final_filename = filename
-                final_path = new_path_rename
-                
-                while os.path.exists(final_path) and final_path != old_path:
-                    print(f"    [MOVE] - Nome {final_filename} já existe, tentando alternativo...")
-                    final_filename = f"{base_name}_{counter}.pdf"
-                    final_path = os.path.join(new_category_folder, final_filename)
-                    counter += 1
-                
-                if final_path != old_path:
-                    print(f"    [MOVE] - Renomeando {old_path} -> {final_path}")
-                    os.rename(old_path, final_path)
-                    return final_path, final_filename
-                else:
-                    print(f"    [MOVE] - Nome já é o correto")
-            
+        # Verificar se arquivo origem existe
+        if not os.path.exists(file_path):
+            print(f"    [MOVE] - ERRO: Arquivo origem não existe!")
             return file_path, os.path.basename(file_path)
+        
+        # Gerar nome único no destino
+        unique_filename = generate_unique_filename(filename, new_category_folder)
+        final_path = os.path.join(new_category_folder, unique_filename)
+        
+        print(f"    [MOVE] - Caminho origem: {file_path}")
+        print(f"    [MOVE] - Caminho destino: {final_path}")
+        print(f"    [MOVE] - Nome final: {unique_filename}")
+        
+        # Mover arquivo
+        print(f"    [MOVE] - Executando movimentação...")
+        shutil.move(file_path, final_path)
+        print(f"    [MOVE] - Arquivo movido com sucesso!")
+        
+        return final_path, unique_filename
         
     except Exception as e:
         print(f"    [MOVE] - ERRO ao mover arquivo: {e}")
@@ -201,7 +214,7 @@ def scan_and_fix_files():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT id, filename, song_name, artist, category, file_path 
+        SELECT id, filename, song_name, artist, category, file_path, musical_key 
         FROM pdf_files
     ''')
     files = cursor.fetchall()
@@ -211,22 +224,42 @@ def scan_and_fix_files():
     changes_made = []
     
     for file_data in files:
-        file_id, current_filename, song_name, artist, category, current_path = file_data
+        file_id, current_filename, song_name, artist, category, current_path, musical_key = file_data
         
         print(f"[DEBUG] Processando arquivo ID {file_id}:")
         print(f"  - Nome atual: {current_filename}")
         print(f"  - Música: {song_name}")
         print(f"  - Artista: {artist}")
+        print(f"  - Tom: {musical_key}")
         print(f"  - Categoria: {category}")
         print(f"  - Caminho atual: {current_path}")
         
-        # Gerar nome ideal do arquivo
-        ideal_filename = generate_filename(song_name, artist, current_filename)
+        # Aplicar formatação camel case nos campos do banco
+        formatted_song = format_camel_case(song_name) if song_name else song_name
+        formatted_artist = format_camel_case(artist) if artist else artist
+        
+        # Verificar se precisa atualizar os campos do banco
+        needs_db_update = (formatted_song != song_name) or (formatted_artist != artist)
+        
+        if needs_db_update:
+            print(f"  - [FORMATAÇÃO] Aplicando camel case:")
+            print(f"    - Música: '{song_name}' -> '{formatted_song}'")
+            print(f"    - Artista: '{artist}' -> '{formatted_artist}'")
+            
+            # Atualizar banco com formatação camel case
+            cursor.execute('''
+                UPDATE pdf_files 
+                SET song_name = ?, artist = ? 
+                WHERE id = ?
+            ''', (formatted_song, formatted_artist, file_id))
+        
+        # Gerar nome ideal do arquivo usando os dados formatados
+        ideal_filename = generate_filename(formatted_song, formatted_artist, current_filename, musical_key)
         print(f"  - Nome ideal: {ideal_filename}")
         
         # Verificar se arquivo está no diretório correto
         expected_dir = os.path.join(ORGANIZED_FOLDER, category)
-        current_dir = os.path.dirname(current_path)
+        current_dir = os.path.dirname(current_path) if current_path else ""
         
         print(f"  - Diretório atual: {current_dir}")
         print(f"  - Diretório esperado: {expected_dir}")
@@ -236,50 +269,71 @@ def scan_and_fix_files():
         
         print(f"  - Precisa renomear: {needs_rename}")
         print(f"  - Precisa mover: {needs_move}")
-        print(f"  - Arquivo existe: {os.path.exists(current_path)}")
+        print(f"  - Arquivo existe: {os.path.exists(current_path) if current_path else False}")
         
-        if needs_rename or needs_move:
+        if needs_rename or needs_move or needs_db_update:
             try:
                 print(f"  - [AÇÃO] Processando correções...")
                 
-                # Mover/renomear arquivo
-                if needs_move:
-                    print(f"  - [AÇÃO] Movendo de {current_dir} para {expected_dir}")
-                    new_path, new_filename = move_file_to_category(
-                        current_path, 
-                        os.path.basename(current_dir), 
-                        category, 
-                        ideal_filename
-                    )
-                    print(f"  - [RESULTADO] Novo caminho: {new_path}")
-                    print(f"  - [RESULTADO] Novo nome: {new_filename}")
-                else:
-                    # Apenas renomear
-                    print(f"  - [AÇÃO] Renomeando apenas...")
-                    new_path = os.path.join(current_dir, ideal_filename)
-                    if current_path != new_path and not os.path.exists(new_path):
-                        print(f"  - [AÇÃO] Renomeando {current_path} -> {new_path}")
-                        os.rename(current_path, new_path)
-                        new_filename = ideal_filename
-                    else:
-                        print(f"  - [AVISO] Arquivo destino já existe ou caminhos são iguais")
-                        new_filename = current_filename
-                        new_path = current_path
+                # Garantir que o diretório de destino existe
+                if not os.path.exists(expected_dir):
+                    print(f"  - [AÇÃO] Criando diretório: {expected_dir}")
+                    os.makedirs(expected_dir, exist_ok=True)
                 
-                # Atualizar banco de dados
+                # Gerar nome único para evitar conflitos
+                unique_filename = generate_unique_filename(ideal_filename, expected_dir)
+                
+                if needs_move or needs_rename:
+                    # Mover/renomear arquivo
+                    if needs_move:
+                        print(f"  - [AÇÃO] Movendo de {current_dir} para {expected_dir}")
+                        new_path, new_filename = move_file_to_category(
+                            current_path, 
+                            os.path.basename(current_dir), 
+                            category, 
+                            unique_filename
+                        )
+                        print(f"  - [RESULTADO] Novo caminho: {new_path}")
+                        print(f"  - [RESULTADO] Novo nome: {new_filename}")
+                    else:
+                        # Apenas renomear no mesmo diretório
+                        print(f"  - [AÇÃO] Renomeando no mesmo diretório...")
+                        new_path = os.path.join(current_dir, unique_filename)
+                        
+                        if current_path != new_path:
+                            if os.path.exists(current_path):
+                                print(f"  - [AÇÃO] Renomeando {current_path} -> {new_path}")
+                                os.rename(current_path, new_path)
+                                new_filename = unique_filename
+                            else:
+                                print(f"  - [AVISO] Arquivo origem não existe!")
+                                new_filename = current_filename
+                                new_path = current_path
+                        else:
+                            print(f"  - [INFO] Caminhos são iguais, sem necessidade de renomear")
+                            new_filename = current_filename
+                            new_path = current_path
+                else:
+                    # Só atualização do banco, sem mudança de arquivo
+                    new_path = current_path
+                    new_filename = current_filename
+                
+                # Atualizar banco de dados com novos dados
                 print(f"  - [AÇÃO] Atualizando banco de dados...")
                 cursor.execute('''
                     UPDATE pdf_files 
-                    SET filename = ?, file_path = ? 
+                    SET filename = ?, file_path = ?, song_name = ?, artist = ? 
                     WHERE id = ?
-                ''', (new_filename, new_path, file_id))
+                ''', (new_filename, new_path, formatted_song, formatted_artist, file_id))
                 
                 changes_made.append({
                     'id': file_id,
                     'old_filename': current_filename,
                     'new_filename': new_filename,
                     'old_path': current_path,
-                    'new_path': new_path
+                    'new_path': new_path,
+                    'song_updated': formatted_song != song_name,
+                    'artist_updated': formatted_artist != artist
                 })
                 
                 print(f"  - [SUCESSO] Arquivo processado com sucesso!")
@@ -483,6 +537,39 @@ def rename_merge_list(list_id, new_name):
     finally:
         conn.close()
 
+def clean_orphaned_list_items():
+    """Limpar itens órfãos de listas que não existem mais."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Encontrar itens órfãos
+    cursor.execute('''
+        SELECT mli.id, mli.merge_list_id, mli.pdf_file_id
+        FROM merge_list_items mli
+        LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+        WHERE ml.id IS NULL
+    ''')
+    orphaned_items = cursor.fetchall()
+    
+    if orphaned_items:
+        print(f"[CLEANUP] Encontrados {len(orphaned_items)} itens órfãos:")
+        for item_id, list_id, file_id in orphaned_items:
+            print(f"  - Item {item_id}: Lista {list_id} (não existe) -> Arquivo {file_id}")
+        
+        # Remover itens órfãos
+        cursor.execute('''
+            DELETE FROM merge_list_items 
+            WHERE merge_list_id NOT IN (SELECT id FROM merge_lists)
+        ''')
+        
+        conn.commit()
+        print(f"[CLEANUP] {len(orphaned_items)} itens órfãos removidos.")
+    else:
+        print("[CLEANUP] Nenhum item órfão encontrado.")
+    
+    conn.close()
+    return len(orphaned_items)
+
 def clean_database_and_files():
     """APENAS PARA ADMIN: Limpar completamente banco e arquivos."""
     if not is_admin_logged():
@@ -589,6 +676,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS merge_lists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            observations TEXT,
             created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -653,6 +741,11 @@ def init_db():
         cursor.execute('ALTER TABLE pdf_files ADD COLUMN artist TEXT')
     except sqlite3.OperationalError:
         pass
+    
+    try:
+        cursor.execute('ALTER TABLE merge_lists ADD COLUMN observations TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     # Inserir dados padrão se as tabelas estiverem vazias
     default_categories = [
@@ -771,11 +864,11 @@ def index():
     categories = [row[0] for row in cursor.fetchall()]
     
     cursor.execute('''
-        SELECT ml.id, ml.name, ml.created_date, ml.updated_date,
+        SELECT ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date,
                COUNT(mli.id) as file_count
         FROM merge_lists ml
         LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
-        GROUP BY ml.id, ml.name, ml.created_date, ml.updated_date
+        GROUP BY ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date
         ORDER BY ml.updated_date DESC
     ''')
     merge_lists = cursor.fetchall()
@@ -829,7 +922,7 @@ def upload_file():
                 
             try:
                 # Gerar nome do arquivo baseado nas informações
-                final_filename = generate_filename(song_name, artist, secure_filename(file.filename))
+                final_filename = generate_filename(song_name, artist, secure_filename(file.filename), musical_key)
                 
                 temp_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
                 file.save(temp_path)
@@ -941,7 +1034,7 @@ def upload_file():
                 
             if file and file.filename.lower().endswith('.pdf'):
                 # Gerar nome do arquivo baseado nas informações
-                final_filename = generate_filename(song_name, artist, secure_filename(file.filename))
+                final_filename = generate_filename(song_name, artist, secure_filename(file.filename), musical_key)
                 
                 temp_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
                 file.save(temp_path)
@@ -1090,11 +1183,11 @@ def merge_lists():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT ml.id, ml.name, ml.created_date, ml.updated_date,
+        SELECT ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date,
                COUNT(mli.id) as file_count
         FROM merge_lists ml
         LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
-        GROUP BY ml.id, ml.name, ml.created_date, ml.updated_date
+        GROUP BY ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date
         ORDER BY ml.updated_date DESC
     ''')
     lists = cursor.fetchall()
@@ -1144,7 +1237,7 @@ def edit_merge_list(list_id):
         list_files = []
     else:
         # Obter informações da lista existente
-        cursor.execute('SELECT id, name FROM merge_lists WHERE id = ?', (list_id,))
+        cursor.execute('SELECT id, name, observations FROM merge_lists WHERE id = ?', (list_id,))
         merge_list = cursor.fetchone()
         
         if not merge_list:
@@ -1164,7 +1257,7 @@ def edit_merge_list(list_id):
     
     # Obter todos os arquivos para adicionar com informações para filtros
     cursor.execute('''
-        SELECT id, filename, original_name, song_name, artist, category, liturgical_time 
+        SELECT id, filename, original_name, song_name, artist, category, liturgical_time, youtube_link 
         FROM pdf_files ORDER BY filename
     ''')
     all_files_raw = cursor.fetchall()
@@ -1359,7 +1452,7 @@ def merge_from_list(list_id):
 
 @app.route('/delete_merge_list/<int:list_id>', methods=['POST'])
 def delete_merge_list(list_id):
-    """Deletar lista de fusão."""
+    """Deletar lista de fusão e todos os seus itens."""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
@@ -1368,9 +1461,15 @@ def delete_merge_list(list_id):
     
     if result:
         list_name = result[0]
+        
+        # Primeiro, remover todos os itens da lista
+        cursor.execute('DELETE FROM merge_list_items WHERE merge_list_id = ?', (list_id,))
+        
+        # Depois, remover a lista
         cursor.execute('DELETE FROM merge_lists WHERE id = ?', (list_id,))
+        
         conn.commit()
-        flash(f'Lista "{list_name}" deletada')
+        flash(f'Lista "{list_name}" e todos os seus itens foram deletados')
     else:
         flash('Lista não encontrada')
     
@@ -1561,12 +1660,23 @@ def api_merge_lists():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id, name FROM merge_lists ORDER BY updated_date DESC')
+    cursor.execute('''
+        SELECT ml.id, ml.name, ml.updated_date, COUNT(mli.id) as file_count
+        FROM merge_lists ml
+        LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
+        GROUP BY ml.id, ml.name, ml.updated_date
+        ORDER BY ml.updated_date DESC
+    ''')
     lists = cursor.fetchall()
     
     conn.close()
     
-    return jsonify([{'id': row[0], 'name': row[1]} for row in lists])
+    return jsonify([{
+        'id': row[0], 
+        'name': row[1], 
+        'updated_date': row[2],
+        'file_count': row[3]
+    } for row in lists])
 
 @app.route('/api/get_youtube_link/<int:file_id>')
 def api_get_youtube_link(file_id):
@@ -1704,6 +1814,43 @@ def api_search_artists():
     artists = [row[0] for row in results]
     return jsonify({'artists': artists})
 
+@app.route('/api/create_artist', methods=['POST'])
+def api_create_artist():
+    """API para criar um novo artista."""
+    try:
+        artist_name = request.form.get('artist_name', '').strip()
+        artist_description = request.form.get('artist_description', '').strip()
+        
+        if not artist_name:
+            return jsonify({'success': False, 'message': 'Nome do artista é obrigatório'}), 400
+        
+        # Verificar se artista já existe
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM artists WHERE LOWER(name) = LOWER(?)', (artist_name,))
+        exists = cursor.fetchone()[0] > 0
+        
+        if exists:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Artista já existe no sistema'}), 400
+        
+        # Criar novo artista - usar a função já existente
+        conn.close()
+        success = create_artist(artist_name, artist_description)
+        
+        if success:
+            return jsonify({
+                'success': True, 
+                'message': 'Artista criado com sucesso',
+                'artist_name': artist_name
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Erro ao criar artista'}), 500
+        
+    except Exception as e:
+        print(f"Erro ao criar artista: {e}")
+        return jsonify({'success': False, 'message': 'Erro interno do servidor'}), 500
+
 @app.route('/api/check_duplicate', methods=['POST'])
 def api_check_duplicate():
     """API para verificar se um arquivo é duplicado baseado no hash."""
@@ -1792,12 +1939,64 @@ def admin_scan_files():
     
     changes = scan_and_fix_files()
     
+    # Preparar URL params para toasts
+    url_params = []
+    
     if changes:
-        flash(f'{len(changes)} arquivo(s) foram corrigidos!')
+        files_renamed = sum(1 for c in changes if c['old_filename'] != c['new_filename'])
+        songs_formatted = sum(1 for c in changes if c.get('song_updated', False))
+        artists_formatted = sum(1 for c in changes if c.get('artist_updated', False))
+        
+        # Toast principal
+        url_params.append(f"toast_success=✅ Escaneamento concluído! {len(changes)} arquivo(s) processados.")
+        
+        # Toasts específicos
+        if files_renamed > 0:
+            url_params.append(f"toast_info=📝 {files_renamed} arquivo(s) renomeados com novo padrão: \"Música - Tom - Artista\"")
+        
+        if songs_formatted > 0:
+            url_params.append(f"toast_info2=🎵 {songs_formatted} nome(s) de música(s) formatados em camel case")
+            
+        if artists_formatted > 0:
+            url_params.append(f"toast_info3=🎤 {artists_formatted} nome(s) de artista(s) formatados em camel case")
+        
+        # Exemplos das mudanças (sem "Exemplo:")
+        examples_shown = 0
+        example_num = 1
         for change in changes:
-            flash(f"ID {change['id']}: {change['old_filename']} → {change['new_filename']}")
+            if examples_shown >= 3:  # Limitar a 3 exemplos
+                break
+            if change['old_filename'] != change['new_filename']:
+                url_params.append(f"toast_warning{example_num}=📄 {change['old_filename']} → {change['new_filename']}")
+                examples_shown += 1
+                example_num += 1
+        
+        if files_renamed > 3:
+            url_params.append(f"toast_info4=... e mais {files_renamed - 3} arquivos renomeados")
+            
     else:
-        flash('Todos os arquivos já estão organizados corretamente!')
+        url_params.append("toast_success=✅ Todos os arquivos já estão organizados corretamente com o novo padrão!")
+    
+    # Redirecionar com parâmetros para mostrar toasts
+    redirect_url = url_for('index')
+    if url_params:
+        redirect_url += '?' + '&'.join(url_params)
+    
+    return redirect(redirect_url)
+
+@app.route('/admin/clean_orphaned_items')
+def admin_clean_orphaned_items():
+    """Rota administrativa para limpar itens órfãos de listas."""
+    if not is_admin_logged():
+        flash('Esta funcionalidade só está disponível para administradores')
+        return redirect(url_for('index'))
+    
+    orphaned_count = clean_orphaned_list_items()
+    
+    if orphaned_count > 0:
+        flash(f'{orphaned_count} item(ns) órfão(s) de listas foram removidos!')
+    else:
+        flash('Nenhum item órfão encontrado. Banco de dados já está limpo!')
     
     return redirect(url_for('index'))
 
@@ -1846,7 +2045,7 @@ def admin_debug_files():
         print(f"  Caminho: {path}")
         print(f"  Arquivo existe: {os.path.exists(path) if path else False}")
         
-        # Gerar nome ideal
+        # Gerar nome ideal (sem musical_key pois é apenas para debug)
         ideal_name = generate_filename(song, artist, filename)
         print(f"  Nome ideal: {ideal_name}")
         print(f"  Precisa renomear: {filename != ideal_name}")
@@ -1993,8 +2192,7 @@ def admin_create_password_action():
 def admin_logout():
     """Logout do admin."""
     session.pop('admin_logged', None)
-    flash('Logout realizado com sucesso')
-    return redirect(url_for('index'))
+    return redirect(url_for('index') + '?admin_logout=success')
 
 def get_merge_lists():
     """Obter todas as listas de fusão para usar nos templates."""
@@ -2110,19 +2308,22 @@ def download_merged_list(list_id):
         flash(f'Erro ao criar arquivo mesclado: {str(e)}')
         return redirect(url_for('edit_merge_list', list_id=list_id))
 
-@app.route('/rename_merge_list/<int:list_id>', methods=['POST'])
-def rename_merge_list_route(list_id):
-    """Renomear lista de fusão."""
-    new_name = request.form.get('new_name', '').strip()
+@app.route('/update_merge_list_info/<int:list_id>', methods=['POST'])
+def update_merge_list_info_route(list_id):
+    """Atualizar informações da lista (nome e observações)."""
+    new_name = request.form.get('list_name', '').strip()
+    observations = request.form.get('observations', '').strip()
     
     if not new_name:
-        flash('Nome não pode estar vazio')
+        flash('Nome da lista é obrigatório')
         return redirect(url_for('edit_merge_list', list_id=list_id))
     
-    if rename_merge_list(list_id, new_name):
-        flash(f'Lista renomeada para "{new_name}" com sucesso!')
+    success = update_merge_list_info(list_id, new_name, observations)
+    
+    if success:
+        flash('Informações da lista atualizadas com sucesso!')
     else:
-        flash('Erro ao renomear lista')
+        flash('Erro ao atualizar informações da lista')
     
     return redirect(url_for('edit_merge_list', list_id=list_id))
 
@@ -2540,6 +2741,749 @@ def api_generate_report(list_id=None):
             'message': f'Erro ao gerar relatório: {str(e)}'
         }), 500
 
+@app.route('/dashboard')
+def dashboard():
+    """Dashboard com relatórios e estatísticas das músicas e listas."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # === ESTATÍSTICAS BÁSICAS ===
+    # Total de músicas
+    cursor.execute('SELECT COUNT(*) FROM pdf_files')
+    total_musics = cursor.fetchone()[0]
+    
+    # Total de listas
+    cursor.execute('SELECT COUNT(*) FROM merge_lists')
+    total_lists = cursor.fetchone()[0]
+    
+    # Total de categorias
+    cursor.execute('SELECT COUNT(*) FROM categories')
+    total_categories = cursor.fetchone()[0]
+    
+    # Média de músicas por lista
+    if total_lists > 0:
+        cursor.execute('''
+            SELECT AVG(music_count) FROM (
+                SELECT COUNT(*) as music_count 
+                FROM merge_list_items 
+                GROUP BY merge_list_id
+            )
+        ''')
+        avg_result = cursor.fetchone()[0]
+        avg_musics_per_list = float(avg_result) if avg_result else 0.0
+    else:
+        avg_musics_per_list = 0.0
+    
+    # === DADOS PARA GRÁFICOS ===
+    # Músicas por categoria (incluindo sem categoria)
+    cursor.execute('''
+        SELECT 
+            CASE 
+                WHEN c.name IS NOT NULL THEN c.name
+                WHEN pf.category IS NOT NULL AND pf.category != '' THEN pf.category
+                ELSE 'Sem categoria'
+            END as category_name,
+            COUNT(DISTINCT pf.id) as count
+        FROM pdf_files pf
+        LEFT JOIN file_categories fc ON pf.id = fc.file_id
+        LEFT JOIN categories c ON fc.category_id = c.id
+        GROUP BY category_name
+        ORDER BY count DESC
+        LIMIT 10
+    ''')
+    categories_data = [{'name': row[0], 'count': row[1]} for row in cursor.fetchall()]
+    
+    # Músicas por tempo litúrgico (incluindo sem tempo litúrgico)
+    cursor.execute('''
+        SELECT 
+            CASE 
+                WHEN lt.name IS NOT NULL THEN lt.name
+                WHEN pf.liturgical_time IS NOT NULL AND pf.liturgical_time != '' THEN pf.liturgical_time
+                ELSE 'Sem tempo litúrgico'
+            END as liturgical_name,
+            COUNT(DISTINCT pf.id) as count
+        FROM pdf_files pf
+        LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+        LEFT JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id
+        GROUP BY liturgical_name
+        ORDER BY count DESC
+        LIMIT 10
+    ''')
+    liturgical_data = [{'name': row[0], 'count': row[1]} for row in cursor.fetchall()]
+    
+    # Uploads por mês (últimos 12 meses)
+    cursor.execute('''
+        SELECT strftime('%Y-%m', upload_date) as month_raw, COUNT(*) as count
+        FROM pdf_files
+        WHERE upload_date >= date('now', '-12 months')
+        GROUP BY strftime('%Y-%m', upload_date)
+        ORDER BY month_raw
+    ''')
+    
+    # Converter formato do mês para "Jan/25", "Fev/25", etc.
+    month_names = {
+        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+        '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+        '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+    }
+    
+    uploads_data = []
+    for row in cursor.fetchall():
+        year_month, count = row
+        if year_month:
+            year, month = year_month.split('-')
+            formatted_month = f"{month_names.get(month, month)}/{year[2:]}"
+            uploads_data.append({'month': formatted_month, 'count': count})
+    
+    # === TOP 10 MÚSICAS MAIS USADAS ===
+    cursor.execute('''
+        SELECT pf.id, pf.song_name, pf.filename, pf.artist, pf.category, COUNT(mli.id) as usage_count
+        FROM pdf_files pf
+        LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+        LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+        WHERE mli.id IS NOT NULL AND ml.id IS NOT NULL
+        GROUP BY pf.id
+        ORDER BY usage_count DESC, pf.song_name
+        LIMIT 10
+    ''')
+    most_used_musics = []
+    for row in cursor.fetchall():
+        most_used_musics.append({
+            'id': row[0],
+            'song_name': row[1],
+            'filename': row[2],
+            'artist': row[3],
+            'category': row[4],
+            'usage_count': row[5]
+        })
+    
+    # === ESTATÍSTICAS DETALHADAS ===
+    # Tamanho total dos arquivos
+    cursor.execute('SELECT SUM(file_size) FROM pdf_files WHERE file_size IS NOT NULL')
+    total_size_bytes = cursor.fetchone()[0] or 0
+    total_file_size_mb = total_size_bytes / (1024 * 1024)
+    
+    # Total de páginas
+    cursor.execute('SELECT SUM(page_count) FROM pdf_files WHERE page_count IS NOT NULL')
+    total_pages = cursor.fetchone()[0] or 0
+    
+    # Músicas com YouTube
+    cursor.execute('SELECT COUNT(*) FROM pdf_files WHERE youtube_link IS NOT NULL AND youtube_link != ""')
+    musics_with_youtube = cursor.fetchone()[0]
+    
+    # Maior lista
+    cursor.execute('''
+        SELECT ml.name, COUNT(mli.id) as count
+        FROM merge_lists ml
+        LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
+        GROUP BY ml.id
+        ORDER BY count DESC
+        LIMIT 1
+    ''')
+    largest_list_result = cursor.fetchone()
+    largest_list = {
+        'name': largest_list_result[0],
+        'count': largest_list_result[1]
+    } if largest_list_result else None
+    
+    # Categoria mais popular
+    cursor.execute('''
+        SELECT c.name, COUNT(DISTINCT fc.file_id) as count
+        FROM categories c
+        LEFT JOIN file_categories fc ON c.id = fc.category_id
+        GROUP BY c.id
+        ORDER BY count DESC
+        LIMIT 1
+    ''')
+    most_popular_cat_result = cursor.fetchone()
+    most_popular_category = {
+        'name': most_popular_cat_result[0],
+        'count': most_popular_cat_result[1]
+    } if most_popular_cat_result else None
+    
+    conn.close()
+    
+    # Converter dados para JSON para JavaScript
+    import json
+    categories_json = json.dumps(categories_data)
+    liturgical_json = json.dumps(liturgical_data)
+    uploads_json = json.dumps(uploads_data)
+    
+    return render_template('dashboard.html',
+                         total_musics=total_musics,
+                         total_lists=total_lists,
+                         total_categories=total_categories,
+                         avg_musics_per_list=avg_musics_per_list,
+                         categories_data=categories_json,
+                         liturgical_data=liturgical_json,
+                         uploads_data=uploads_json,
+                         most_used_musics=most_used_musics,
+                         total_file_size_mb=total_file_size_mb,
+                         total_pages=total_pages,
+                         musics_with_youtube=musics_with_youtube,
+                         largest_list=largest_list,
+                                                   most_popular_category=most_popular_category)
+
+@app.route('/api/dashboard/top_by_categories')
+def api_dashboard_top_by_categories():
+    """API para obter top 5 músicas por categoria."""
+    selected_categories = request.args.getlist('categories')
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Se não especificou categorias, buscar todas
+    if not selected_categories:
+        cursor.execute('SELECT name FROM categories ORDER BY name')
+        selected_categories = [row[0] for row in cursor.fetchall()]
+        # Adicionar também "Sem categoria"
+        selected_categories.append('Sem categoria')
+    
+    results = {}
+    
+    for category in selected_categories:
+        if category == 'Sem categoria':
+            # Buscar músicas sem categoria
+            cursor.execute('''
+                SELECT pf.id, pf.song_name, pf.filename, pf.artist, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_categories fc ON pf.id = fc.file_id
+                WHERE (pf.category IS NULL OR pf.category = '' OR pf.category = 'Diversos') 
+                  AND fc.file_id IS NULL
+                  AND ml.id IS NOT NULL
+                GROUP BY pf.id
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''')
+        else:
+            # Buscar músicas da categoria específica
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_categories fc ON pf.id = fc.file_id
+                LEFT JOIN categories c ON fc.category_id = c.id
+                WHERE (pf.category = ? OR c.name = ?)
+                  AND ml.id IS NOT NULL
+                GROUP BY pf.id
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''', (category, category))
+        
+        musics = []
+        for row in cursor.fetchall():
+            if row[4] > 0:  # Só incluir se foi usada em pelo menos 1 lista
+                musics.append({
+                    'id': row[0],
+                    'song_name': row[1],
+                    'filename': row[2],
+                    'artist': row[3],
+                    'usage_count': row[4]
+                })
+        
+        if musics:  # Só adicionar categoria se tem músicas
+            results[category] = musics
+    
+    conn.close()
+    return jsonify(results)
+
+@app.route('/api/dashboard/top_by_liturgical_times')
+def api_dashboard_top_by_liturgical_times():
+    """API para obter top 5 músicas por tempo litúrgico."""
+    selected_times = request.args.getlist('liturgical_times')
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Se não especificou tempos, buscar todos
+    if not selected_times:
+        cursor.execute('SELECT name FROM liturgical_times ORDER BY name')
+        selected_times = [row[0] for row in cursor.fetchall()]
+        # Adicionar também "Sem tempo litúrgico"
+        selected_times.append('Sem tempo litúrgico')
+    
+    results = {}
+    
+    for liturgical_time in selected_times:
+        if liturgical_time == 'Sem tempo litúrgico':
+            # Buscar músicas sem tempo litúrgico
+            cursor.execute('''
+                SELECT pf.id, pf.song_name, pf.filename, pf.artist, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+                WHERE (pf.liturgical_time IS NULL OR pf.liturgical_time = '')
+                  AND flt.file_id IS NULL
+                  AND ml.id IS NOT NULL
+                GROUP BY pf.id
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''')
+        else:
+            # Buscar músicas do tempo litúrgico específico
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+                LEFT JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id
+                WHERE (pf.liturgical_time = ? OR lt.name = ?)
+                  AND ml.id IS NOT NULL
+                GROUP BY pf.id
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''', (liturgical_time, liturgical_time))
+        
+        musics = []
+        for row in cursor.fetchall():
+            if row[4] > 0:  # Só incluir se foi usada em pelo menos 1 lista
+                musics.append({
+                    'id': row[0],
+                    'song_name': row[1],
+                    'filename': row[2],
+                    'artist': row[3],
+                    'usage_count': row[4]
+                })
+        
+        if musics:  # Só adicionar tempo se tem músicas
+            results[liturgical_time] = musics
+    
+    conn.close()
+    return jsonify(results)
+
+@app.route('/api/dashboard/get_categories')
+def api_dashboard_get_categories():
+    """API para obter lista de todas as categorias."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT name FROM categories ORDER BY name')
+    categories = [row[0] for row in cursor.fetchall()]
+    
+    # Verificar se existem músicas sem categoria
+    cursor.execute('''
+        SELECT COUNT(*) FROM pdf_files pf
+        LEFT JOIN file_categories fc ON pf.id = fc.file_id
+        WHERE (pf.category IS NULL OR pf.category = '' OR pf.category = 'Diversos') 
+          AND fc.file_id IS NULL
+    ''')
+    
+    if cursor.fetchone()[0] > 0:
+        categories.append('Sem categoria')
+    
+    conn.close()
+    return jsonify(categories)
+
+@app.route('/api/dashboard/get_liturgical_times')
+def api_dashboard_get_liturgical_times():
+    """API para obter lista de todos os tempos litúrgicos."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT name FROM liturgical_times ORDER BY name')
+    times = [row[0] for row in cursor.fetchall()]
+    
+    # Verificar se existem músicas sem tempo litúrgico
+    cursor.execute('''
+        SELECT COUNT(*) FROM pdf_files pf
+        LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+        WHERE (pf.liturgical_time IS NULL OR pf.liturgical_time = '')
+          AND flt.file_id IS NULL
+    ''')
+    
+    if cursor.fetchone()[0] > 0:
+        times.append('Sem tempo litúrgico')
+    
+    conn.close()
+    return jsonify(times)
+
+def update_merge_list_info(list_id, new_name, observations):
+    """Atualizar informações da lista de fusão (nome e observações)."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE merge_lists 
+            SET name = ?, observations = ?, updated_date = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        ''', (new_name, observations, list_id))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+@app.route('/api/dashboard/pivot_categories')
+def api_dashboard_pivot_categories():
+    """API para obter relatório pivot de categorias (formato tabular linear)."""
+    selected_categories = request.args.getlist('categories')
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Se não especificou categorias, buscar todas
+    if not selected_categories:
+        cursor.execute('SELECT name FROM categories ORDER BY name')
+        selected_categories = [row[0] for row in cursor.fetchall()]
+        # Adicionar também "Sem categoria"
+        selected_categories.append('Sem categoria')
+    
+    # Buscar músicas com suas informações para cada categoria
+    results = []
+    
+    for category in selected_categories:
+        if category == 'Sem categoria':
+            # Buscar músicas sem categoria
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, 
+                       pf.musical_key, pf.youtube_link, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_categories fc ON pf.id = fc.file_id
+                WHERE (pf.category IS NULL OR pf.category = '' OR pf.category = 'Diversos') 
+                  AND fc.file_id IS NULL
+                GROUP BY pf.id, pf.song_name, pf.filename, pf.artist, pf.musical_key, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+            ''')
+        else:
+            # Buscar músicas da categoria específica
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, 
+                       pf.musical_key, pf.youtube_link, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_categories fc ON pf.id = fc.file_id
+                LEFT JOIN categories c ON fc.category_id = c.id
+                WHERE (pf.category = ? OR c.name = ?)
+                GROUP BY pf.id, pf.song_name, pf.filename, pf.artist, pf.musical_key, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+            ''', (category, category))
+        
+        for row in cursor.fetchall():
+            music_name = row[1] if row[1] and row[1].strip() else row[2].replace('.pdf', '')
+            artist = row[3] if row[3] and row[3].strip() else 'Não informado'
+            musical_key = row[4] if row[4] and row[4].strip() else '-'
+            youtube_link = row[5] if row[5] and row[5].strip() else ''
+            usage_count = row[6]
+            
+            results.append({
+                'id': row[0],
+                'music_name': music_name,
+                'artist': artist,
+                'category': category,
+                'musical_key': musical_key,
+                'youtube_link': youtube_link,
+                'usage_count': usage_count
+            })
+    
+    conn.close()
+    
+    # Ordenar por contagem de uso (decrescente) e depois por nome
+    results.sort(key=lambda x: (-x['usage_count'], x['music_name']))
+    
+    return jsonify(results)
+
+@app.route('/api/dashboard/pivot_liturgical')
+def api_dashboard_pivot_liturgical():
+    """API para obter relatório pivot de tempos litúrgicos (formato tabular linear)."""
+    selected_times = request.args.getlist('liturgical_times')
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Se não especificou tempos, buscar todos
+    if not selected_times:
+        cursor.execute('SELECT name FROM liturgical_times ORDER BY name')
+        selected_times = [row[0] for row in cursor.fetchall()]
+        # Adicionar também "Sem tempo litúrgico"
+        selected_times.append('Sem tempo litúrgico')
+    
+    # Buscar músicas com suas informações para cada tempo litúrgico
+    results = []
+    
+    for liturgical_time in selected_times:
+        if liturgical_time == 'Sem tempo litúrgico':
+            # Buscar músicas sem tempo litúrgico
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, 
+                       pf.musical_key, pf.youtube_link, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+                WHERE (pf.liturgical_time IS NULL OR pf.liturgical_time = '')
+                  AND flt.file_id IS NULL
+                GROUP BY pf.id, pf.song_name, pf.filename, pf.artist, pf.musical_key, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+            ''')
+        else:
+            # Buscar músicas do tempo litúrgico específico
+            cursor.execute('''
+                SELECT DISTINCT pf.id, pf.song_name, pf.filename, pf.artist, 
+                       pf.musical_key, pf.youtube_link, COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                LEFT JOIN merge_lists ml ON mli.merge_list_id = ml.id
+                LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id
+                LEFT JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id
+                WHERE (pf.liturgical_time = ? OR lt.name = ?)
+                GROUP BY pf.id, pf.song_name, pf.filename, pf.artist, pf.musical_key, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+            ''', (liturgical_time, liturgical_time))
+        
+        for row in cursor.fetchall():
+            music_name = row[1] if row[1] and row[1].strip() else row[2].replace('.pdf', '')
+            artist = row[3] if row[3] and row[3].strip() else 'Não informado'
+            musical_key = row[4] if row[4] and row[4].strip() else '-'
+            youtube_link = row[5] if row[5] and row[5].strip() else ''
+            usage_count = row[6]
+            
+            results.append({
+                'id': row[0],
+                'music_name': music_name,
+                'artist': artist,
+                'liturgical_time': liturgical_time,
+                'musical_key': musical_key,
+                'youtube_link': youtube_link,
+                'usage_count': usage_count
+            })
+    
+    conn.close()
+    
+    # Ordenar por contagem de uso (decrescente) e depois por nome
+    results.sort(key=lambda x: (-x['usage_count'], x['music_name']))
+    
+    return jsonify(results)
+
+@app.route('/api/dashboard/liturgical_top_by_categories/<liturgical_time>')
+def api_dashboard_liturgical_top_by_categories(liturgical_time):
+    """API para obter top 5 músicas por categoria dentro de um tempo litúrgico específico."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    # Buscar todas as categorias que têm músicas neste tempo litúrgico
+    cursor.execute('''
+        SELECT DISTINCT 
+            CASE 
+                WHEN pf.category IS NOT NULL AND pf.category != '' THEN pf.category
+                ELSE 'Sem categoria'
+            END as category
+        FROM pdf_files pf
+        WHERE pf.liturgical_time = ? OR pf.id IN (
+            SELECT flt.file_id 
+            FROM file_liturgical_times flt 
+            JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id 
+            WHERE lt.name = ?
+        )
+        ORDER BY category
+    ''', (liturgical_time, liturgical_time))
+    
+    categories = [row[0] for row in cursor.fetchall()]
+    
+    result = {}
+    
+    for category in categories:
+        if category == 'Sem categoria':
+            # Buscar músicas sem categoria neste tempo litúrgico
+            cursor.execute('''
+                SELECT pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link,
+                       COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                WHERE (pf.category IS NULL OR pf.category = '') 
+                  AND (pf.liturgical_time = ? OR pf.id IN (
+                      SELECT flt.file_id 
+                      FROM file_liturgical_times flt 
+                      JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id 
+                      WHERE lt.name = ?
+                  ))
+                GROUP BY pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''', (liturgical_time, liturgical_time))
+        else:
+            # Buscar músicas desta categoria neste tempo litúrgico
+            cursor.execute('''
+                SELECT pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link,
+                       COUNT(mli.id) as usage_count
+                FROM pdf_files pf
+                LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+                WHERE (pf.category = ? OR pf.id IN (
+                          SELECT fc.file_id 
+                          FROM file_categories fc 
+                          JOIN categories c ON fc.category_id = c.id 
+                          WHERE c.name = ?
+                      ))
+                  AND (pf.liturgical_time = ? OR pf.id IN (
+                          SELECT flt.file_id 
+                          FROM file_liturgical_times flt 
+                          JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id 
+                          WHERE lt.name = ?
+                      ))
+                GROUP BY pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link
+                ORDER BY usage_count DESC, pf.song_name
+                LIMIT 5
+            ''', (category, category, liturgical_time, liturgical_time))
+        
+        musics = []
+        for row in cursor.fetchall():
+            music_id, song_name, original_name, artist, youtube_link, usage_count = row
+            musics.append({
+                'id': music_id,
+                'name': song_name or original_name,
+                'artist': artist or 'Não informado',
+                'youtube_link': youtube_link,
+                'usage_count': usage_count
+            })
+        
+        if musics:  # Só adicionar categorias que têm músicas
+            result[category] = musics
+    
+    conn.close()
+    return jsonify(result)
+
+@app.route('/api/dashboard/category_top_musics/<category>')
+def api_dashboard_category_top_musics(category):
+    """API para obter top 5 músicas de uma categoria específica."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    if category == 'Sem categoria':
+        # Buscar músicas sem categoria
+        cursor.execute('''
+            SELECT pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link,
+                   pf.liturgical_time, COUNT(mli.id) as usage_count
+            FROM pdf_files pf
+            LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+            WHERE (pf.category IS NULL OR pf.category = '')
+            GROUP BY pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link, pf.liturgical_time
+            ORDER BY usage_count DESC, pf.song_name
+            LIMIT 5
+        ''')
+    else:
+        # Buscar músicas desta categoria
+        cursor.execute('''
+            SELECT pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link,
+                   pf.liturgical_time, COUNT(mli.id) as usage_count
+            FROM pdf_files pf
+            LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+            WHERE pf.category = ? OR pf.id IN (
+                SELECT fc.file_id 
+                FROM file_categories fc 
+                JOIN categories c ON fc.category_id = c.id 
+                WHERE c.name = ?
+            )
+            GROUP BY pf.id, pf.song_name, pf.original_name, pf.artist, pf.youtube_link, pf.liturgical_time
+            ORDER BY usage_count DESC, pf.song_name
+            LIMIT 5
+        ''', (category, category))
+    
+    musics = []
+    for row in cursor.fetchall():
+        music_id, song_name, original_name, artist, youtube_link, liturgical_time, usage_count = row
+        musics.append({
+            'id': music_id,
+            'name': song_name or original_name,
+            'artist': artist or 'Não informado',
+            'youtube_link': youtube_link,
+            'liturgical_time': liturgical_time or 'Não informado',
+            'usage_count': usage_count
+        })
+    
+    conn.close()
+    return jsonify(musics)
+
+@app.route('/api/dashboard/top_musics')
+def api_dashboard_top_musics():
+    """API para obter top músicas mais utilizadas em listas."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            pf.id,
+            COALESCE(pf.song_name, pf.original_name) as name,
+            COALESCE(pf.artist, 'Não informado') as artist,
+            COALESCE(pf.category, 'Sem categoria') as category,
+            pf.youtube_link,
+            COUNT(mli.id) as usage_count
+        FROM pdf_files pf
+        LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+        GROUP BY pf.id, pf.song_name, pf.original_name, pf.artist, pf.category, pf.youtube_link
+        HAVING usage_count > 0
+        ORDER BY usage_count DESC, name
+        LIMIT 10
+    ''')
+    
+    results = []
+    for row in cursor.fetchall():
+        file_id, name, artist, category, youtube_link, usage_count = row
+        results.append({
+            'id': file_id,
+            'name': name,
+            'artist': artist,
+            'category': category,
+            'youtube_link': youtube_link,
+            'usage_count': usage_count
+        })
+    
+    conn.close()
+    return jsonify(results)
+
+@app.route('/api/dashboard/top_artists')
+def api_dashboard_top_artists():
+    """API para obter top 10 artistas com mais músicas."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            artist,
+            COUNT(*) as music_count
+        FROM pdf_files 
+        WHERE artist IS NOT NULL AND artist != '' AND artist != 'Não informado'
+        GROUP BY artist
+        ORDER BY music_count DESC, artist ASC
+        LIMIT 10
+    ''')
+    
+    results = []
+    for row in cursor.fetchall():
+        artist, music_count = row
+        results.append({
+            'artist': artist,
+            'music_count': music_count
+        })
+    
+    conn.close()
+    return jsonify(results)
+
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    print("="*60)
+    print("🎵 SISTEMA MÚSICAS IGREJA - SERVIDOR INICIADO 🎵")
+    print("="*60)
+    print()
+    print("📍 Acesse o sistema através dos seguintes endereços:")
+    print("   • http://localhost:5000")
+    print("   • http://127.0.0.1:5000") 
+    print("   • http://musicas-igreja.local:5000")
+    print("   • http://192.168.15.11:5000 (rede local)")
+    print()
+    print("🔧 Para configurar o domínio customizado:")
+    print("   1. Execute como Administrador: start_musicas_igreja.bat")
+    print("   2. Ou siga as instruções no README")
+    print()
+    print("⏹️  Para parar o servidor: Ctrl+C")
+    print("="*60)
+    print()
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)

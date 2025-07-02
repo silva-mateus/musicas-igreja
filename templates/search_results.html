@@ -3,51 +3,78 @@
 {% block title %}Resultados da Busca - Organizador de Música Litúrgica{% endblock %}
 
 {% block content %}
+<style>
+/* Aplicar cores dos botões aos itens do dropdown mobile - Versão corrigida */
+.actions-dropdown-item.btn-info-style {
+    color: #17a2b8 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-info-style:hover {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-primary-style {
+    color: #007bff !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-primary-style:hover {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-danger-style {
+    color: #dc3545 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-danger-style:hover {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-warning-style {
+    color: #ffc107 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-warning-style:hover {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.actions-dropdown-item.btn-success-style {
+    color: #28a745 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-success-style:hover {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+</style>
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1><i class="fas fa-search"></i> Resultados da Busca</h1>
-                    {% if query and selected_category and selected_liturgical %}
-                        <p class="text-muted">
-                            Resultados para "<strong>{{ query }}</strong>" em "<strong>{{ selected_category }}</strong>" - "<strong>{{ selected_liturgical }}</strong>"
-                        </p>
-                    {% elif query and selected_category %}
-                        <p class="text-muted">
-                            Resultados para "<strong>{{ query }}</strong>" na categoria "<strong>{{ selected_category }}</strong>"
-                        </p>
-                    {% elif query and selected_liturgical %}
-                        <p class="text-muted">
-                            Resultados para "<strong>{{ query }}</strong>" no tempo "<strong>{{ selected_liturgical }}</strong>"
-                        </p>
-                    {% elif query %}
-                        <p class="text-muted">Resultados para "<strong>{{ query }}</strong>"</p>
-                    {% elif selected_category %}
-                        <p class="text-muted">Músicas na categoria "<strong>{{ selected_category }}</strong>"</p>
-                    {% elif selected_liturgical %}
-                        <p class="text-muted">Músicas do tempo "<strong>{{ selected_liturgical }}</strong>"</p>
-                    {% endif %}
-                    <p class="small text-muted">{{ files|length }} música(s) encontrada(s)</p>
-                </div>
-                <div>
-                    <!-- View Mode Toggle -->
-                    <div class="btn-group me-2" role="group">
-                        <a href="{{ url_for('search', q=query, category=selected_category, liturgical_time=selected_liturgical, view='card') }}" 
-                           class="btn btn-outline-secondary {% if request.args.get('view', 'card') == 'card' %}active{% endif %}">
-                            <i class="fas fa-th-large"></i> Cards
-                        </a>
-                        <a href="{{ url_for('search', q=query, category=selected_category, liturgical_time=selected_liturgical, view='list') }}" 
-                           class="btn btn-outline-secondary {% if request.args.get('view', 'card') == 'list' %}active{% endif %}">
-                            <i class="fas fa-list"></i> Lista
-                        </a>
-                    </div>
-                    
+                <h1><i class="fas fa-search"></i> Resultados da Busca</h1>
+                <button type="button" class="btn btn-outline-secondary" onclick="goBack()">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </button>
+            </div>
+        </div>
+    </div>
 
-                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Voltar para Todas
-                    </a>
-                </div>
+    <!-- Search Query Display -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> 
+                Resultados para: <strong>"{{ query }}"</strong> 
+                ({{ files|length }} música(s) encontrada(s))
             </div>
         </div>
     </div>
@@ -127,7 +154,7 @@
                             {% else %}
                             <div class="text-center py-4">
                                 <i class="fas fa-info-circle fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">Nenhuma lista de fusão criada ainda.</p>
+                                <p class="text-muted">Nenhuma lista de música criada ainda.</p>
                                 <small class="text-muted">Crie sua primeira lista na aba "Criar Nova Lista".</small>
                             </div>
                             {% endif %}
@@ -138,232 +165,153 @@
         </div>
     </div>
 
-    <!-- Advanced Search Form -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title"><i class="fas fa-filter"></i> Filtros de Busca</h6>
-                    
-                    <!-- Search Input -->
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <label for="dynamicSearch" class="form-label">Buscar Músicas</label>
-                            <input type="text" class="form-control" id="dynamicSearch" 
-                                   placeholder="Digite o nome da música, artista ou descrição..." 
-                                   value="{{ query }}">
-                            <div class="form-text">
-                                <small>A busca é atualizada automaticamente conforme você digita</small>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <!-- Categories Filter -->
-                        <div class="col-md-6">
-                            <label class="form-label">Categorias</label>
-                            <div class="border p-3 rounded" style="max-height: 200px; overflow-y: auto;">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="category-all" 
-                                           onchange="toggleAllCategories()" checked>
-                                    <label class="form-check-label fw-bold" for="category-all">
-                                        Todas as Categorias
-                                    </label>
-                                </div>
-                                <hr class="my-2">
-                                {% for category in categories %}
-                                    <div class="form-check">
-                                        <input class="form-check-input category-filter" type="checkbox" 
-                                               id="cat-{{ loop.index }}" value="{{ category }}" 
-                                               onchange="applyFilters()"
-                                               {% if category == selected_category %}checked{% endif %}>
-                                        <label class="form-check-label" for="cat-{{ loop.index }}">
-                                            {{ category }}
-                                        </label>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        
-                        <!-- Liturgical Times Filter -->
-                        <div class="col-md-6">
-                            <label class="form-label">Tempos Litúrgicos</label>
-                            <div class="border p-3 rounded" style="max-height: 200px; overflow-y: auto;">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="liturgical-all" 
-                                           onchange="toggleAllLiturgical()" checked>
-                                    <label class="form-check-label fw-bold" for="liturgical-all">
-                                        Todos os Tempos
-                                    </label>
-                                </div>
-                                <hr class="my-2">
-                                {% for time in liturgical_times %}
-                                    <div class="form-check">
-                                        <input class="form-check-input liturgical-filter" type="checkbox" 
-                                               id="lit-{{ loop.index }}" value="{{ time }}" 
-                                               onchange="applyFilters()"
-                                               {% if time == selected_liturgical %}checked{% endif %}>
-                                        <label class="form-check-label" for="lit-{{ loop.index }}">
-                                            {{ time }}
-                                        </label>
-                                    </div>
-                                {% endfor %}
-                                {% if not liturgical_times %}
-                                    <div class="text-muted small">
-                                        Nenhum tempo litúrgico definido
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Pagination controls -->
-                    <div class="row mt-3">
-                        <div class="col-md-6">
-                            <label for="per_page" class="form-label">Resultados por página</label>
-                            <select class="form-select" id="per_page" onchange="applyFilters()">
-                                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
-                                <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25</option>
-                                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <div class="text-muted">
-                                <span id="resultsCount">Carregando...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Results -->
+    <!-- Search Results -->
     {% if files %}
+        {% set view_mode = request.args.get('view', 'list') %}
+        
         {% if view_mode == 'list' %}
             <!-- List View -->
             <div class="row">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header">
-                            <h6 class="mb-0">Músicas ({{ files|length }})</h6>
+                            <h6 class="mb-0">Resultados da Busca ({{ files|length }})</h6>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
+                        <!-- Desktop Table View -->
+                        <div class="table-responsive music-table-responsive">
+                            <table class="table table-hover mb-0 music-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width: 50px;">
                                             <input type="checkbox" class="form-check-input" id="selectAll" 
                                                    onchange="toggleSelectAll()">
                                         </th>
-                                        <th>Música / Artista</th>
+                                        <th>Música</th>
+                                        <th>Artista</th>
                                         <th>Categoria</th>
-                                        <th>Tom</th>
-                                        <th>Tempo Litúrgico</th>
-                                        <th>Páginas</th>
-                                        <th>Data</th>
-                                        <th style="width: 180px;">Ações</th>
+                                        <th class="d-none-mobile">Tom</th>
+                                        <th class="d-none-mobile">Tempo Litúrgico</th>
+                                        <th style="width: 120px;">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for file in files %}
-                                        <tr class="music-card"
-                                            data-search="{{ (file[1] + ' ' + (file[2] or '') + ' ' + (file[3] or '') + ' ' + (file[4] or ''))|lower }}"
-                                            data-category="{{ file[5] }}"
-                                            data-liturgical="{{ file[6] or '' }}">
+                                        <tr>
                                             <td>
                                                 <input type="checkbox" class="form-check-input file-selector" 
                                                        name="selected_files" value="{{ file[0] }}" 
                                                        onchange="updateBulkSelection()">
                                             </td>
                                             <td>
-                                                <div class="d-flex align-items-center">
-                                                    <i class="fas fa-file-pdf text-danger me-2"></i>
-                                                    <div>
-                                                        {% if file[3] %}
-                                                            <strong>{{ file[3] }}</strong><br>
-                                                        {% endif %}
-                                                        {% if file[4] %}
-                                                            <small class="text-muted">por {{ file[4] }}</small><br>
-                                                        {% endif %}
-                                                        <small class="text-muted">{{ file[2] }}</small>
-                                                        {% if file[8] %}
-                                                            <a href="{{ file[8] }}" target="_blank" class="ms-2">
-                                                                <i class="fab fa-youtube text-danger"></i>
-                                                            </a>
-                                                        {% endif %}
-                                                    </div>
+                                                <div>
+                                                    {% if file[3] %}
+                                                        <strong>{{ file[3] }}</strong>
+                                                    {% else %}
+                                                        <span class="text-muted">{{ file[2] }}</span>
+                                                    {% endif %}
                                                 </div>
                                             </td>
-                                            <td><span class="badge bg-primary">{{ file[5] }}</span></td>
                                             <td>
+                                                {% if file[4] %}
+                                                    <span>{{ file[4] }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if file[13] %}
+                                                    {% for category in file[13] %}
+                                                        <span class="badge bg-primary me-1 mb-1">{{ category }}</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="d-none-mobile">
                                                 {% if file[7] %}
                                                     <span class="badge bg-success">{{ file[7] }}</span>
                                                 {% else %}
                                                     <span class="text-muted">-</span>
                                                 {% endif %}
                                             </td>
-                                            <td>
-                                                {% if file[6] %}
-                                                    <span class="badge bg-info">{{ file[6] }}</span>
+                                            <td class="d-none-mobile">
+                                                {% if file[14] %}
+                                                    {% for liturgical_time in file[14] %}
+                                                        <span class="badge bg-info me-1 mb-1">{{ liturgical_time }}</span>
+                                                    {% endfor %}
                                                 {% else %}
                                                     <span class="text-muted">-</span>
                                                 {% endif %}
                                             </td>
-                                            <td>{{ file[11] or '-' }}</td>
-                                            <td><small>{{ file[10][:16] if file[10] else '-' }}</small></td>
+
                                             <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    <a href="{{ url_for('music_details', file_id=file[0]) }}" 
-                                                                                                   class="btn btn-outline-info btn-sm action-btn" title="Detalhes">
-                                            <i class="fas fa-info-circle"></i>
-                                        </a>
-                                                    
-                                                    <!-- Add to List Dropdown for List View -->
-                                                    {% if merge_lists %}
-                                                    <div class="btn-group" role="group">
-                                                        <button type="button" class="btn btn-outline-warning btn-sm dropdown-toggle" 
-                                                                data-bs-toggle="dropdown" aria-expanded="false" title="Adicionar à Lista">
-                                                            <i class="fas fa-plus"></i>
-                                                        </button>
-                                                        <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                                                            <div class="px-3 py-2">
-                                                                <input type="text" class="form-control form-control-sm" 
-                                                                       placeholder="Buscar lista..." 
-                                                                       onkeyup="filterDropdownLists(this, 'dropdown-list-{{ file[0] }}')">
-                                                            </div>
-                                                            <div class="dropdown-divider"></div>
-                                                            <div id="dropdown-list-{{ file[0] }}" style="max-height: 200px; overflow-y: auto;">
-                                                                {% for list in merge_lists %}
-                                                                <div class="dropdown-list-item" data-name="{{ list[1] | lower }}">
-                                                                    <form method="POST" action="{{ url_for('add_song_to_list', file_id=file[0], list_id=list[0]) }}" style="display: inline;">
-                                                                        <button type="submit" class="dropdown-item">
-                                                                            <i class="fas fa-list text-primary"></i> {{ list[1] }}
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                                {% endfor %}
-                                                            </div>
-                                                        </div>
+                                                <!-- Dropdown de ações customizado -->
+                                                <div class="actions-dropdown d-md-none">
+                                                    <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('actions-{{ file[0] }}', event)">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div class="actions-dropdown-menu" id="actions-{{ file[0] }}">
+                                                        <a href="{{ url_for('music_details', file_id=file[0]) }}" class="actions-dropdown-item btn-info-style">
+                                                            <i class="fas fa-info-circle"></i> Detalhes
+                                                        </a>
+                                                        <a href="{{ url_for('view_file', file_id=file[0]) }}" target="_blank" class="actions-dropdown-item btn-primary-style">
+                                                            <i class="fas fa-eye"></i> Visualizar PDF
+                                                        </a>
+                                                        {% if file[8] %}
+                                                            <a href="{{ file[8] }}" target="_blank" class="actions-dropdown-item btn-danger-style">
+                                                                <i class="fab fa-youtube"></i> YouTube
+                                                            </a>
+                                                        {% endif %}
+                                                        <a href="{{ url_for('download_file', file_id=file[0]) }}" class="actions-dropdown-item btn-warning-style">
+                                                            <i class="fas fa-download"></i> Baixar PDF
+                                                        </a>
+                                                        {% if merge_lists %}
+                                                            <button type="button" class="actions-dropdown-item btn-success-style" onclick="showAddToListModal({{ file[0] }})">
+                                                                <i class="fas fa-plus"></i> Adicionar à Lista
+                                                            </button>
+                                                        {% endif %}
+                                                        <a href="#" onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" class="actions-dropdown-item btn-danger-style">
+                                                            <i class="fas fa-trash"></i> Deletar
+                                                        </a>
                                                     </div>
+                                                </div>
+                                                
+                                                <!-- Botões individuais para desktop -->
+                                                <div class="btn-group btn-group-sm d-none d-md-flex">
+                                                    <a href="{{ url_for('music_details', file_id=file[0]) }}" 
+                                                       class="btn btn-outline-info action-btn" title="Detalhes">
+                                                        <i class="fas fa-info-circle"></i>
+                                                    </a>
+                                                    
+                                                    <!-- Add to List Button -->
+                                                    {% if merge_lists %}
+                                                        <button type="button" class="btn btn-outline-success action-btn" 
+                                                                onclick="showAddToListModal({{ file[0] }})" title="Adicionar à Lista">
+                                                            <i class="fas fa-plus"></i> 
+                                                        </button>
                                                     {% endif %}
                                                     
-                                                                                            <a href="{{ url_for('view_file', file_id=file[0]) }}" 
-                                           class="btn btn-outline-primary btn-sm action-btn" target="_blank" title="Ver PDF">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        
-                                        {% if file[8] %}
-                                            <a href="{{ file[8] }}" 
-                                               class="btn btn-outline-danger btn-sm action-btn" target="_blank" title="Ouvir no YouTube">
-                                                <i class="fab fa-youtube"></i>
-                                            </a>
-                                        {% else %}
-                                            <button class="btn btn-outline-danger btn-sm action-btn" disabled title="YouTube não disponível">
-                                                <i class="fab fa-youtube"></i>
-                                            </button>
-                                        {% endif %}
-                                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                                    <a href="{{ url_for('view_file', file_id=file[0]) }}" 
+                                                       class="btn btn-outline-primary action-btn" target="_blank" title="Visualizar PDF">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    
+                                                    {% if file[8] %}
+                                                        <a href="{{ file[8] }}" 
+                                                           class="btn btn-outline-danger action-btn" target="_blank" title="Ouvir no YouTube">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </a>
+                                                    {% else %}
+                                                        <button class="btn btn-outline-danger action-btn" disabled title="YouTube não disponível">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </button>
+                                                    {% endif %}
+                                                    
+                                                    <a href="{{ url_for('download_file', file_id=file[0]) }}" 
+                                                       class="btn btn-outline-warning action-btn" title="Baixar PDF">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                    <button type="button" class="btn btn-outline-danger action-btn"
                                                             onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" title="Deletar">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
@@ -374,6 +322,83 @@
                                 </tbody>
                             </table>
                         </div>
+                        
+                        <!-- Mobile Cards View -->
+                        <div class="music-cards-mobile">
+                            {% for file in files %}
+                                <div class="music-card-mobile">
+                                    <div class="checkbox-section">
+                                        <input type="checkbox" class="form-check-input file-selector" 
+                                               name="selected_files" value="{{ file[0] }}" 
+                                               onchange="updateBulkSelection()">
+                                    </div>
+                                    
+                                    <div class="info-section">
+                                        <div class="music-title">
+                                            {% if file[3] %}
+                                                {{ file[3] }}
+                                            {% else %}
+                                                {{ file[2] }}
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if file[4] %}
+                                            <div class="music-artist">por {{ file[4] }}</div>
+                                        {% endif %}
+                                        
+                                        <div class="music-badges">
+                                            {% if file[13] %}
+                                                {% for category in file[13] %}
+                                                    <span class="badge bg-primary">{{ category }}</span>
+                                                {% endfor %}
+                                            {% endif %}
+                                            
+                                            {% if file[7] %}
+                                                <span class="badge bg-success">{{ file[7] }}</span>
+                                            {% endif %}
+                                            
+                                            {% if file[14] %}
+                                                {% for liturgical_time in file[14] %}
+                                                    <span class="badge bg-info">{{ liturgical_time }}</span>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="actions-section">
+                                        <div class="actions-dropdown">
+                                            <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('mobile-actions-{{ file[0] }}', event)">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="actions-dropdown-menu" id="mobile-actions-{{ file[0] }}">
+                                                <a href="{{ url_for('music_details', file_id=file[0]) }}" class="actions-dropdown-item btn-info-style">
+                                                    <i class="fas fa-info-circle"></i> Detalhes
+                                                </a>
+                                                <a href="{{ url_for('view_file', file_id=file[0]) }}" target="_blank" class="actions-dropdown-item btn-primary-style">
+                                                    <i class="fas fa-eye"></i> Visualizar PDF
+                                                </a>
+                                                {% if file[8] %}
+                                                    <a href="{{ file[8] }}" target="_blank" class="actions-dropdown-item btn-danger-style">
+                                                        <i class="fab fa-youtube"></i> YouTube
+                                                    </a>
+                                                {% endif %}
+                                                {% if merge_lists %}
+                                                    <button type="button" class="actions-dropdown-item btn-success-style" onclick="showAddToListModal({{ file[0] }})">
+                                                        <i class="fas fa-plus"></i> Adicionar à Lista
+                                                    </button>
+                                                {% endif %}
+                                                <a href="{{ url_for('download_file', file_id=file[0]) }}" class="actions-dropdown-item btn-warning-style">
+                                                    <i class="fas fa-download"></i> Baixar PDF
+                                                </a>
+                                                <a href="#" onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" class="actions-dropdown-item btn-danger-style">
+                                                    <i class="fas fa-trash"></i> Deletar
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -381,133 +406,127 @@
             <!-- Card View -->
             <div class="row">
                 {% for file in files %}
-                    <div class="col-lg-4 col-md-6 mb-4 music-card" 
-                         data-search="{{ (file[1] + ' ' + (file[2] or '') + ' ' + (file[3] or '') + ' ' + (file[4] or ''))|lower }}"
-                         data-category="{{ file[5] }}"
-                         data-liturgical="{{ file[6] or '' }}">
-                        <div class="card file-card h-100">
-                            <div class="card-body">
-                                <!-- Bulk selection checkbox -->
-                                <div class="d-flex justify-content-end mb-2">
-                                    <input type="checkbox" class="form-check-input file-selector" 
-                                           name="selected_files" value="{{ file[0] }}" 
-                                           onchange="updateBulkSelection()">
-                                </div>
-                                
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title text-truncate" title="{{ file[3] or file[2] }}">
-                                        <i class="fas fa-file-pdf text-danger"></i>
-                                        {% if file[3] %}
-                                            {{ file[3][:30] }}{% if file[3]|length > 30 %}...{% endif %}
-                                        {% else %}
-                                            {{ file[2][:30] }}{% if file[2]|length > 30 %}...{% endif %}
-                                        {% endif %}
-                                    </h5>
-                                    <span class="badge bg-primary category-badge">{{ file[5] }}</span>
-                                </div>
-                                
-                                <!-- Song Name and Artist -->
-                                {% if file[3] or file[4] %}
-                                    <div class="mb-2">
-                                        {% if file[3] %}
-                                            <h6 class="mb-1"><strong>{{ file[3] }}</strong></h6>
-                                        {% endif %}
-                                        {% if file[4] %}
-                                            <p class="text-muted small mb-1">por {{ file[4] }}</p>
-                                        {% endif %}
-                                    </div>
-                                {% endif %}
-                                
-                                <div class="mb-2">
-                                    {% if file[6] %}
-                                        <span class="badge bg-info">{{ file[6] }}</span>
-                                    {% endif %}
-                                    {% if file[7] %}
-                                        <span class="badge bg-success">{{ file[7] }}</span>
-                                    {% endif %}
-                                    {% if file[8] %}
-                                        <a href="{{ file[8] }}" target="_blank" class="badge bg-danger text-decoration-none">
-                                            <i class="fab fa-youtube"></i> YouTube
-                                        </a>
-                                    {% endif %}
-                                </div>
-                                
-                                <p class="text-muted small mb-2">
-                                    <strong>Arquivo:</strong> {{ file[2] }}
-                                </p>
-                                
-                                {% if file[12] %}
-                                    <p class="text-muted small mb-2">{{ file[12] }}</p>
-                                {% endif %}
-                                
-                                <div class="row text-muted small mb-3">
-                                    <div class="col-6">
-                                        <strong>Páginas:</strong> {{ file[11] or 'N/A' }}
-                                    </div>
-                                    <div class="col-6">
-                                        <strong>Tamanho:</strong> 
-                                        {% set file_size = file[9] %}
-                                        {% if file_size %}
-                                            {{ "%.1f"|format(file_size / 1024 / 1024) }} MB
-                                        {% else %}
-                                            N/A
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                
-                                <p class="text-muted small mb-3">
-                                    <i class="fas fa-calendar"></i> {{ file[10][:19] if file[10] else 'Desconhecido' }}
-                                </p>
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <!-- Bulk selection checkbox -->
+                            <div class="d-flex justify-content-end mb-2">
+                                <input type="checkbox" class="form-check-input file-selector" 
+                                       name="selected_files" value="{{ file[0] }}" 
+                                       onchange="updateBulkSelection()">
                             </div>
                             
-                            <div class="card-footer bg-transparent">
-                                <div class="btn-group w-100" role="group">
-                                    <a href="{{ url_for('music_details', file_id=file[0]) }}" 
-                                       class="btn btn-outline-info btn-sm">
-                                        <i class="fas fa-info-circle"></i> Detalhes
-                                    </a>
-                                    
-                                    <!-- Add to List Dropdown -->
-                                    {% if merge_lists %}
-                                    <div class="btn-group" role="group">
-                                        <button type="button" class="btn btn-outline-warning btn-sm dropdown-toggle" 
-                                                data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="fas fa-plus"></i> Lista
-                                        </button>
-                                        <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                                            <div class="px-3 py-2">
-                                                <input type="text" class="form-control form-control-sm" 
-                                                       placeholder="Buscar lista..." 
-                                                       onkeyup="filterDropdownLists(this, 'dropdown-card-{{ file[0] }}')">
-                                            </div>
-                                            <div class="dropdown-divider"></div>
-                                            <div id="dropdown-card-{{ file[0] }}" style="max-height: 200px; overflow-y: auto;">
-                                                {% for list in merge_lists %}
-                                                <div class="dropdown-list-item" data-name="{{ list[1] | lower }}">
-                                                    <form method="POST" action="{{ url_for('add_song_to_list', file_id=file[0], list_id=list[0]) }}" style="display: inline;">
-                                                        <button type="submit" class="dropdown-item">
-                                                            <i class="fas fa-list text-primary"></i> {{ list[1] }}
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title text-truncate" title="{{ file[3] or file[2] }}">
+                                    {% if file[3] %}
+                                        {{ file[3][:25] }}{% if file[3]|length > 25 %}...{% endif %}
+                                    {% else %}
+                                        {{ file[1][:25] }}{% if file[1]|length > 25 %}...{% endif %}
                                     {% endif %}
-                                    
-                                    <a href="{{ url_for('view_file', file_id=file[0]) }}" 
-                                       class="btn btn-outline-primary btn-sm" target="_blank">
-                                        <i class="fas fa-eye"></i> Ver PDF
-                                    </a>
-                                    <button type="button" class="btn btn-outline-danger btn-sm"
-                                            onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')">
-                                        <i class="fas fa-trash"></i> Deletar
-                                    </button>
+                                </h5>
+                                {% if file[13] %}
+                                    {% for category in file[13] %}
+                                        <span class="badge bg-primary category-badge me-1 mb-1">{{ category }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Sem categoria</span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Song Name and Artist -->
+                            {% if file[3] or file[4] %}
+                                <div class="mb-2">
+                                    {% if file[3] and file[4] %}
+                                        <h6 class="mb-1"><strong>{{ file[3] }}</strong></h6>
+                                        <p class="text-muted small mb-1">por {{ file[4] }}</p>
+                                    {% elif file[3] %}
+                                        <h6 class="mb-1"><strong>{{ file[3] }}</strong></h6>
+                                    {% elif file[4] %}
+                                        <p class="text-muted small mb-1">por {{ file[4] }}</p>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            
+                            <div class="mb-2">
+                                {% if file[14] %}
+                                    {% for liturgical_time in file[14] %}
+                                        <span class="badge bg-info me-1 mb-1">{{ liturgical_time }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                                {% if file[7] %}
+                                    <span class="badge bg-success">{{ file[7] }}</span>
+                                {% endif %}
+                            </div>
+                            
+                            <p class="text-muted small mb-2">
+                                <strong>Arquivo:</strong> {{ file[2] }}
+                            </p>
+                            
+                            <div class="row text-muted small mb-3">
+                                <div class="col-6">
+                                    <strong>Páginas:</strong> {{ file[11] or 'N/A' }}
+                                </div>
+                                <div class="col-6">
+                                    <strong>Tamanho:</strong> 
+                                    {% if file[9] %}
+                                        {{ "%.1f"|format(file[9] / 1024 / 1024) }} MB
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
                                 </div>
                             </div>
+                            
+                            <p class="text-muted small mb-3">
+                                <i class="fas fa-calendar"></i> {{ file[10][:19] if file[10] else 'Desconhecido' }}
+                            </p>
+                        </div>
+                        
+                        <div class="card-footer bg-transparent">
+                            <div class="btn-group w-100 mb-2" role="group">
+                                <a href="{{ url_for('music_details', file_id=file[0]) }}" 
+                                   class="btn btn-outline-info btn-sm action-btn" title="Detalhes">
+                                    <i class="fas fa-info-circle"></i>
+                                </a>
+                                
+                                <a href="{{ url_for('view_file', file_id=file[0]) }}" 
+                                   class="btn btn-outline-primary btn-sm action-btn" target="_blank" title="Visualizar PDF">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                
+                                {% if file[8] %}
+                                    <a href="{{ file[8] }}" 
+                                       class="btn btn-outline-danger btn-sm action-btn" target="_blank" title="Ouvir no YouTube">
+                                        <i class="fab fa-youtube"></i>
+                                    </a>
+                                {% else %}
+                                    <button class="btn btn-outline-danger btn-sm action-btn" disabled title="YouTube não disponível">
+                                        <i class="fab fa-youtube"></i>
+                                    </button>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('download_file', file_id=file[0]) }}" 
+                                   class="btn btn-outline-warning btn-sm action-btn" title="Baixar PDF">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                
+                                <button type="button" class="btn btn-outline-danger btn-sm action-btn"
+                                        onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" title="Deletar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Add to List Button - Usando modal -->
+                            {% if merge_lists %}
+                            <div class="btn-group w-100" role="group">
+                                <button type="button" class="btn btn-outline-success btn-sm" 
+                                        onclick="showAddToListModal({{ file[0] }})">
+                                    <i class="fas fa-plus"></i> Adicionar à Lista
+                                </button>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
+                </div>
                 {% endfor %}
             </div>
         {% endif %}
@@ -516,75 +535,14 @@
             <div class="col-12">
                 <div class="text-center py-5">
                     <i class="fas fa-search fa-3x text-muted mb-3"></i>
-                    <h3 class="text-muted">Nenhum arquivo encontrado</h3>
-                    {% if query or selected_category %}
-                        <p class="text-muted">Tente ajustar seus critérios de busca ou veja todos os arquivos.</p>
-                        <div class="mt-3">
-                            <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
-                                <i class="fas fa-list"></i> Ver Todos
-                            </a>
-                            <a href="{{ url_for('upload_file') }}" class="btn btn-outline-primary">
-                                <i class="fas fa-upload"></i> Enviar PDF
-                            </a>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">Comece enviando seu primeiro arquivo PDF.</p>
-                        <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
-                            <i class="fas fa-upload"></i> Enviar PDF
-                        </a>
-                    {% endif %}
+                    <h3 class="text-muted">Nenhum resultado encontrado</h3>
+                    <p class="text-muted">Tente usar termos diferentes ou verifique a ortografia.</p>
+                    <button type="button" class="btn btn-primary" onclick="goBack()">
+                        <i class="fas fa-home"></i> Voltar
+                    </button>
                 </div>
             </div>
         </div>
-    {% endif %}
-    
-    <!-- Pagination -->
-    {% if files and pagination.total_pages > 1 %}
-    <div class="row mt-4">
-        <div class="col-12">
-            <nav aria-label="Navegação de páginas">
-                <ul class="pagination justify-content-center">
-                    {% if pagination.has_prev %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('search', q=query, category=selected_category, liturgical_time=selected_liturgical, page=pagination.prev_num, per_page=pagination.per_page, view=view_mode) }}">
-                                <i class="fas fa-chevron-left"></i> Anterior
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link"><i class="fas fa-chevron-left"></i> Anterior</span>
-                        </li>
-                    {% endif %}
-                    
-                    {% for page_num in pagination.pages %}
-                        {% if page_num == pagination.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                        {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('search', q=query, category=selected_category, liturgical_time=selected_liturgical, page=page_num, per_page=pagination.per_page, view=view_mode) }}">
-                                    {{ page_num }}
-                                </a>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if pagination.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="{{ url_for('search', q=query, category=selected_category, liturgical_time=selected_liturgical, page=pagination.next_num, per_page=pagination.per_page, view=view_mode) }}">
-                                Próxima <i class="fas fa-chevron-right"></i>
-                            </a>
-                        </li>
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">Próxima <i class="fas fa-chevron-right"></i></span>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-    </div>
     {% endif %}
 </div>
 
@@ -601,10 +559,10 @@
                 <p class="text-muted">Esta ação não pode ser desfeita.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form id="deleteForm" method="POST" style="display: inline;">
                     <button type="submit" class="btn btn-danger">Deletar</button>
                 </form>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
             </div>
         </div>
     </div>
@@ -613,14 +571,12 @@
 
 {% block scripts %}
 <script>
-// Função removida - checkboxes sempre visíveis
-
+// Funções similares às da página inicial
 function updateBulkSelection() {
     const selected = document.querySelectorAll('.file-selector:checked');
     const count = selected.length;
     const panel = document.getElementById('bulkSelectPanel');
     
-    // Mostrar/esconder painel baseado na seleção
     if (count > 0) {
         panel.style.display = 'block';
     } else {
@@ -630,7 +586,6 @@ function updateBulkSelection() {
     document.getElementById('selectedCountBadge').textContent = count + ' selecionada(s)';
     document.getElementById('createListBtn').disabled = count === 0;
     
-    // Update existing list button
     const existingListBtn = document.getElementById('addToExistingBtn');
     const existingListSelect = document.getElementById('existingListSelect');
     if (existingListBtn && existingListSelect) {
@@ -643,11 +598,10 @@ function addSelectedToExisting() {
     const listId = document.getElementById('existingListSelect').value;
     
     if (!listId || selected.length === 0) {
-        alert('Selecione uma lista e pelo menos uma música');
+        showToast('Selecione uma lista e pelo menos uma música', 'warning');
         return;
     }
     
-    // Create form to add selected files to existing list
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = '/add_multiple_to_list/' + listId;
@@ -664,30 +618,16 @@ function addSelectedToExisting() {
     form.submit();
 }
 
-function loadMergeLists() {
-    // Load existing merge lists via fetch
-    fetch('/api/merge_lists')
-        .then(response => response.json())
-        .then(lists => {
-            const select = document.getElementById('existingListSelect');
-            select.innerHTML = '<option value="">Selecione uma lista...</option>';
-            lists.forEach(list => {
-                const option = document.createElement('option');
-                option.value = list.id;
-                option.textContent = list.name;
-                select.appendChild(option);
-            });
-        })
-        .catch(error => console.error('Error loading lists:', error));
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.file-selector');
+    
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+    });
+    
+    updateBulkSelection();
 }
-
-// Update existing list button when selection changes
-document.addEventListener('DOMContentLoaded', function() {
-    const existingListSelect = document.getElementById('existingListSelect');
-    if (existingListSelect) {
-        existingListSelect.addEventListener('change', updateBulkSelection);
-    }
-});
 
 function deleteFile(fileId, fileName) {
     document.getElementById('deleteFileName').textContent = fileName;
@@ -712,1735 +652,62 @@ function filterLists() {
     document.getElementById('addToExistingBtn').disabled = !found;
 }
 
-function filterDropdownLists(input, dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    const search = input.value.toLowerCase();
-
-    dropdown.querySelectorAll('.dropdown-list-item').forEach(item => {
-        const text = item.getAttribute('data-name');
-        if (text.includes(search)) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.file-selector');
-    
-    checkboxes.forEach(cb => {
-        cb.checked = selectAll.checked;
-    });
-    
-    updateBulkSelection();
-}
-
-// Dynamic search and filter functionality
-let searchTimeout;
-
-function toggleAllCategories() {
-    const checkboxes = document.querySelectorAll('.category-filter');
-    const allChecked = document.getElementById('category-all').checked;
-    
-    checkboxes.forEach(cb => {
-        cb.checked = allChecked;
-    });
-    
-    applyFilters();
-}
-
-function toggleAllLiturgical() {
-    const checkboxes = document.querySelectorAll('.liturgical-filter');
-    const allChecked = document.getElementById('liturgical-all').checked;
-    
-    checkboxes.forEach(cb => {
-        cb.checked = allChecked;
-    });
-    
-    applyFilters();
-}
-
-function applyFilters() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        filterMusicCards();
-    }, 300);
-}
-
-function filterMusicCards() {
-    const searchText = document.getElementById('dynamicSearch').value.toLowerCase();
-    const selectedCategories = Array.from(document.querySelectorAll('.category-filter:checked')).map(cb => cb.value);
-    const selectedLiturgical = Array.from(document.querySelectorAll('.liturgical-filter:checked')).map(cb => cb.value);
-    const musicCards = document.querySelectorAll('.music-card');
-    
-    let visibleCount = 0;
-    
-    musicCards.forEach(card => {
-        const cardData = {
-            search: card.dataset.search || '',
-            category: card.dataset.category || '',
-            liturgical: card.dataset.liturgical || ''
-        };
-        
-        let visible = true;
-        
-        // Search text filter
-        if (searchText && !cardData.search.includes(searchText)) {
-            visible = false;
-        }
-        
-        // Category filter
-        if (selectedCategories.length > 0 && !selectedCategories.includes(cardData.category)) {
-            visible = false;
-        }
-        
-        // Liturgical time filter
-        if (selectedLiturgical.length > 0 && selectedLiturgical.length < document.querySelectorAll('.liturgical-filter').length) {
-            if (!selectedLiturgical.includes(cardData.liturgical)) {
-                visible = false;
-            }
-        }
-        
-        card.style.display = visible ? 'block' : 'none';
-        if (visible) visibleCount++;
-    });
-    
-    // Update results count
-    document.getElementById('resultsCount').textContent = `${visibleCount} resultados encontrados`;
-}
-
-// Initialize dynamic search
+// Update existing list button when selection changes
 document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('dynamicSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', applyFilters);
+    const existingListSelect = document.getElementById('existingListSelect');
+    if (existingListSelect) {
+        existingListSelect.addEventListener('change', updateBulkSelection);
+    }
+});
+
+// Sistema de toast
+function showToast(message, type = 'success') {
+    const existingToast = document.getElementById('toast-notification');
+    if (existingToast) {
+        existingToast.remove();
     }
     
-    // Initial filter
-    applyFilters();
-});
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
-    // ou chamar uma nova função para buscar os dados filtrados
-    // Por exemplo, você pode usar window.location.href para recarregar a página
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = `toast-notification ${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+        color: ${type === 'warning' ? '#000' : 'white'};
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+        min-width: 250px;
+    `;
+    
+    const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : 
+                 type === 'warning' ? '<i class="fas fa-exclamation-triangle"></i>' : 
+                 '<i class="fas fa-exclamation-circle"></i>';
+    toast.innerHTML = `${icon} ${message}`;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 50);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
 </script>
 {% endblock %} 

@@ -23,7 +23,7 @@
                             <i class="fas fa-times"></i> Cancelar
                         </button>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary" onclick="goBackFromList()">
+                    <button type="button" class="btn btn-outline-secondary" onclick="goBack()">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </button>
                 </div>
@@ -152,6 +152,11 @@
                     <p class="small mb-2">
                         <strong>Nome:</strong> {{ merge_list[1] }}
                     </p>
+                    {% if merge_list[2] %}
+                    <p class="small mb-2">
+                        <strong>Observações:</strong> {{ merge_list[2] }}
+                    </p>
+                    {% endif %}
                     <p class="small mb-2">
                         <strong>Músicas:</strong> {{ list_files|length }}
                     </p>
@@ -182,8 +187,8 @@
                             </form>
                         {% endif %}
                         
-                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#renameListModal" title="Renomear lista">
-                            <i class="fas fa-edit"></i> Renomear Lista
+                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editInfoModal" title="Editar informações">
+                            <i class="fas fa-edit"></i> Editar Informações
                         </button>
                         
                         <button type="button" class="btn btn-danger btn-sm" onclick="deleteList({{ merge_list[0] }}, '{{ merge_list[1] }}')" title="Deletar lista">
@@ -292,8 +297,8 @@
                     <div id="available-music" style="max-height: 500px; overflow-y: auto;">
                         {% for file in all_files %}
                             <div class="music-item mb-2 p-2 border rounded" 
-                                 data-category="{{ file[7][0] if file[7] else file[5] }}" 
-                                 data-liturgical="{{ file[8][0] if file[8] else (file[6] or '') }}"
+                                 data-category="{{ file[8][0] if file[8] else file[5] }}" 
+                                 data-liturgical="{{ file[9][0] if file[9] else (file[6] or '') }}"
                                  data-search="{{ (file[1] + ' ' + (file[2] or '') + ' ' + (file[3] or '') + ' ' + (file[4] or ''))|lower }}">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1">
@@ -310,15 +315,15 @@
                                                 {% endif %}
                                                 <br><small class="text-muted">{{ file[2] }}</small>
                                                 <br>
-                                                {% if file[7] %}
-                                                    {% for category in file[7] %}
+                                                {% if file[8] %}
+                                                    {% for category in file[8] %}
                                                         <span class="badge bg-primary badge-sm me-1 mb-1">{{ category }}</span>
                                                     {% endfor %}
                                                 {% else %}
                                                     <span class="badge bg-secondary badge-sm">Sem categoria</span>
                                                 {% endif %}
-                                                {% if file[8] %}
-                                                    {% for time in file[8] %}
+                                                {% if file[9] %}
+                                                    {% for time in file[9] %}
                                                         <span class="badge bg-info badge-sm me-1 mb-1">{{ time }}</span>
                                                     {% endfor %}
                                                 {% endif %}
@@ -336,17 +341,21 @@
                                             <i class="fas fa-eye"></i>
                                         </a>
                                         
-                                        <button type="button" class="btn btn-outline-danger btn-sm action-btn" 
-                                                onclick="openYouTube({{ file[0] }})" title="Ouvir no YouTube">
-                                            <i class="fab fa-youtube"></i>
-                                        </button>
-                                        
-                                        <form method="POST" action="{{ url_for('add_to_merge_list', list_id=merge_list[0]) }}" style="display: inline;">
-                                            <input type="hidden" name="file_id" value="{{ file[0] }}">
-                                            <button type="submit" class="btn btn-success btn-sm action-btn" title="Adicionar à lista">
-                                                <i class="fas fa-plus"></i>
+                                        {% if file[7] %}
+                                            <a href="{{ file[7] }}" target="_blank" class="btn btn-outline-danger btn-sm action-btn" title="Ouvir no YouTube">
+                                                <i class="fab fa-youtube"></i>
+                                            </a>
+                                        {% else %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm action-btn" 
+                                                    onclick="openYouTube({{ file[0] }})" title="Ouvir no YouTube" disabled>
+                                                <i class="fab fa-youtube"></i>
                                             </button>
-                                        </form>
+                                        {% endif %}
+                                        
+                                        <button type="button" class="btn btn-success btn-sm action-btn" 
+                                                onclick="showAddToListModal({{ file[0] }})" title="Adicionar à lista">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -380,25 +389,31 @@
     </div>
 </div>
 
-<!-- Rename List Modal -->
+<!-- Edit List Info Modal -->
 {% if merge_list[0] != 0 %}
-<div class="modal fade" id="renameListModal" tabindex="-1">
+<div class="modal fade" id="editInfoModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Renomear Lista</h5>
+                <h5 class="modal-title">Editar Informações da Lista</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ url_for('rename_merge_list_route', list_id=merge_list[0]) }}">
+            <form method="POST" action="{{ url_for('update_merge_list_info_route', list_id=merge_list[0]) }}">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="newListName" class="form-label">Novo nome da lista</label>
-                        <input type="text" class="form-control" id="newListName" name="new_name" 
+                        <label for="listNameEdit" class="form-label">Nome da Lista</label>
+                        <input type="text" class="form-control" id="listNameEdit" name="list_name" 
                                value="{{ merge_list[1] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observationsEdit" class="form-label">Observações</label>
+                        <textarea class="form-control" id="observationsEdit" name="observations" 
+                                  rows="3" placeholder="Adicione observações sobre esta lista...">{{ merge_list[2] or '' }}</textarea>
+                        <div class="form-text">Campo opcional para anotações sobre esta lista</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 </div>
             </form>
@@ -1124,12 +1139,13 @@ function discardAndNavigateFromList() {
     executeListGoBack();
 }
 
-// Interceptar navegação em listas
+// Interceptar navegação em listas - mais específico
 window.addEventListener('beforeunload', function(e) {
     if (hasUnsavedChanges) {
+        const message = 'Você tem alterações não salvas na lista que serão perdidas. Tem certeza que deseja sair?';
         e.preventDefault();
-        e.returnValue = '';
-        return '';
+        e.returnValue = message;
+        return message;
     }
 });
 

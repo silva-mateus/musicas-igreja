@@ -418,14 +418,14 @@ function addNewCategory() {
     const categoryName = input.value.trim();
     
     if (!categoryName) {
-        alert('Por favor, digite o nome da categoria');
+        showToast('Por favor, digite o nome da categoria', 'warning');
         return;
     }
     
     // Verificar se já existe
     const existingCategories = Array.from(document.querySelectorAll('.category-checkbox')).map(cb => cb.value);
     if (existingCategories.includes(categoryName)) {
-        alert('Esta categoria já existe');
+        showToast('Esta categoria já existe', 'warning');
         return;
     }
     
@@ -459,14 +459,14 @@ function addNewLiturgicalTime() {
     const liturgicalName = input.value.trim();
     
     if (!liturgicalName) {
-        alert('Por favor, digite o nome do tempo litúrgico');
+        showToast('Por favor, digite o nome do tempo litúrgico', 'warning');
         return;
     }
     
     // Verificar se já existe
     const existingTimes = Array.from(document.querySelectorAll('.liturgical-checkbox')).map(cb => cb.value);
     if (existingTimes.includes(liturgicalName)) {
-        alert('Este tempo litúrgico já existe');
+        showToast('Este tempo litúrgico já existe', 'warning');
         return;
     }
     
@@ -754,12 +754,13 @@ function trackFormChanges() {
     });
 }
 
-// Interceptar navegação do browser (botão voltar)
+// Interceptar navegação do browser (botão voltar) - mais específico
 window.addEventListener('beforeunload', function(e) {
     if (navigationHistory.hasChanges) {
+        const message = 'Você tem alterações não salvas que serão perdidas. Tem certeza que deseja sair?';
         e.preventDefault();
-        e.returnValue = '';
-        return '';
+        e.returnValue = message;
+        return message;
     }
 });
 

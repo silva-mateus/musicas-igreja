@@ -138,6 +138,32 @@ A aplicação está completamente funcional! Para melhorias futuras:
 - Templates de listas por tempo litúrgico
 - Exportar listas como texto
 
+## 🚀 Início Rápido
+
+### 1. Aplicação Está Rodando
+- Acesse: http://localhost:5000
+- Ou use a URL personalizada: http://musicas-igreja.local:5000
+
+### 2. Primeira Música
+1. Clique "Enviar" no menu
+2. Selecione um arquivo PDF
+3. Escolha categoria e tempo litúrgico
+4. Adicione tom musical e link do YouTube (opcional)
+5. Clique "Enviar PDF"
+
+### 3. Comandos Rápidos
+
+**Parar o sistema:**
+Pressione Ctrl+C no terminal
+
+**Reiniciar o sistema:**
+```bash
+python app.py
+```
+
+**Iniciar automaticamente:**
+Execute: `start_musicas_igreja.bat`
+
 ---
 
 **🎵 Organize sua música litúrgica de forma simples e eficiente! 🎵** 

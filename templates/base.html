@@ -161,10 +161,329 @@
         .music-table .btn-group {
             gap: 2px;
         }
+
+        /* ===== RESPONSIVIDADE ===== */
+        
+        /* Remover espaçamento entre botões Card/Lista no mobile */
+        @media (max-width: 992px) {
+            .mobile-icon-only .btn-group {
+                gap: 0 !important;
+            }
+            
+            .mobile-icon-only .btn-group .btn {
+                border-radius: 0;
+                margin: 0 !important;
+            }
+            
+            .mobile-icon-only .btn-group .btn:first-child {
+                border-top-left-radius: 0.375rem;
+                border-bottom-left-radius: 0.375rem;
+            }
+            
+            .mobile-icon-only .btn-group .btn:last-child {
+                border-top-right-radius: 0.375rem;
+                border-bottom-right-radius: 0.375rem;
+            }
+        }
+        
+        /* Mobile/Tablet: Esconder botões individuais e mostrar só o dropdown de ações */
+        @media (max-width: 990px) {
+            .action-btn:not(.actions-dropdown-btn) {
+                display: none !important;
+            }
+            
+            .btn-group .action-btn:first-child {
+                display: inline-flex !important; /* Mostrar só o primeiro botão (dropdown) */
+            }
+            
+            /* Ajustar tabela para mobile */
+            .music-table {
+                font-size: 0.875rem;
+            }
+            
+            .music-table th,
+            .music-table td {
+                padding: 8px 4px;
+                word-break: break-word;
+            }
+            
+            /* Esconder algumas colunas menos importantes no mobile */
+            .music-table .d-none-mobile {
+                display: none !important;
+            }
+            
+            /* Ajustar cards para mobile */
+            .card-body {
+                padding: 1rem 0.75rem;
+            }
+            
+            /* Menu lateral específico */
+            .offcanvas-end {
+                width: 280px;
+            }
+        }
+
+        /* Tablet */
+        @media (max-width: 992px) and (min-width: 769px) {
+            .action-btn {
+                width: 32px;
+                height: 32px;
+            }
+            
+            .action-btn i {
+                font-size: 12px;
+            }
+        }
+
+        /* ===== DROPDOWN DE AÇÕES CUSTOMIZADO ===== */
+        .actions-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .actions-dropdown-btn {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .actions-dropdown-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .actions-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 160px;
+            display: none;
+            overflow: hidden;
+        }
+
+        .actions-dropdown-menu.show {
+            display: block;
+        }
+
+        .actions-dropdown-item {
+            display: block;
+            padding: 10px 15px;
+            color: #495057;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid #f8f9fa;
+            font-size: 0.875rem;
+            border: none !important;
+            background: transparent !important;
+            width: 100% !important;
+            text-align: left !important;
+        }
+
+        .actions-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .actions-dropdown-item:hover {
+            background-color: #f8f9fa;
+            color: #495057;
+        }
+
+        .actions-dropdown-item.text-danger:hover {
+            background-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .actions-dropdown-item.text-warning:hover {
+            background-color: #ffeaa7;
+            color: #856404;
+        }
+
+        .actions-dropdown-item.text-primary:hover {
+            background-color: #cce7ff;
+            color: #004085;
+        }
+
+        .actions-dropdown-item i {
+            width: 16px;
+            margin-right: 8px;
+        }
+
+        /* ===== MODO LISTA RESPONSIVO ===== */
+        @media (max-width: 992px) {
+            /* Transformar tabela em lista de cards no mobile */
+            .music-table-responsive {
+                display: none;
+            }
+            
+            .music-cards-mobile {
+                display: block;
+            }
+            
+            .music-card-mobile {
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                display: grid;
+                grid-template-columns: 40px 1fr 50px;
+                gap: 12px;
+                align-items: start;
+            }
+            
+            .music-card-mobile .checkbox-section {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding-top: 8px;
+            }
+            
+            .music-card-mobile .info-section {
+                min-width: 0; /* Allow flex items to shrink */
+            }
+            
+            .music-card-mobile .music-title {
+                font-weight: 600;
+                font-size: 0.95rem;
+                margin-bottom: 4px;
+                color: #495057;
+                line-height: 1.2;
+                word-break: break-word;
+            }
+            
+            .music-card-mobile .music-artist {
+                color: #6c757d;
+                font-size: 0.8rem;
+                margin-bottom: 6px;
+                line-height: 1.1;
+            }
+            
+            .music-card-mobile .music-badges {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 3px;
+            }
+            
+            .music-card-mobile .music-badges .badge {
+                font-size: 0.7rem;
+                padding: 2px 6px;
+                line-height: 1.2;
+            }
+            
+            .music-card-mobile .actions-section {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding-top: 8px;
+            }
+
+            /* Também aplicar para listas de músicas recentes */
+            .recent-list-card-mobile {
+                background: white;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                display: grid;
+                grid-template-columns: 1fr 80px;
+                gap: 12px;
+                align-items: center;
+            }
+
+            .recent-list-card-mobile .list-info {
+                min-width: 0;
+            }
+
+            .recent-list-card-mobile .list-title {
+                font-weight: 600;
+                font-size: 0.95rem;
+                margin-bottom: 4px;
+                color: #495057;
+                line-height: 1.2;
+            }
+
+            .recent-list-card-mobile .list-meta {
+                color: #6c757d;
+                font-size: 0.75rem;
+                line-height: 1.1;
+            }
+
+            .recent-list-card-mobile .list-actions {
+                display: flex;
+                justify-content: center;
+            }
+
+            /* Esconder tabela de listas recentes no mobile */
+            .recent-lists-table {
+                display: none;
+            }
+
+            .recent-lists-mobile {
+                display: block;
+            }
+
+            /* Botões do topo só ícones no mobile */
+            .mobile-icon-only .btn-text {
+                display: none;
+            }
+
+            .mobile-icon-only .btn {
+                padding: 8px 10px;
+                margin: 0 3px;
+            }
+        }
+
+        @media (min-width: 993px) {
+            .music-table-responsive {
+                display: table;
+            }
+            
+            .music-cards-mobile {
+                display: none;
+            }
+
+            .recent-lists-table {
+                display: table;
+            }
+
+            .recent-lists-mobile {
+                display: none;
+            }
+        }
+        
+        /* ===== STICKY FOOTER LAYOUT ===== */
+        html {
+            position: relative;
+            min-height: 100%;
+        }
+        
+        body {
+            margin: 0;
+            padding-bottom: 180px;
+        }
+        
+        footer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            border-top: 1px solid #444;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="main-wrapper">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
                 <i class="bi bi-music-note-beamed"></i> Organizador de PDFs
@@ -172,10 +491,14 @@
                     <span class="admin-badge">ADMIN</span>
                 {% endif %}
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            
+            <!-- Mobile menu button -->
+            <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileMenu">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            
+            <!-- Desktop navigation -->
+            <div class="collapse navbar-collapse d-none d-lg-flex" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
@@ -190,6 +513,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('merge_lists') }}">
                             <i class="bi bi-list-ul"></i> Lista de Músicas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-chart-line"></i> Dashboard
                         </a>
                     </li>
                 </ul>
@@ -221,6 +549,9 @@
                                 <li><a class="dropdown-item" href="{{ url_for('admin_debug_files') }}">
                                     <i class="bi bi-bug"></i> Debug Arquivos
                                 </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin_clean_orphaned_items') }}">
+                                    <i class="bi bi-trash3"></i> Limpar Dados Órfãos
+                                </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="{{ url_for('admin_clean_database') }}">
                                     <i class="bi bi-trash"></i> Limpar Sistema
@@ -233,15 +564,77 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('admin_login') }}">
-                                <i class="bi bi-shield-lock"></i> Admin
-                            </a>
+                                            <a class="nav-link" href="#" onclick="requireAdminAuth('login', function() { window.location.reload(); })">
+                    <i class="bi bi-shield-lock"></i> Admin
+                </a>
                         </li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
+
+    <!-- Mobile Sidebar Menu -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="mobileMenu">
+        <div class="offcanvas-header bg-dark text-white">
+            <h5 class="offcanvas-title">
+                <i class="bi bi-music-note-beamed"></i> Menu
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('index') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-house me-2"></i> Início
+                </a>
+                <a href="{{ url_for('upload_file') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-cloud-upload me-2"></i> Upload
+                </a>
+                <a href="{{ url_for('merge_lists') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-list-ul me-2"></i> Lista de Músicas
+                </a>
+                <a href="{{ url_for('dashboard') }}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-chart-line me-2"></i> Dashboard
+                </a>
+                
+                <div class="list-group-item">
+                    <form class="d-flex" method="GET" action="{{ url_for('search') }}">
+                        <input class="form-control me-2" type="search" name="q" 
+                               placeholder="Buscar música..." value="{{ request.args.get('q', '') }}">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </form>
+                </div>
+                
+                {% if is_admin_logged %}
+                    <div class="list-group-item bg-light">
+                        <small class="text-muted fw-bold">ADMINISTRAÇÃO</small>
+                    </div>
+                    <a href="{{ url_for('admin_scan_files') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-search me-2"></i> Escanear Arquivos
+                    </a>
+                    <a href="{{ url_for('admin_debug_files') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-bug me-2"></i> Debug Arquivos
+                    </a>
+                    <a href="{{ url_for('admin_clean_orphaned_items') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-trash3 me-2"></i> Limpar Dados Órfãos
+                    </a>
+                    <a href="{{ url_for('admin_clean_database') }}" class="list-group-item list-group-item-action text-danger">
+                        <i class="bi bi-trash me-2"></i> Limpar Sistema
+                    </a>
+                    <a href="{{ url_for('admin_logout') }}" class="list-group-item list-group-item-action">
+                        <i class="bi bi-box-arrow-right me-2"></i> Logout
+                    </a>
+                {% else %}
+                    <a href="#" onclick="requireAdminAuth('login', function() { window.location.reload(); })" 
+                       class="list-group-item list-group-item-action" data-bs-dismiss="offcanvas">
+                        <i class="bi bi-shield-lock me-2"></i> Admin
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="container mt-4">
         {% with messages = get_flashed_messages() %}
@@ -256,38 +649,8 @@
         {% endwith %}
 
         {% block content %}{% endblock %}
-    </div>
-
-    <!-- Footer -->
-    <footer class="bg-dark text-light py-4 mt-5">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-8">
-                    <h6><i class="fas fa-music"></i> Organizador de Música Litúrgica</h6>
-                    <p class="mb-0 small">Sistema para organização e gestão de músicas litúrgicas em formato PDF.</p>
-                </div>
-                <div class="col-md-4 text-md-end">
-                    <p class="mb-1 small">Desenvolvido com ❤️ por</p>
-                    <p class="mb-0"><strong>Mateus Silva</strong></p>
-                    <p class="mb-0 small text-muted">© 2025 - Todos os direitos reservados</p>
-                </div>
-            </div>
-            <hr class="my-3">
-            <div class="row">
-                <div class="col-12 text-center">
-                    <small class="text-muted">
-                        <i class="fas fa-code"></i> Feito com Flask & Bootstrap
-                        <span class="mx-2">|</span>
-                        <i class="fas fa-database"></i> SQLite
-                        <span class="mx-2">|</span>
-                        <i class="fas fa-file-pdf"></i> PDF.js
-                    </small>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Admin Authentication Modal -->
+        
+        <!-- Admin Authentication Modal -->
     <div class="modal fade" id="adminAuthModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -301,7 +664,6 @@
                             <label for="adminPassword" class="form-label">Senha de Administrador</label>
                             <input type="password" class="form-control" id="adminPassword" name="password" required>
                         </div>
-                        <div id="adminAuthMessage" class="alert d-none"></div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -314,12 +676,159 @@
         </div>
     </div>
 
+    <!-- Add to List Modal -->
+    <div class="modal fade" id="addToListModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Adicionar à Lista</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="listSearch" class="form-label">Buscar Lista</label>
+                        <input type="text" class="form-control" id="listSearch" 
+                               placeholder="Digite para buscar uma lista..." 
+                               onkeyup="searchLists()">
+                    </div>
+                    
+                    <div id="listsContainer">
+                        <div id="recentLists">
+                            <h6 class="text-muted mb-2">Listas Recentes</h6>
+                            <div class="list-group" id="recentListsGroup">
+                                <!-- Listas carregadas via JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <div id="searchResults" style="display: none;">
+                            <h6 class="text-muted mb-2">Resultados da Busca</h6>
+                            <div class="list-group" id="searchResultsGroup">
+                                <!-- Resultados da busca -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="noResults" style="display: none;" class="text-center py-3">
+                        <i class="fas fa-search fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">Nenhuma lista encontrada</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div></div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8">
+                    <h6><i class="fas fa-music"></i> Organizador de Música Litúrgica</h6>
+                    <p class="mb-0 small">Sistema para organização e gestão de músicas litúrgicas em formato PDF.</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <p class="mb-1 small">Desenvolvido com ❤️ por</p>
+                    <p class="mb-0"><strong>Mateus Silva</strong></p>
+                    <p class="mb-0 small text-muted">© 2025 - Todos os direitos reservados</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-    // Global admin authentication function
-    function requireAdminAuth(action, callback) {
+    // ===== SISTEMA DE TOAST GLOBAL =====
+let toastQueue = [];
+let toastDisplaying = false;
+
+function showToast(message, type = 'success') {
+    // Adicionar à fila se já estiver exibindo um toast
+    if (toastDisplaying) {
+        toastQueue.push({ message, type });
+        return;
+    }
+    
+    displayToast(message, type);
+}
+
+function displayToast(message, type = 'success') {
+    toastDisplaying = true;
+    
+    // Remover toast anterior se existir
+    const existingToast = document.getElementById('toast-notification');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Criar toast único
+    const toastId = 'toast-notification-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = `toast-notification ${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : type === 'info' ? '#17a2b8' : '#dc3545'};
+        color: ${type === 'warning' ? '#000' : 'white'};
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+        min-width: 250px;
+        max-width: 500px;
+    `;
+    
+    const iconMap = {
+        'success': '<i class="fas fa-check-circle"></i>',
+        'error': '<i class="fas fa-exclamation-circle"></i>',
+        'warning': '<i class="fas fa-exclamation-triangle"></i>',
+        'info': '<i class="fas fa-info-circle"></i>'
+    };
+    const icon = iconMap[type] || iconMap['info'];
+    toast.innerHTML = `${icon} ${message}`;
+    
+    document.body.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 50);
+    
+    // Remover após 5 segundos
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+            toastDisplaying = false;
+            
+            // Mostrar próximo toast da fila, se existir
+            if (toastQueue.length > 0) {
+                const next = toastQueue.shift();
+                setTimeout(() => displayToast(next.message, next.type), 500);
+            }
+        }, 300);
+    }, 5000);
+}
+
+// Função para mostrar múltiplos toasts sequencialmente
+function showSequentialToasts(toasts) {
+    toasts.forEach((toast, index) => {
+        setTimeout(() => showToast(toast.message, toast.type), index * 1000);
+    });
+}
+
+// Global admin authentication function
+function requireAdminAuth(action, callback) {
         {% if is_admin_logged %}
         // Already authenticated
         if (callback) callback();
@@ -336,15 +845,14 @@
     
     function authenticateAdmin() {
         const password = document.getElementById('adminPassword').value;
-        const messageDiv = document.getElementById('adminAuthMessage');
         
         if (!password) {
-            showAdminMessage('Por favor, digite a senha', 'danger');
+            showToast('Por favor, digite a senha', 'warning');
             return;
         }
         
         // Show loading
-        showAdminMessage('Verificando...', 'info');
+        showToast('Verificando senha...', 'info');
         
         fetch('/admin/modal_auth', {
             method: 'POST',
@@ -356,43 +864,252 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showAdminMessage(data.message, 'success');
+                showToast(data.message, 'success');
                 
-                // Close modal after delay
-                setTimeout(() => {
-                    bootstrap.Modal.getInstance(document.getElementById('adminAuthModal')).hide();
-                    
-                    // Execute callback if exists
-                    if (window.adminActionCallback) {
+                // Close modal immediately
+                bootstrap.Modal.getInstance(document.getElementById('adminAuthModal')).hide();
+                
+                // Execute callback if exists
+                if (window.adminActionCallback) {
+                    setTimeout(() => {
                         window.adminActionCallback();
                         window.adminActionCallback = null;
-                    }
-                    
-                    // Reload page to update admin status
+                    }, 500);
+                }
+                
+                // Reload page to update admin status
+                setTimeout(() => {
                     window.location.reload();
                 }, 1000);
             } else {
-                showAdminMessage(data.message, 'danger');
+                showToast(data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            showAdminMessage('Erro de conexão', 'danger');
+            showToast('Erro de conexão', 'error');
         });
     }
     
-    function showAdminMessage(message, type) {
-        const messageDiv = document.getElementById('adminAuthMessage');
-        messageDiv.className = `alert alert-${type}`;
-        messageDiv.textContent = message;
-        messageDiv.classList.remove('d-none');
+    // Clear form when modal is hidden and add Enter key support
+    document.addEventListener('DOMContentLoaded', function() {
+        const adminModal = document.getElementById('adminAuthModal');
+        const adminPasswordField = document.getElementById('adminPassword');
+        
+        if (adminModal && adminPasswordField) {
+            // Enter key support
+            adminPasswordField.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    authenticateAdmin();
+                }
+            });
+            
+            // Clear form when modal is hidden
+            adminModal.addEventListener('hidden.bs.modal', function() {
+                adminPasswordField.value = '';
+            });
+        }
+
+        // Check for URL parameters and show toasts
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Admin logout toast
+        if (urlParams.get('admin_logout') === 'success') {
+            showToast('Logout realizado com sucesso', 'success');
+        }
+        
+        // Toasts from admin scan files
+        const toastsToShow = [];
+        
+        // Coletar todos os toasts dos parâmetros da URL
+        for (const [key, value] of urlParams.entries()) {
+            if (key.startsWith('toast_')) {
+                const type = key.replace('toast_', '').replace(/\d+$/, ''); // Remove números do final
+                toastsToShow.push({ message: decodeURIComponent(value), type: type });
+            }
+        }
+        
+        // Mostrar toasts sequencialmente se existirem
+        if (toastsToShow.length > 0) {
+            showSequentialToasts(toastsToShow);
+            
+            // Limpar parâmetros da URL após mostrar os toasts
+            setTimeout(() => {
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }, toastsToShow.length * 1000 + 2000);
+        } else if (urlParams.get('admin_logout') === 'success') {
+            // Limpar apenas o parâmetro de logout se for o único
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    });
+    
+    // ===== DROPDOWN DE AÇÕES CUSTOMIZADO =====
+    function toggleActionsDropdown(dropdownId, event) {
+        event.stopPropagation();
+        
+        // Fechar todos os outros dropdowns
+        document.querySelectorAll('.actions-dropdown-menu').forEach(menu => {
+            if (menu.id !== dropdownId) {
+                menu.classList.remove('show');
+            }
+        });
+        
+        // Toggle do dropdown atual
+        const dropdown = document.getElementById(dropdownId);
+        dropdown.classList.toggle('show');
     }
     
-    // Clear form when modal is hidden
-    document.getElementById('adminAuthModal').addEventListener('hidden.bs.modal', function() {
-        document.getElementById('adminPassword').value = '';
-        document.getElementById('adminAuthMessage').classList.add('d-none');
+    // Fechar dropdowns quando clicar fora
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.actions-dropdown-menu').forEach(menu => {
+            menu.classList.remove('show');
+        });
     });
+
+    // ===== MODAL DE ADICIONAR À LISTA =====
+    let currentFileId = null;
+    let allLists = [];
+
+    function showAddToListModal(fileId) {
+        currentFileId = fileId;
+        const modal = new bootstrap.Modal(document.getElementById('addToListModal'));
+        
+        // Limpar busca
+        document.getElementById('listSearch').value = '';
+        
+        // Carregar listas recentes
+        loadRecentLists();
+        
+        modal.show();
+    }
+
+    function loadRecentLists() {
+        fetch('/api/merge_lists')
+            .then(response => response.json())
+            .then(data => {
+                allLists = data;
+                displayRecentLists(data.slice(0, 5));
+                hideSearchResults();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar listas:', error);
+                showToast('Erro ao carregar listas', 'error');
+            });
+    }
+
+    function displayRecentLists(lists) {
+        const container = document.getElementById('recentListsGroup');
+        container.innerHTML = '';
+        
+        if (lists.length === 0) {
+            container.innerHTML = '<div class="list-group-item text-muted">Nenhuma lista criada ainda</div>';
+            return;
+        }
+        
+        lists.forEach(list => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${list.name}</h6>
+                        <small class="text-muted">${list.file_count || 0} música(s)</small>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+            `;
+            item.onclick = () => addToList(list.id, list.name);
+            container.appendChild(item);
+        });
+    }
+
+    function searchLists() {
+        const query = document.getElementById('listSearch').value.trim().toLowerCase();
+        
+        if (query === '') {
+            showRecentLists();
+            return;
+        }
+        
+        const filteredLists = allLists.filter(list => 
+            list.name.toLowerCase().includes(query)
+        );
+        
+        if (filteredLists.length === 0) {
+            showNoResults();
+        } else {
+            displaySearchResults(filteredLists);
+        }
+    }
+
+    function displaySearchResults(lists) {
+        const container = document.getElementById('searchResultsGroup');
+        container.innerHTML = '';
+        
+        lists.forEach(list => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${list.name}</h6>
+                        <small class="text-muted">${list.file_count || 0} música(s)</small>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+            `;
+            item.onclick = () => addToList(list.id, list.name);
+            container.appendChild(item);
+        });
+        
+        showSearchResults();
+    }
+
+    function showRecentLists() {
+        document.getElementById('recentLists').style.display = 'block';
+        document.getElementById('searchResults').style.display = 'none';
+        document.getElementById('noResults').style.display = 'none';
+    }
+
+    function showSearchResults() {
+        document.getElementById('recentLists').style.display = 'none';
+        document.getElementById('searchResults').style.display = 'block';
+        document.getElementById('noResults').style.display = 'none';
+    }
+
+    function hideSearchResults() {
+        showRecentLists();
+    }
+
+    function showNoResults() {
+        document.getElementById('recentLists').style.display = 'none';
+        document.getElementById('searchResults').style.display = 'none';
+        document.getElementById('noResults').style.display = 'block';
+    }
+
+    function addToList(listId, listName) {
+        if (!currentFileId) return;
+        
+        // Criar form e submeter
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/add_song_to_list/${currentFileId}/${listId}`;
+        form.style.display = 'none';
+        
+        document.body.appendChild(form);
+        form.submit();
+        
+        // Fechar modal
+        bootstrap.Modal.getInstance(document.getElementById('addToListModal')).hide();
+        
+        // Mostrar toast
+        showToast(`Música adicionada à lista "${listName}"`, 'success');
+    }
     
     // Autocomplete search functionality
     let searchTimeout;
@@ -470,6 +1187,15 @@
         searchSuggestions.style.display = 'none';
         // Navigate directly to music details
         window.location.href = `/details/${musicId}`;
+    }
+
+    // Navegação inteligente global
+    function goBack() {
+        if (document.referrer && document.referrer.includes(window.location.hostname)) {
+            window.history.back();
+        } else {
+            window.location.href = '/';
+        }
     }
     </script>
 

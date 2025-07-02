@@ -23,28 +23,104 @@
 .clickable-badge {
     transition: all 0.2s ease;
 }
+
+/* Remover espaçamento entre botões Card/Lista no mobile */
+@media (max-width: 992px) {
+    .mobile-icon-only .btn-group {
+        gap: 0 !important;
+    }
+    
+    .mobile-icon-only .btn-group .btn {
+        border-radius: 0;
+        margin: 0 !important;
+    }
+    
+    .mobile-icon-only .btn-group .btn:first-child {
+        border-top-left-radius: 0.375rem;
+        border-bottom-left-radius: 0.375rem;
+    }
+    
+    .mobile-icon-only .btn-group .btn:last-child {
+        border-top-right-radius: 0.375rem;
+        border-bottom-right-radius: 0.375rem;
+    }
+}
+
+/* Aplicar cores dos botões aos itens do dropdown mobile - Versão corrigida */
+.actions-dropdown-item.btn-info-style {
+    color: #17a2b8 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-info-style:hover {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-primary-style {
+    color: #007bff !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-primary-style:hover {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-danger-style {
+    color: #dc3545 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-danger-style:hover {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-warning-style {
+    color: #ffc107 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-warning-style:hover {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.actions-dropdown-item.btn-success-style {
+    color: #28a745 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-success-style:hover {
+    background-color: #28a745 !important;
+    color: white !important;
+}
 </style>
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1><i class="fas fa-music"></i> Painel Principal</h1>
-                <div>
+                <h1>Painel Principal</h1>
+                <div class="mobile-icon-only">
                     <!-- View Mode Toggle -->
                     <div class="btn-group me-2" role="group">
                         <a href="{{ url_for('index', view='card') }}" 
-                           class="btn btn-outline-secondary {% if view_mode == 'card' %}active{% endif %}">
-                            <i class="fas fa-th-large"></i> Cards
+                           class="btn btn-outline-secondary {% if view_mode == 'card' %}active{% endif %}"
+                           title="Visualização em Cards">
+                            <i class="fas fa-th-large"></i> <span class="btn-text">Cards</span>
                         </a>
                         <a href="{{ url_for('index', view='list') }}" 
-                           class="btn btn-outline-secondary {% if view_mode == 'list' %}active{% endif %}">
-                            <i class="fas fa-list"></i> Lista
+                           class="btn btn-outline-secondary {% if view_mode == 'list' %}active{% endif %}"
+                           title="Visualização em Lista">
+                            <i class="fas fa-list"></i> <span class="btn-text">Lista</span>
                         </a>
                     </div>
                     
 
-                    <a href="{{ url_for('upload_file') }}" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Adicionar Música
+                    <a href="{{ url_for('upload_file') }}" class="btn btn-primary"
+                       title="Adicionar Nova Música">
+                        <i class="fas fa-plus"></i> <span class="btn-text">Adicionar Música</span>
                     </a>
                 </div>
             </div>
@@ -64,14 +140,15 @@
                             <i class="fas fa-eye"></i> Ver Todas
                         </a>
                     </div>
-                    <div class="table-responsive">
+                    <!-- Desktop Table View -->
+                    <div class="table-responsive recent-lists-table">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
                                     <th>Nome da Lista</th>
-                                    <th>Quantidade</th>
+                                    <th>Quantidade de Músicas</th>
                                     <th>Atualizada</th>
-                                    <th style="width: 150px;">Ações</th>
+                                    <th style="width: 180px;">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -81,26 +158,101 @@
                                             <strong><i class="fas fa-music text-primary me-2"></i>{{ list[1] }}</strong>
                                         </td>
                                         <td>
-                                            <span class="badge bg-primary">{{ list[4] }} música(s)</span>
+                                            <span class="badge bg-primary">{{ list[5] }} música(s)</span>
                                         </td>
-                                        <td><small>{{ list[3][:16] if list[3] else 'N/A' }}</small></td>
+                                        <td><small>{{ list[4][:16] if list[4] else 'N/A' }}</small></td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <!-- Dropdown de ações para tablet/mobile -->
+                                            <div class="actions-dropdown d-lg-none">
+                                                <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('list-actions-{{ list[0] }}', event)">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <div class="actions-dropdown-menu" id="list-actions-{{ list[0] }}">
+                                                    <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" class="actions-dropdown-item btn-primary-style">
+                                                        <i class="fas fa-edit"></i> Editar Lista
+                                                    </a>
+                                                    <button type="button" class="actions-dropdown-item btn-info-style" onclick="generateListReportFromHome({{ list[0] }})">
+                                                        <i class="fas fa-file-export"></i> Gerar Relatório
+                                                    </button>
+                                                    <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: contents;">
+                                                        <button type="submit" class="actions-dropdown-item btn-warning-style">
+                                                            <i class="fas fa-download"></i> Baixar PDF
+                                                        </button>
+                                                    </form>
+                                                    <button type="button" class="actions-dropdown-item btn-danger-style"
+                                                            onclick="deleteList({{ list[0] }}, '{{ list[1] }}')" title="Deletar Lista">
+                                                        <i class="fas fa-trash"></i> Deletar Lista
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Botões individuais para desktop -->
+                                            <div class="btn-group btn-group-sm d-none d-lg-flex">
                                                 <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" 
-                                                   class="btn btn-outline-primary btn-sm" title="Editar Lista">
+                                                   class="btn btn-outline-primary action-btn" title="Editar Lista">
                                                     <i class="fas fa-edit"></i>
                                                 </a>
+                                                <button type="button" class="btn btn-outline-info action-btn" 
+                                                        onclick="generateListReportFromHome({{ list[0] }})" title="Gerar Relatório">
+                                                    <i class="fas fa-file-export"></i>
+                                                </button>
                                                 <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: inline;">
-                                                    <button type="submit" class="btn btn-outline-warning btn-sm" title="Baixar PDF Unificado">
+                                                    <button type="submit" class="btn btn-outline-warning action-btn" title="Baixar PDF Unificado">
                                                         <i class="fas fa-download"></i>
                                                     </button>
                                                 </form>
+                                                <button type="button" class="btn btn-outline-danger action-btn"
+                                                        onclick="deleteList({{ list[0] }}, '{{ list[1] }}')" title="Deletar Lista">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Mobile Cards View -->
+                    <div class="recent-lists-mobile">
+                        {% for list in merge_lists[:5] %}
+                            <div class="recent-list-card-mobile">
+                                <div class="list-info">
+                                    <div class="list-title">
+                                        <i class="fas fa-music text-primary me-2"></i>{{ list[1] }}
+                                    </div>
+                                    <div class="list-meta">
+                                        <span class="badge bg-primary">{{ list[5] }} música(s)</span>
+                                        <span class="text-muted ms-2">{{ list[4][:16] if list[4] else 'N/A' }}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="list-actions">
+                                    <div class="actions-dropdown">
+                                        <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('mobile-list-actions-{{ list[0] }}', event)">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div class="actions-dropdown-menu" id="mobile-list-actions-{{ list[0] }}">
+                                            <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" class="actions-dropdown-item btn-primary-style">
+                                                <i class="fas fa-edit"></i> Editar Lista
+                                            </a>
+                                            <button type="button" class="actions-dropdown-item btn-info-style" onclick="generateListReportFromHome({{ list[0] }})">
+                                                <i class="fas fa-file-export"></i> Gerar Relatório
+                                            </button>
+                                            <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: contents;">
+                                                <button type="submit" class="actions-dropdown-item btn-warning-style">
+                                                    <i class="fas fa-download"></i> Baixar PDF
+                                                </button>
+                                            </form>
+                                            <button type="button" class="actions-dropdown-item btn-danger-style"
+                                                    onclick="deleteList({{ list[0] }}, '{{ list[1] }}')" title="Deletar Lista">
+                                                <i class="fas fa-trash"></i> Deletar Lista
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -312,7 +464,8 @@
                         <div class="card-header">
                             <h6 class="mb-0">Músicas ({{ files|length }})</h6>
                         </div>
-                        <div class="table-responsive">
+                        <!-- Desktop Table View -->
+                        <div class="table-responsive music-table-responsive">
                             <table class="table table-hover mb-0 music-table">
                                 <thead class="table-light">
                                     <tr>
@@ -329,13 +482,13 @@
                                         <th class="sortable-header" onclick="sortBy('category')" style="cursor: pointer;">
                                             Categoria <span id="sort-category" class="sort-icon"></span>
                                         </th>
-                                        <th class="sortable-header" onclick="sortBy('musical_key')" style="cursor: pointer;">
+                                        <th class="sortable-header d-none-mobile" onclick="sortBy('musical_key')" style="cursor: pointer;">
                                             Tom <span id="sort-musical_key" class="sort-icon"></span>
                                         </th>
-                                        <th class="sortable-header" onclick="sortBy('liturgical')" style="cursor: pointer;">
+                                        <th class="sortable-header d-none-mobile" onclick="sortBy('liturgical')" style="cursor: pointer;">
                                             Tempo Litúrgico <span id="sort-liturgical" class="sort-icon"></span>
                                         </th>
-                                        <th style="width: 200px;">Ações</th>
+                                        <th style="width: 120px;">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -376,7 +529,7 @@
                                                     <span class="text-muted">-</span>
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="d-none-mobile">
                                                 {% if file[7] %}
                                                     <span class="badge bg-success clickable-badge" 
                                                           onclick="filterByMusicalKey('{{ file[7] }}')" 
@@ -388,7 +541,7 @@
                                                     <span class="text-muted">-</span>
                                                 {% endif %}
                                             </td>
-                                            <td>
+                                            <td class="d-none-mobile">
                                                 {% if file[14] %}
                                                     {% for liturgical_time in file[14] %}
                                                         <span class="badge bg-info clickable-badge me-1 mb-1" 
@@ -404,62 +557,73 @@
                                             </td>
 
                                             <td>
-                                                <div class="btn-group btn-group-sm">
+                                                <!-- Dropdown de ações customizado -->
+                                                <div class="actions-dropdown d-md-none">
+                                                    <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('actions-{{ file[0] }}', event)">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div class="actions-dropdown-menu" id="actions-{{ file[0] }}">
+                                                        <a href="{{ url_for('music_details', file_id=file[0]) }}" class="actions-dropdown-item btn-info-style">
+                                                            <i class="fas fa-info-circle"></i> Detalhes
+                                                        </a>
+                                                        <a href="{{ url_for('view_file', file_id=file[0]) }}" target="_blank" class="actions-dropdown-item btn-primary-style">
+                                                            <i class="fas fa-eye"></i> Visualizar PDF
+                                                        </a>
+                                                        {% if file[8] %}
+                                                            <a href="{{ file[8] }}" target="_blank" class="actions-dropdown-item btn-danger-style">
+                                                                <i class="fab fa-youtube"></i> YouTube
+                                                            </a>
+                                                        {% endif %}
+                                                        <a href="{{ url_for('download_file', file_id=file[0]) }}" class="actions-dropdown-item btn-warning-style">
+                                                            <i class="fas fa-download"></i> Baixar PDF
+                                                        </a>
+                                                        {% if merge_lists %}
+                                                            <button type="button" class="actions-dropdown-item btn-success-style" style="border: none; background: none; width: 100%; text-align: left;" onclick="showAddToListModal({{ file[0] }})">
+                                                                <i class="fas fa-plus"></i> Adicionar à Lista
+                                                            </button>
+                                                        {% endif %}
+                                                        <a href="#" onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" class="actions-dropdown-item btn-danger-style">
+                                                            <i class="fas fa-trash"></i> Deletar
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Botões individuais para desktop -->
+                                                <div class="btn-group btn-group-sm d-none d-md-flex">
                                                     <a href="{{ url_for('music_details', file_id=file[0]) }}" 
-                                                       class="btn btn-outline-info btn-sm action-btn" title="Detalhes">
+                                                       class="btn btn-outline-info action-btn" title="Detalhes">
                                                         <i class="fas fa-info-circle"></i>
                                                     </a>
                                                     
-                                                    <!-- Add to List Dropdown -->
+                                                    <!-- Add to List Button -->
                                                     {% if merge_lists %}
-                                                    <div class="btn-group" role="group">
-                                                        <button type="button" class="btn btn-outline-warning btn-sm dropdown-toggle list-dropdown-btn" 
-                                                                data-bs-toggle="dropdown" aria-expanded="false">
-                                                            <i class="fas fa-plus"></i> Lista
+                                                        <button type="button" class="btn btn-outline-success action-btn" 
+                                                                onclick="showAddToListModal({{ file[0] }})" title="Adicionar à Lista">
+                                                            <i class="fas fa-plus"></i> 
                                                         </button>
-                                                        <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                                                            <div class="px-3 py-2">
-                                                                <input type="text" class="form-control form-control-sm" 
-                                                                       placeholder="Buscar lista..." 
-                                                                       onkeyup="filterDropdownLists(this, 'dropdown-{{ file[0] }}')">
-                                                            </div>
-                                                            <div class="dropdown-divider"></div>
-                                                            <div id="dropdown-{{ file[0] }}" style="max-height: 200px; overflow-y: auto;">
-                                                                {% for list in merge_lists %}
-                                                                <div class="dropdown-list-item" data-name="{{ list[1] | lower }}">
-                                                                    <form method="POST" action="{{ url_for('add_song_to_list', file_id=file[0], list_id=list[0]) }}" style="display: inline;">
-                                                                        <button type="submit" class="dropdown-item">
-                                                                            <i class="fas fa-list text-primary"></i> {{ list[1] }}
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                                {% endfor %}
-                                                            </div>
-                                                        </div>
-                                                    </div>
                                                     {% endif %}
                                                     
                                                     <a href="{{ url_for('view_file', file_id=file[0]) }}" 
-                                                       class="btn btn-outline-primary btn-sm action-btn" target="_blank" title="Visualizar PDF">
+                                                       class="btn btn-outline-primary action-btn" target="_blank" title="Visualizar PDF">
                                                         <i class="fas fa-eye"></i>
                                                     </a>
                                                     
                                                     {% if file[8] %}
                                                         <a href="{{ file[8] }}" 
-                                                           class="btn btn-outline-danger btn-sm action-btn" target="_blank" title="Ouvir no YouTube">
+                                                           class="btn btn-outline-danger action-btn" target="_blank" title="Ouvir no YouTube">
                                                             <i class="fab fa-youtube"></i>
                                                         </a>
                                                     {% else %}
-                                                        <button class="btn btn-outline-danger btn-sm action-btn" disabled title="YouTube não disponível">
+                                                        <button class="btn btn-outline-danger action-btn" disabled title="YouTube não disponível">
                                                             <i class="fab fa-youtube"></i>
                                                         </button>
                                                     {% endif %}
                                                     
                                                     <a href="{{ url_for('download_file', file_id=file[0]) }}" 
-                                                       class="btn btn-outline-warning btn-sm action-btn" title="Baixar PDF">
+                                                       class="btn btn-outline-warning action-btn" title="Baixar PDF">
                                                         <i class="fas fa-download"></i>
                                                     </a>
-                                                    <button type="button" class="btn btn-outline-danger btn-sm action-btn"
+                                                    <button type="button" class="btn btn-outline-danger action-btn"
                                                             onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" title="Deletar">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
@@ -469,6 +633,95 @@
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <!-- Mobile Cards View -->
+                        <div class="music-cards-mobile">
+                            {% for file in files %}
+                                <div class="music-card-mobile">
+                                    <div class="checkbox-section">
+                                        <input type="checkbox" class="form-check-input file-selector" 
+                                               name="selected_files" value="{{ file[0] }}" 
+                                               onchange="updateBulkSelection()">
+                                    </div>
+                                    
+                                    <div class="info-section">
+                                        <div class="music-title">
+                                            {% if file[3] %}
+                                                {{ file[3] }}
+                                            {% else %}
+                                                {{ file[2] }}
+                                            {% endif %}
+                                        </div>
+                                        
+                                        {% if file[4] %}
+                                            <div class="music-artist">por {{ file[4] }}</div>
+                                        {% endif %}
+                                        
+                                        <div class="music-badges">
+                                            {% if file[13] %}
+                                                {% for category in file[13] %}
+                                                    <span class="badge bg-primary clickable-badge" 
+                                                          onclick="filterByCategory('{{ category }}')" 
+                                                          style="cursor: pointer;">
+                                                        {{ category }}
+                                                    </span>
+                                                {% endfor %}
+                                            {% endif %}
+                                            
+                                            {% if file[7] %}
+                                                <span class="badge bg-success clickable-badge" 
+                                                      onclick="filterByMusicalKey('{{ file[7] }}')" 
+                                                      style="cursor: pointer;">
+                                                    {{ file[7] }}
+                                                </span>
+                                            {% endif %}
+                                            
+                                            {% if file[14] %}
+                                                {% for liturgical_time in file[14] %}
+                                                    <span class="badge bg-info clickable-badge" 
+                                                          onclick="filterByLiturgical('{{ liturgical_time }}')" 
+                                                          style="cursor: pointer;">
+                                                        {{ liturgical_time }}
+                                                    </span>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="actions-section">
+                                        <div class="actions-dropdown">
+                                            <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('mobile-actions-{{ file[0] }}', event)">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <div class="actions-dropdown-menu" id="mobile-actions-{{ file[0] }}">
+                                                <a href="{{ url_for('music_details', file_id=file[0]) }}" class="actions-dropdown-item btn-info-style">
+                                                    <i class="fas fa-info-circle"></i> Detalhes
+                                                </a>
+                                                <a href="{{ url_for('view_file', file_id=file[0]) }}" target="_blank" class="actions-dropdown-item btn-primary-style">
+                                                    <i class="fas fa-eye"></i> Visualizar PDF
+                                                </a>
+                                                {% if file[8] %}
+                                                    <a href="{{ file[8] }}" target="_blank" class="actions-dropdown-item btn-danger-style">
+                                                        <i class="fab fa-youtube"></i> YouTube
+                                                    </a>
+                                                {% endif %}
+                                                {% if merge_lists %}
+                                                    <button type="button" class="actions-dropdown-item btn-success-style" style="border: none; background: none; width: 100%; text-align: left;" onclick="showAddToListModal({{ file[0] }})">
+                                                        <i class="fas fa-plus"></i> Adicionar à Lista
+                                                    </button>
+                                                {% endif %}
+                                                <a href="{{ url_for('download_file', file_id=file[0]) }}" class="actions-dropdown-item btn-warning-style">
+                                                    <i class="fas fa-download"></i> Baixar PDF
+                                                </a>
+                                                <a href="#" onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" class="actions-dropdown-item btn-danger-style">
+                                                    <i class="fas fa-trash"></i> Deletar
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -598,40 +851,16 @@
                                     <i class="fas fa-download"></i>
                                 </a>
                                 
-                                <button type="button" class="btn btn-outline-danger btn-sm action-btn"
-                                        onclick="deleteFile({{ file[0] }}, '{{ file[1] }}')" title="Deletar">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Add to List Dropdown for Card View -->
-                            {% if merge_lists %}
-                            <div class="btn-group w-100" role="group">
-                                <button type="button" class="btn btn-outline-success btn-sm dropdown-toggle list-dropdown-btn" 
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-plus"></i> Adicionar à Lista
-                                </button>
-                                <div class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                                    <div class="px-3 py-2">
-                                        <input type="text" class="form-control form-control-sm" 
-                                               placeholder="Buscar lista..." 
-                                               onkeyup="filterDropdownLists(this, 'dropdown-card-{{ file[0] }}')">
-                                    </div>
-                                    <div class="dropdown-divider"></div>
-                                    <div id="dropdown-card-{{ file[0] }}" style="max-height: 200px; overflow-y: auto;">
-                                        {% for list in merge_lists %}
-                                        <div class="dropdown-list-item" data-name="{{ list[1] | lower }}">
-                                            <form method="POST" action="{{ url_for('add_song_to_list', file_id=file[0], list_id=list[0]) }}" style="display: inline;">
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="fas fa-list text-primary"></i> {{ list[1] }}
-                                                </button>
-                                            </form>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
+                                <!-- Add to List Dropdown for Card View - Substituir pelo modal -->
+                                {% if merge_lists %}
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-outline-success btn-sm" 
+                                            onclick="showAddToListModal({{ file[0] }})">
+                                        <i class="fas fa-plus"></i> Adicionar à Lista
+                                    </button>
                                 </div>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -709,7 +938,7 @@ function addSelectedToExisting() {
     const listId = document.getElementById('existingListSelect').value;
     
     if (!listId || selected.length === 0) {
-        alert('Selecione uma lista e pelo menos uma música');
+        showToast('Selecione uma lista e pelo menos uma música', 'warning');
         return;
     }
     
@@ -1423,8 +1652,138 @@ function filterByMusicalKey(musicalKey) {
     // Destacar o campo brevemente
     filterTextElement.style.border = '2px solid #007bff';
     setTimeout(() => {
-        filterTextElement.style.border = '';
-    }, 2000);
+            filterTextElement.style.border = '';
+}, 2000);
+}
+
+// Função para gerar relatório de lista da página inicial
+function generateListReportFromHome(listId) {
+    // Encontrar o botão que foi clicado
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    
+    // Mostrar indicador de carregamento
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch(`/api/generate_report/${listId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Copiar para o clipboard
+                navigator.clipboard.writeText(data.report).then(() => {
+                    // Mostrar sucesso temporário no botão
+                    button.innerHTML = '<i class="fas fa-check"></i>';
+                    button.className = 'btn btn-success btn-sm action-btn';
+                    
+                    // Mostrar toast de sucesso
+                    showToast('Relatório copiado para a área de transferência!', 'success');
+                    
+                    // Restaurar botão após 2 segundos
+                    setTimeout(() => {
+                        button.innerHTML = originalContent;
+                        button.className = 'btn btn-outline-info btn-sm action-btn';
+                        button.disabled = false;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Erro ao copiar para clipboard:', err);
+                    showToast('Erro ao copiar para o clipboard', 'error');
+                    button.innerHTML = originalContent;
+                    button.disabled = false;
+                });
+            } else {
+                showToast('Erro ao gerar relatório: ' + data.message, 'error');
+                button.innerHTML = originalContent;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('Erro ao gerar relatório', 'error');
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        });
+}
+
+// Função para deletar lista
+function deleteList(listId, listName) {
+    const modalHtml = `
+        <div class="modal fade" id="deleteListModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmar Exclusão</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Tem certeza que deseja deletar a lista <strong>${listName}</strong>?</p>
+                        <p class="text-muted">Esta ação não pode ser desfeita e todas as músicas da lista serão removidas.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <form method="POST" action="/delete_merge_list/${listId}" style="display: inline;">
+                            <button type="submit" class="btn btn-danger">Deletar Lista</button>
+                        </form>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    new bootstrap.Modal(document.getElementById('deleteListModal')).show();
+}
+
+// Sistema de toast (reutilizando do edit_merge_list)
+function showToast(message, type = 'success') {
+    // Remover toast anterior se existir
+    const existingToast = document.getElementById('toast-notification');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Criar toast
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = `toast-notification ${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: ${type === 'success' ? '#28a745' : '#dc3545'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+        min-width: 250px;
+    `;
+    
+    const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-circle"></i>';
+    toast.innerHTML = `${icon} ${message}`;
+    
+    document.body.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 50);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
 }
 </script>
-{% endblock %} 
+{% endblock %}  
