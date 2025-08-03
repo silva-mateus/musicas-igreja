@@ -113,7 +113,7 @@ jobs:
     - name: Deploy para servidor (executado diretamente no runner local)
       # Define variáveis de ambiente que estarão disponíveis para o script 'run'
       env: 
-        SECRET_KEY: ${{ secrets.APP_SECRET_KEY }} # Passa a SECRET_KEY da sua aplicação
+        SECRET_KEY: ${{ secrets.SECRET_KEY }} # Passa a SECRET_KEY da sua aplicação
       run: |
         # Define as variáveis para facilitar o uso no script
         IMAGE_FULL_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
