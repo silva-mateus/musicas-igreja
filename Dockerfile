@@ -17,8 +17,10 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 # Stage final - imagem de produção
 FROM python:3.11-slim
 
-# Criar usuário não-root para segurança
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Definir UID/GID para o usuário não-root para consistência com permissões de volume no host
+ARG APP_USER_UID=1000
+ARG APP_USER_GID=1000
+RUN groupadd -r -g ${APP_USER_GID} appuser && useradd -r -g appuser -u ${APP_USER_UID} appuser
 
 # Instalar apenas dependências runtime necessárias
 RUN apt-get update && apt-get install -y \
@@ -37,9 +39,11 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copiar aplicação
 COPY --chown=appuser:appuser . .
 
-# Criar diretórios necessários
-RUN mkdir -p logs uploads organized && \
-    chown -R appuser:appuser /app
+# Criar diretórios necessários DENTRO DO CONTÊINER (se não estiverem montados como volume)
+# Estes comandos são menos relevantes para volumes montados, mas mantidos para clareza
+# e para o caso de o volume não ser montado.
+RUN mkdir -p /app/data/logs /app/data/uploads /app/data/organized && \
+    chown -R appuser:appuser /app/data
 
 # Configurar variáveis de ambiente
 ENV FLASK_APP=app.py

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   musicas-igreja:
     # A seção 'build' foi removida porque a imagem é construída e empurrada para o GHCR

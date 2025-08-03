@@ -127,9 +127,6 @@ jobs:
         cp docker-compose.yml ~/musicas-igreja/
         cd ~/musicas-igreja
         
-        echo "Conteúdo do docker-compose.yml:"
-        cat docker-compose.yml
-        
         echo "Verificando se Docker está disponível..."
         docker --version
         docker compose version
