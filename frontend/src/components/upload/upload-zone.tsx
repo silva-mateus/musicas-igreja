@@ -1,0 +1,198 @@
+'use client'
+
+import { useCallback, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import {
+    Upload,
+    FileText,
+    X,
+    AlertCircle,
+    CheckCircle2,
+    File
+} from 'lucide-react'
+import { formatFileSize } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+
+interface UploadZoneProps {
+    onFilesSelected: (files: File[]) => void
+    disabled?: boolean
+    selectedFiles?: File[]
+    onRemoveFile?: (index: number) => void
+}
+
+export function UploadZone({
+    onFilesSelected,
+    disabled = false,
+    selectedFiles = [],
+    onRemoveFile
+}: UploadZoneProps) {
+    const [dragActive, setDragActive] = useState(false)
+
+    const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+        if (disabled) return
+
+        // Filter only PDF files
+        const pdfFiles = acceptedFiles.filter(file => file.type === 'application/pdf')
+
+        if (pdfFiles.length > 0) {
+            onFilesSelected([...selectedFiles, ...pdfFiles])
+        }
+
+        // Show error for rejected files
+        if (rejectedFiles.length > 0 || pdfFiles.length !== acceptedFiles.length) {
+            console.warn('Alguns arquivos foram rejeitados (apenas PDFs são aceitos)')
+        }
+    }, [disabled, selectedFiles, onFilesSelected])
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'application/pdf': ['.pdf']
+        },
+        disabled,
+        maxSize: 50 * 1024 * 1024, // 50MB
+        onDragEnter: () => setDragActive(true),
+        onDragLeave: () => setDragActive(false),
+        onDropAccepted: () => setDragActive(false),
+        onDropRejected: () => setDragActive(false)
+    })
+
+    const getFileStatus = (file: File) => {
+        if (file.size > 50 * 1024 * 1024) {
+            return { status: 'error', message: 'Arquivo muito grande (máx. 50MB)' }
+        }
+        if (file.type !== 'application/pdf') {
+            return { status: 'error', message: 'Apenas arquivos PDF são aceitos' }
+        }
+        return { status: 'success', message: 'Pronto para upload' }
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Drop Zone */}
+            <div
+                {...getRootProps()}
+                className={cn(
+                    "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+                    "hover:border-primary/50 hover:bg-primary/5",
+                    isDragActive || dragActive
+                        ? "border-primary bg-primary/10"
+                        : "border-border",
+                    disabled && "opacity-50 cursor-not-allowed"
+                )}
+            >
+                <input {...getInputProps()} />
+
+                <div className="flex flex-col items-center gap-4">
+                    <div className={cn(
+                        "p-4 rounded-full",
+                        isDragActive || dragActive
+                            ? "bg-primary/20 text-primary"
+                            : "bg-muted text-muted-foreground"
+                    )}>
+                        <Upload className="h-8 w-8" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-medium">
+                            {isDragActive || dragActive
+                                ? "Solte os arquivos aqui"
+                                : "Arraste arquivos PDF ou clique para selecionar"
+                            }
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            Suporte para múltiplos arquivos • Máximo 50MB por arquivo
+                        </p>
+                    </div>
+
+                    <Button
+                        variant="outline"
+                        disabled={disabled}
+                        className="gap-2"
+                    >
+                        <FileText className="h-4 w-4" />
+                        Selecionar Arquivos
+                    </Button>
+                </div>
+            </div>
+
+            {/* Selected Files List */}
+            {selectedFiles.length > 0 && (
+                <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                        <File className="h-4 w-4" />
+                        Arquivos Selecionados ({selectedFiles.length})
+                    </h4>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {selectedFiles.map((file, index) => {
+                            const fileStatus = getFileStatus(file)
+
+                            return (
+                                <Card key={index} className="p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className={cn(
+                                                "p-2 rounded",
+                                                fileStatus.status === 'success'
+                                                    ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                                                    : "bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                                            )}>
+                                                <FileText className="h-4 w-4" />
+                                            </div>
+
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium truncate">
+                                                    {file.name}
+                                                </p>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>{formatFileSize(file.size)}</span>
+                                                    <span>•</span>
+                                                    <span>{file.type}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Badge
+                                                variant={fileStatus.status === 'success' ? 'default' : 'destructive'}
+                                                className="gap-1"
+                                            >
+                                                {fileStatus.status === 'success' ? (
+                                                    <CheckCircle2 className="h-3 w-3" />
+                                                ) : (
+                                                    <AlertCircle className="h-3 w-3" />
+                                                )}
+                                                {fileStatus.status === 'success' ? 'OK' : 'Erro'}
+                                            </Badge>
+
+                                            {onRemoveFile && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => onRemoveFile(index)}
+                                                    className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {fileStatus.status === 'error' && (
+                                        <div className="mt-2 text-xs text-destructive">
+                                            {fileStatus.message}
+                                        </div>
+                                    )}
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}

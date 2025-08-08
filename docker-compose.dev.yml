@@ -1,0 +1,88 @@
+version: '3.8'
+
+# Configuração para desenvolvimento
+services:
+  # Backend Flask API (Desenvolvimento)
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: musicas-igreja-backend-dev
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
+      - SECRET_KEY=dev-secret-key-not-for-production
+      - DATABASE_PATH=/app/data/pdf_organizer.db
+      - UPLOAD_FOLDER=/app/data/uploads
+      - ORGANIZED_FOLDER=/app/data/organized
+      - LOG_FOLDER=/app/data/logs
+      - PORT=5000
+      - FRONTEND_URL=http://localhost:3000
+    volumes:
+      # Volume para persistir dados
+      - backend_data_dev:/app/data
+      # Mount do código para hot reload
+      - ./backend:/app
+    networks:
+      - musicas-network-dev
+    ports:
+      - "5000:5000"
+    command: python app.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend NextJS (Desenvolvimento)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      target: deps  # Apenas instalar deps para desenvolvimento
+    container_name: musicas-igreja-frontend-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - PORT=3000
+    volumes:
+      # Mount do código para hot reload
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - musicas-network-dev
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    depends_on:
+      - backend
+
+  # Banco de dados para desenvolvimento (opcional)
+  # Descomente se quiser usar PostgreSQL ao invés de SQLite
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: musicas-igreja-postgres-dev
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=musicas_igreja
+  #     - POSTGRES_USER=dev_user
+  #     - POSTGRES_PASSWORD=dev_password
+  #   volumes:
+  #     - postgres_data_dev:/var/lib/postgresql/data
+  #   networks:
+  #     - musicas-network-dev
+  #   ports:
+  #     - "5432:5432"
+
+networks:
+  musicas-network-dev:
+    driver: bridge
+
+volumes:
+  backend_data_dev:
+    driver: local
+  # postgres_data_dev:
+  #   driver: local
