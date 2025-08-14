@@ -99,6 +99,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+**/venv/
+**/.venv/
 
 # Spyder project settings
 .spyderproject
@@ -120,8 +122,17 @@ dmypy.json
 
 # Project specific
 
-logs/*.log
+# Python/Flask runtime (backend)
+backend/uploads/
+backend/organized/
+backend/flask_session/
+backend/logs/
+backend/**/*.log
 
+# Databases (SQLite)
+*.db
+backend/*.db
+backend/data/*.db
 *.db-journal
 
 # IDE
@@ -130,6 +141,21 @@ logs/*.log
 *.swp
 *.swo
 *~
+
+# Frontend build artifacts
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+frontend/.eslintcache
+frontend/coverage/
+
+# Local env files
+.env.local
+.env.*.local
+frontend/.env.local
 
 # OS
 .DS_Store
