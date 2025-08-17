@@ -124,16 +124,19 @@ dmypy.json
 
 # Python/Flask runtime (backend)
 backend/uploads/
-backend/organized/
+#backend/organized/
 backend/flask_session/
 backend/logs/
 backend/**/*.log
+backend/templates/
 
 # Databases (SQLite)
-*.db
-backend/*.db
-backend/data/*.db
-*.db-journal
+# Atenção: vamos COMMITAR o db atual no primeiro deploy. Depois reativar ignores.
+# *.db
+# backend/*.db
+# backend/data/*.db
+# *.db-journal
+*.db.bkp
 
 # IDE
 .vscode/
@@ -155,6 +158,7 @@ frontend/coverage/
 # Local env files
 .env.local
 .env.*.local
+*.env.example
 frontend/.env.local
 
 # OS

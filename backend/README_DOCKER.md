@@ -39,17 +39,17 @@ DOMAIN=musicas.seudominio.com
 ACME_EMAIL=admin@seudominio.com
 
 # Paths (deixar padrão para Docker)
-DATABASE_PATH=/app/data/pdf_organizer.db
-UPLOAD_FOLDER=/app/data/uploads
-ORGANIZED_FOLDER=/app/data/organized
-LOG_FOLDER=/app/data/logs
+DATABASE_PATH=/data/pdf_organizer.db
+UPLOAD_FOLDER=/data/uploads
+ORGANIZED_FOLDER=/data/organized
+LOG_FOLDER=/data/logs
 ```
 
-### 3. Deploy Local
+### 3. Deploy Local (backend + frontend)
 
 ```bash
-# Build e start
-docker-compose up -d
+# Build e start (ambos serviços)
+docker compose up -d
 
 # Verificar logs
 docker-compose logs -f musicas-igreja
@@ -60,7 +60,8 @@ docker-compose ps
 
 ### 4. Acesso
 
-- **Aplicação:** http://localhost:5000
+- **Backend (API):** http://localhost:5000
+- **Frontend:** http://localhost:3000
 - **Health Check:** http://localhost:5000/health
 
 ## 🌐 Deploy com SSL (Traefik)
@@ -176,8 +177,8 @@ docker-compose logs --tail=100 musicas-igreja
 
 ```bash
 # Backup do banco de dados
-docker-compose exec musicas-igreja cp /app/data/pdf_organizer.db /tmp/
-docker cp $(docker-compose ps -q musicas-igreja):/tmp/pdf_organizer.db ./backup.db
+docker compose exec musicas-igreja cp /data/pdf_organizer.db /tmp/
+docker cp $(docker compose ps -q musicas-igreja):/tmp/pdf_organizer.db ./backup.db
 
 # Backup completo dos dados
 docker run --rm -v musicas_data:/data -v $(pwd):/backup alpine tar czf /backup/backup.tar.gz -C /data .
@@ -261,8 +262,8 @@ nslookup musicas.seudominio.com
 **Banco de dados corrompido:**
 ```bash
 # Backup e recriar
-docker-compose exec musicas-igreja cp /app/data/pdf_organizer.db /app/data/pdf_organizer.db.backup
-docker-compose exec musicas-igreja python -c "from app import init_db; init_db()"
+docker compose exec musicas-igreja cp /data/pdf_organizer.db /data/pdf_organizer.db.backup
+docker compose exec musicas-igreja python -c "from app import init_db; init_db()"
 ```
 
 ## 📈 Performance
@@ -320,8 +321,8 @@ docker-compose up -d musicas-igreja
 cat > backup.sh << 'EOF'
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-docker-compose exec musicas-igreja cp /app/data/pdf_organizer.db /tmp/backup_$DATE.db
-docker cp $(docker-compose ps -q musicas-igreja):/tmp/backup_$DATE.db ./backups/
+docker compose exec musicas-igreja cp /data/pdf_organizer.db /tmp/backup_$DATE.db
+docker cp $(docker compose ps -q musicas-igreja):/tmp/backup_$DATE.db ./backups/
 find ./backups -name "backup_*.db" -mtime +30 -delete
 EOF
 

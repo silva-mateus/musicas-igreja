@@ -19,6 +19,29 @@ import sys
 
 app = Flask(__name__)
 
+# Configuração CORS para desenvolvimento
+@app.after_request
+def after_request(response):
+    # Permitir requisições do frontend durante desenvolvimento
+    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+    response.headers.add('Vary', 'Origin')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+# Tratar preflight CORS
+@app.route('/api/<path:any_path>', methods=['OPTIONS'])
+def cors_preflight(any_path):
+    response = app.make_response(('', 204))
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    response.headers['Vary'] = 'Origin'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Max-Age'] = '86400'
+    return response
+
 # Configurações de produção com variáveis de ambiente
 app.secret_key = os.environ.get('SECRET_KEY', 'musicas-igreja-secret-key-2024-security-enhanced')
 MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 52428800))  # 50MB padrão
@@ -26,45 +49,87 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)  # 8 hours session timeout
 
 # Configuration - Suporte a variáveis de ambiente para Docker (definir antes do logging)
-UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
-ORGANIZED_FOLDER = os.environ.get('ORGANIZED_FOLDER', 'organized')
-DATABASE = os.environ.get('DATABASE_PATH', 'pdf_organizer.db')
-LOG_FOLDER = os.environ.get('LOG_FOLDER', 'logs')
+# Detectar execução dentro de Docker para escolher diretório padrão de dados
+IN_DOCKER = os.path.exists('/.dockerenv') or os.environ.get('RUNNING_IN_DOCKER', '').lower() in ('1', 'true', 'yes')
+DEFAULT_DATA_DIR = '/data' if IN_DOCKER else os.path.join(os.path.dirname(__file__), 'data')
+
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(DEFAULT_DATA_DIR, 'uploads'))
+ORGANIZED_FOLDER = os.environ.get('ORGANIZED_FOLDER', os.path.join(os.path.dirname(__file__), 'organized'))
+DATABASE = os.environ.get('DATABASE_PATH', os.path.join(DEFAULT_DATA_DIR, 'pdf_organizer.db'))
+LOG_FOLDER = os.environ.get('LOG_FOLDER', os.path.join(DEFAULT_DATA_DIR, 'logs'))
+# Helpers para paths organizados: salvar relativo (/organized/...) e resolver para absoluto quando necessário
+def to_relative_organized_path(path: str) -> str:
+    try:
+        # Já relativo
+        if path.startswith('/organized/') or path.startswith('organized/'):
+            return path if path.startswith('/organized/') else '/' + path
+        # Se for dentro da pasta organizada absoluta
+        if path.startswith(ORGANIZED_FOLDER):
+            rel = os.path.relpath(path, ORGANIZED_FOLDER).replace('\\', '/')
+            return f"/organized/{rel}"
+    except Exception:
+        pass
+    return path
+
+
+def to_absolute_organized_path(path: str) -> str:
+    try:
+        if path.startswith('/organized/'):
+            rel = path[len('/organized/'):]
+            return os.path.join(ORGANIZED_FOLDER, rel)
+        if path.startswith('organized/'):
+            rel = path[len('organized/'):]
+            return os.path.join(ORGANIZED_FOLDER, rel)
+    except Exception:
+        pass
+    return path
+
+# OAuth (Google) - permitir HTTP em desenvolvimento local
+if os.environ.get('FLASK_ENV', 'development') != 'production':
+    os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
+    os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
 
 # Setup logging to daily log file
 def setup_logging():
     """Configure logging to write to daily log files."""
     # Ensure logs directory exists
     os.makedirs(LOG_FOLDER, exist_ok=True)
-    
+
     # Generate daily log filename
     today = datetime.now().strftime('%Y-%m-%d')
     log_file = f'{LOG_FOLDER}/{today}_sistema.log'
-    
+
+    # Avoid duplicate handlers when the module is reloaded or setup is called twice
+    if getattr(app, '_logging_configured', False):
+        return log_file
+    app.logger.handlers.clear()
+    app.logger.propagate = False
+
     # Configure logging format
     formatter = logging.Formatter(
         '[%(asctime)s] [FLASK-%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
+
     # Create file handler
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.INFO)
-    
+
     # Configure Flask app logger
     app.logger.addHandler(file_handler)
     app.logger.setLevel(logging.INFO)
-    
+
     # Also log to console for interactive mode
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     console_handler.setLevel(logging.INFO)
     app.logger.addHandler(console_handler)
-    
+
     # Disable default Flask logging to avoid duplicates
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
-    
+
+    app._logging_configured = True
     return log_file
 
 # Initialize logging
@@ -113,19 +178,25 @@ def sanitize_filename(text):
     return text
 
 def format_camel_case(text):
-    """Formatar texto em camel case: primeira letra de cada palavra maiúscula, 
-    exceto palavras de 1-2 letras que não sejam a primeira palavra."""
+    """Formatar texto em title case: primeira letra de cada palavra maiúscula, 
+    exceto palavras pequenas que não sejam a primeira palavra."""
     if not text:
         return ""
     
     # Lista de palavras que devem permanecer em minúscula (exceto se forem a primeira palavra)
     small_words = ['a', 'e', 'o', 'as', 'os', 'da', 'de', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 
-                   'com', 'por', 'para', 'que', 'se', 'te', 'me', 'lhe', 'la', 'le', 'lo', 'um', 'uma', 'uns', 'umas']
+                   'com', 'por', 'para', 'que', 'se', 'te', 'me', 'lhe', 'la', 'le', 'lo', 'um', 'uma', 'uns', 'umas',
+                   'ao', 'aos', 'à', 'às', 'pelo', 'pela', 'pelos', 'pelas', 'sob', 'sobre', 'sem', 'até', 'mas']
     
     words = text.split()
     formatted_words = []
     
     for i, word in enumerate(words):
+        # Preservar caracteres especiais e formatação
+        if not word.strip():
+            formatted_words.append(word)
+            continue
+            
         # Remove caracteres especiais temporariamente para análise
         clean_word = re.sub(r'[^\w]', '', word.lower())
         
@@ -133,7 +204,9 @@ def format_camel_case(text):
         # Palavras com mais de 2 letras sempre com inicial maiúscula
         # Palavras de 1-2 letras só em minúscula se não forem a primeira e estiverem na lista
         if i == 0 or len(clean_word) > 2 or clean_word not in small_words:
-            formatted_words.append(word.capitalize())
+            # Title case: primeira letra maiúscula, resto minúsculo
+            formatted_word = word[0].upper() + word[1:].lower()
+            formatted_words.append(formatted_word)
         else:
             formatted_words.append(word.lower())
     
@@ -1736,22 +1809,77 @@ def api_merge_lists():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT ml.id, ml.name, ml.updated_date, COUNT(mli.id) as file_count
+        SELECT ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date, COUNT(mli.id) as file_count
         FROM merge_lists ml
         LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
-        GROUP BY ml.id, ml.name, ml.updated_date
+        GROUP BY ml.id, ml.name, ml.observations, ml.created_date, ml.updated_date
         ORDER BY ml.updated_date DESC
     ''')
     lists = cursor.fetchall()
     
     conn.close()
     
+    app.logger.info(f"/api/merge_lists -> retornando {len(lists)} listas")
     return jsonify([{
-        'id': row[0], 
-        'name': row[1], 
-        'updated_date': row[2],
-        'file_count': row[3]
+        'id': row[0],
+        'name': row[1],
+        'observations': row[2],
+        'created_date': row[3],
+        'updated_date': row[4],
+        'file_count': row[5]
     } for row in lists])
+
+# ==========================================
+# API - filtros/sugestões para frontend
+# ==========================================
+
+@app.route('/api/filters/suggestions')
+def api_filters_suggestions():
+    """Retorna categorias, tempos litúrgicos, artistas e tonalidades suportadas."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    # Buscar categorias das tabelas normalizadas e da tabela principal (para compatibilidade)
+    cursor.execute('''
+        SELECT DISTINCT name FROM (
+            SELECT name FROM categories
+            UNION
+            SELECT DISTINCT category as name FROM pdf_files WHERE category IS NOT NULL AND category != ''
+        ) ORDER BY name
+    ''')
+    categories = [row[0] for row in cursor.fetchall() if row[0] and row[0].strip()]
+
+    # Buscar tempos litúrgicos das tabelas normalizadas e da tabela principal
+    cursor.execute('''
+        SELECT DISTINCT name FROM (
+            SELECT name FROM liturgical_times
+            UNION
+            SELECT DISTINCT liturgical_time as name FROM pdf_files WHERE liturgical_time IS NOT NULL AND liturgical_time != ''
+        ) ORDER BY name
+    ''')
+    liturgical_times = [row[0] for row in cursor.fetchall() if row[0] and row[0].strip()]
+
+    # Buscar artistas das tabelas normalizadas e da tabela principal
+    cursor.execute('''
+        SELECT DISTINCT name FROM (
+            SELECT name FROM artists
+            UNION
+            SELECT DISTINCT artist as name FROM pdf_files WHERE artist IS NOT NULL AND artist != ''
+        ) ORDER BY name
+    ''')
+    artists = [row[0] for row in cursor.fetchall() if row[0] and row[0].strip()]
+
+    conn.close()
+
+    musical_keys = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B','Cm','C#m','Dm','D#m','Em','Fm','F#m','Gm','G#m','Am','A#m','Bm']
+
+    app.logger.info("/api/filters/suggestions -> categorias=%d tempos=%d artistas=%d", len(categories), len(liturgical_times), len(artists))
+    return jsonify({
+        'categories': categories,
+        'liturgical_times': liturgical_times,
+        'artists': artists,
+        'musical_keys': musical_keys
+    })
 
 @app.route('/api/get_youtube_link/<int:file_id>')
 def api_get_youtube_link(file_id):
@@ -1768,6 +1896,148 @@ def api_get_youtube_link(file_id):
         return jsonify({'success': True, 'youtube_link': result[0]})
     else:
         return jsonify({'success': False, 'message': 'Link do YouTube não encontrado'})
+
+@app.route('/api/admin/verify-pdfs', methods=['GET'])
+def api_verify_pdfs():
+    """Verificar se os nomes dos PDFs seguem o padrão correto."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, filename, song_name, artist, musical_key, file_path
+        FROM pdf_files
+        ORDER BY id
+    ''')
+    
+    files = cursor.fetchall()
+    conn.close()
+    
+    mismatched_files = []
+    
+    for file_id, current_filename, song_name, artist, musical_key, file_path in files:
+        if song_name and artist:
+            expected_filename = generate_filename(song_name, artist, current_filename, musical_key)
+            
+            if current_filename != expected_filename:
+                mismatched_files.append({
+                    'id': file_id,
+                    'current_filename': current_filename,
+                    'expected_filename': expected_filename,
+                    'song_name': song_name,
+                    'artist': artist,
+                    'musical_key': musical_key,
+                    'file_path': file_path
+                })
+    
+    return jsonify({
+        'total_files': len(files),
+        'mismatched_count': len(mismatched_files),
+        'mismatched_files': mismatched_files
+    })
+
+@app.route('/api/admin/fix-pdf-names', methods=['POST'])
+def api_fix_pdf_names():
+    """Corrigir nomes dos PDFs que não seguem o padrão."""
+    data = request.get_json() or {}
+    file_ids = data.get('file_ids', [])
+    
+    if not file_ids:
+        return jsonify({'success': False, 'error': 'Nenhum arquivo especificado'}), 400
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    fixed_files = []
+    errors = []
+    
+    for file_id in file_ids:
+        try:
+            cursor.execute('''
+                SELECT filename, song_name, artist, musical_key, file_path, category
+                FROM pdf_files WHERE id = ?
+            ''', (file_id,))
+            
+            result = cursor.fetchone()
+            if not result:
+                errors.append(f"Arquivo {file_id} não encontrado")
+                continue
+                
+            current_filename, song_name, artist, musical_key, file_path, category = result
+            
+            if not song_name or not artist:
+                errors.append(f"Arquivo {file_id}: nome da música ou artista não preenchido")
+                continue
+            
+            new_filename = generate_filename(song_name, artist, current_filename, musical_key)
+            
+            # Verificar se o arquivo físico existe
+            if not os.path.exists(file_path):
+                errors.append(f"Arquivo {file_id}: arquivo físico não encontrado em {file_path}")
+                continue
+            
+            # Gerar novo caminho baseado na categoria
+            category_folder = os.path.join(ORGANIZED_FOLDER, category or 'Diversos')
+            os.makedirs(category_folder, exist_ok=True)
+            
+            new_file_path = os.path.join(category_folder, new_filename)
+            
+            # Se já existe um arquivo com o novo nome, adicionar contador
+            counter = 1
+            base_name = os.path.splitext(new_filename)[0]
+            while os.path.exists(new_file_path) and new_file_path != file_path:
+                new_filename = f"{base_name}_{counter}.pdf"
+                new_file_path = os.path.join(category_folder, new_filename)
+                counter += 1
+            
+            # Mover/renomear arquivo se necessário
+            app.logger.info(f"🔄 [RENAME] Arquivo {file_id}:")
+            app.logger.info(f"   - Caminho atual: {file_path}")
+            app.logger.info(f"   - Novo caminho: {new_file_path}")
+            app.logger.info(f"   - Nome atual: {current_filename}")
+            app.logger.info(f"   - Novo nome: {new_filename}")
+            
+            if file_path != new_file_path:
+                app.logger.info(f"📁 [RENAME] Movendo arquivo...")
+                shutil.move(file_path, new_file_path)
+                app.logger.info(f"✅ [RENAME] Arquivo movido com sucesso")
+            elif current_filename != new_filename:
+                # Mesmo diretório, mas nome diferente - renomear in-place
+                app.logger.info(f"📝 [RENAME] Apenas renomeando (mesmo diretório)...")
+                directory = os.path.dirname(file_path)
+                new_path_same_dir = os.path.join(directory, new_filename)
+                os.rename(file_path, new_path_same_dir)
+                new_file_path = new_path_same_dir
+                app.logger.info(f"✅ [RENAME] Arquivo renomeado no mesmo diretório")
+            else:
+                app.logger.info(f"⏭️ [RENAME] Nenhuma alteração necessária")
+            
+            # Atualizar banco de dados
+            cursor.execute('''
+                UPDATE pdf_files 
+                SET filename = ?, file_path = ?
+                WHERE id = ?
+            ''', (new_filename, new_file_path, file_id))
+            
+            fixed_files.append({
+                'id': file_id,
+                'old_filename': current_filename,
+                'new_filename': new_filename,
+                'old_path': file_path,
+                'new_path': new_file_path
+            })
+            
+        except Exception as e:
+            errors.append(f"Erro ao processar arquivo {file_id}: {str(e)}")
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({
+        'success': True,
+        'fixed_count': len(fixed_files),
+        'fixed_files': fixed_files,
+        'errors': errors
+    })
 
 def remove_accents_sql(text):
     """Função auxiliar para remover acentos usando SQL REPLACE."""
@@ -3596,6 +3866,224 @@ def api_dashboard_top_artists():
 # API-ONLY ENDPOINTS (JSON)
 # ==========================================
 
+@app.route('/api/dashboard/stats', methods=['GET'])
+def api_dashboard_stats():
+    """Obter estatísticas do dashboard."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    try:
+        # Total de músicas
+        cursor.execute('SELECT COUNT(*) FROM pdf_files')
+        total_musics = cursor.fetchone()[0]
+        
+        # Total de listas
+        cursor.execute('SELECT COUNT(*) FROM merge_lists')
+        total_lists = cursor.fetchone()[0]
+        
+        # Total de categorias
+        cursor.execute('SELECT COUNT(*) FROM categories')
+        total_categories = cursor.fetchone()[0]
+        
+        # Total de tempos litúrgicos
+        cursor.execute('SELECT COUNT(*) FROM liturgical_times')
+        total_liturgical_times = cursor.fetchone()[0]
+        
+        # Total de artistas únicos
+        cursor.execute('SELECT COUNT(DISTINCT artist) FROM pdf_files WHERE artist IS NOT NULL AND artist != ""')
+        total_artists = cursor.fetchone()[0]
+        
+        # Tamanho total dos arquivos em MB
+        cursor.execute('SELECT SUM(file_size) FROM pdf_files WHERE file_size IS NOT NULL')
+        total_size_bytes = cursor.fetchone()[0] or 0
+        total_file_size_mb = round(total_size_bytes / (1024 * 1024), 2)
+        
+        # Total de páginas
+        cursor.execute('SELECT SUM(page_count) FROM pdf_files WHERE page_count IS NOT NULL')
+        total_pages = cursor.fetchone()[0] or 0
+        
+        # Músicas com YouTube
+        cursor.execute('SELECT COUNT(*) FROM pdf_files WHERE youtube_link IS NOT NULL AND youtube_link != ""')
+        musics_with_youtube = cursor.fetchone()[0]
+        
+        # Média de músicas por lista
+        cursor.execute('SELECT AVG(item_count) FROM (SELECT COUNT(*) as item_count FROM merge_list_items GROUP BY merge_list_id)')
+        avg_result = cursor.fetchone()[0]
+        avg_musics_per_list = round(avg_result if avg_result else 0, 1)
+        
+        # Lista com mais músicas
+        cursor.execute('''
+            SELECT ml.name, COUNT(mli.id) as count
+            FROM merge_lists ml
+            LEFT JOIN merge_list_items mli ON ml.id = mli.merge_list_id
+            GROUP BY ml.id, ml.name
+            ORDER BY count DESC
+            LIMIT 1
+        ''')
+        largest_list_result = cursor.fetchone()
+        largest_list = {'name': largest_list_result[0], 'count': largest_list_result[1]} if largest_list_result else None
+        
+        # Categoria mais popular
+        cursor.execute('''
+            SELECT c.name, COUNT(fc.file_id) as count
+            FROM categories c
+            LEFT JOIN file_categories fc ON c.id = fc.category_id
+            GROUP BY c.id, c.name
+            ORDER BY count DESC
+            LIMIT 1
+        ''')
+        popular_category_result = cursor.fetchone()
+        most_popular_category = {'name': popular_category_result[0], 'count': popular_category_result[1]} if popular_category_result else None
+        
+        stats = {
+            'total_musics': total_musics,
+            'total_lists': total_lists,
+            'total_categories': total_categories,
+            'total_liturgical_times': total_liturgical_times,
+            'total_artists': total_artists,
+            'total_file_size_mb': total_file_size_mb,
+            'total_pages': total_pages,
+            'musics_with_youtube': musics_with_youtube,
+            'avg_musics_per_list': avg_musics_per_list,
+            'largest_list': largest_list,
+            'most_popular_category': most_popular_category
+        }
+        
+        conn.close()
+        return jsonify(stats)
+        
+    except Exception as e:
+        conn.close()
+        app.logger.error(f"❌ [DASHBOARD] Erro ao buscar estatísticas: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
+@app.route('/api/dashboard/top-songs-by-category', methods=['GET'])
+def api_top_songs_by_category():
+    """Top 5 músicas por categoria."""
+    category = request.args.get('category', '').strip()
+    if not category:
+        return jsonify({'error': 'Categoria é obrigatória'}), 400
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    try:
+        # Buscar músicas da categoria (via tabela relacional)
+        cursor.execute('''
+            SELECT pf.id, pf.song_name, pf.artist, pf.musical_key,
+                   COUNT(mli.id) as usage_count
+            FROM pdf_files pf
+            LEFT JOIN file_categories fc ON pf.id = fc.file_id
+            LEFT JOIN categories c ON fc.category_id = c.id
+            LEFT JOIN merge_list_items mli ON pf.id = mli.pdf_file_id
+            WHERE c.name = ? OR pf.category = ?
+            GROUP BY pf.id, pf.song_name, pf.artist, pf.musical_key
+            ORDER BY usage_count DESC, pf.song_name ASC
+            LIMIT 5
+        ''', (category, category))
+        
+        songs = []
+        for row in cursor.fetchall():
+            songs.append({
+                'id': row[0],
+                'song_name': row[1],
+                'artist': row[2] or 'Artista não informado',
+                'musical_key': row[3] or '-',
+                'usage_count': row[4]
+            })
+        
+        conn.close()
+        return jsonify({'songs': songs, 'category': category})
+        
+    except Exception as e:
+        conn.close()
+        app.logger.error(f"❌ [DASHBOARD] Erro ao buscar top músicas: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
+@app.route('/api/dashboard/top-artists', methods=['GET'])
+def api_top_artists():
+    """Top 5 artistas com mais músicas."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT artist, COUNT(*) as song_count
+            FROM pdf_files 
+            WHERE artist IS NOT NULL AND artist != ''
+            GROUP BY LOWER(TRIM(artist))
+            ORDER BY song_count DESC
+            LIMIT 5
+        ''')
+        
+        artists = []
+        for row in cursor.fetchall():
+            artists.append({
+                'artist': row[0],
+                'song_count': row[1]
+            })
+        
+        conn.close()
+        return jsonify({'artists': artists})
+        
+    except Exception as e:
+        conn.close()
+        app.logger.error(f"❌ [DASHBOARD] Erro ao buscar top artistas: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
+@app.route('/api/dashboard/uploads-timeline', methods=['GET'])
+def api_uploads_timeline():
+    """Timeline de uploads dos últimos 12 meses."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    try:
+        # Últimos 12 meses
+        cursor.execute('''
+            SELECT 
+                strftime('%Y-%m', upload_date) as month,
+                COUNT(*) as upload_count
+            FROM pdf_files 
+            WHERE upload_date >= date('now', '-12 months')
+            GROUP BY strftime('%Y-%m', upload_date)
+            ORDER BY month ASC
+        ''')
+        
+        # Preencher meses sem uploads com 0
+        from datetime import datetime, timedelta
+        import calendar
+        
+        data_dict = {}
+        for row in cursor.fetchall():
+            data_dict[row[0]] = row[1]
+        
+        # Gerar últimos 12 meses
+        now = datetime.now()
+        timeline = []
+        for i in range(12):
+            date = now - timedelta(days=30*i)
+            month_key = date.strftime('%Y-%m')
+            month_name = f"{calendar.month_name[date.month]} {date.year}"
+            timeline.append({
+                'month': month_key,
+                'month_name': month_name,
+                'upload_count': data_dict.get(month_key, 0)
+            })
+        
+        timeline.reverse()  # Ordem cronológica
+        
+        conn.close()
+        return jsonify({'timeline': timeline})
+        
+    except Exception as e:
+        conn.close()
+        app.logger.error(f"❌ [DASHBOARD] Erro ao buscar timeline: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
+
+
 @app.route('/api/files', methods=['GET'])
 def api_list_files():
     """Listar arquivos com filtros e paginação (JSON)."""
@@ -3685,7 +4173,7 @@ def api_list_files():
         if not file_times and row[6]:
             file_times = [row[6]]
 
-        files.append({
+        file_data = {
             'id': row[0],
             'filename': row[1],
             'original_name': row[2],
@@ -3702,7 +4190,13 @@ def api_list_files():
             'page_count': row[11],
             'description': row[12],
             'file_path': row[13]
-        })
+        }
+        
+        # Debug log para verificar dados
+        if len(file_categories) > 1 or len(file_times) > 1:
+            app.logger.info(f"🔍 [FILES] Arquivo {row[0]} tem múltiplas categorias/tempos: cats={file_categories}, times={file_times}")
+        
+        files.append(file_data)
 
     conn.close()
     return jsonify({
@@ -3719,6 +4213,10 @@ def api_list_files():
 @app.route('/api/files', methods=['POST'])
 def api_upload_file():
     """Upload de PDF (multipart/form-data) retornando JSON."""
+    app.logger.info("📤 [UPLOAD] Recebendo requisição de upload...")
+    app.logger.info(f"📋 [UPLOAD] Form keys: {list(request.form.keys())}")
+    app.logger.info(f"📁 [UPLOAD] Files keys: {list(request.files.keys())}")
+    
     if 'file' not in request.files:
         return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
 
@@ -3728,9 +4226,21 @@ def api_upload_file():
     new_artist = request.form.get('new_artist', '').strip()
     selected_categories = request.form.getlist('categories') or []
     selected_liturgical_times = request.form.getlist('liturgical_times') or []
+    new_categories = request.form.getlist('new_categories') or []
+    new_liturgical_times = request.form.getlist('new_liturgical_times') or []
     musical_key = request.form.get('musical_key', '')
     youtube_link = request.form.get('youtube_link', '')
     description = request.form.get('description', '')
+
+    # Adicionar novas categorias à lista de selecionadas
+    for new_cat in new_categories:
+        if new_cat.strip():
+            selected_categories.append(new_cat.strip())
+
+    # Adicionar novos tempos litúrgicos à lista de selecionados
+    for new_time in new_liturgical_times:
+        if new_time.strip():
+            selected_liturgical_times.append(new_time.strip())
 
     category = selected_categories[0] if selected_categories else 'Diversos'
     liturgical_time = selected_liturgical_times[0] if selected_liturgical_times else ''
@@ -3776,11 +4286,12 @@ def api_upload_file():
         pdf_info = get_pdf_info(final_path)
         file_size = os.path.getsize(final_path)
 
+        relative_path = to_relative_organized_path(final_path)
         cursor.execute('''
             INSERT INTO pdf_files 
             (filename, original_name, song_name, artist, category, liturgical_time, musical_key, youtube_link, file_path, file_size, file_hash, page_count, description)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, final_path, file_size, file_hash, pdf_info['page_count'], description))
+        ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, relative_path, file_size, file_hash, pdf_info['page_count'], description))
 
         file_id = cursor.lastrowid
 
@@ -3871,30 +4382,42 @@ def api_get_file(file_id):
 @app.route('/api/files/<int:file_id>', methods=['DELETE'])
 def api_delete_file(file_id):
     """Deletar arquivo (JSON)."""
+    app.logger.info(f"🗑️ [DELETE] Tentando deletar arquivo ID: {file_id}")
+    
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('SELECT file_path, filename FROM pdf_files WHERE id = ?', (file_id,))
     result = cursor.fetchone()
     if not result:
+        app.logger.warning(f"❌ [DELETE] Arquivo não encontrado ID: {file_id}")
         conn.close()
         return jsonify({'success': False, 'error': 'Arquivo não encontrado'}), 404
 
     file_path, filename = result
+    app.logger.info(f"📁 [DELETE] Arquivo encontrado: {filename} em {file_path}")
+    
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-        except Exception:
-            pass
+            app.logger.info(f"✅ [DELETE] Arquivo físico removido: {file_path}")
+        except Exception as e:
+            app.logger.warning(f"⚠️ [DELETE] Erro ao remover arquivo físico: {e}")
+    else:
+        app.logger.warning(f"⚠️ [DELETE] Arquivo físico não encontrado: {file_path}")
+    
     cursor.execute('DELETE FROM pdf_files WHERE id = ?', (file_id,))
     conn.commit()
     conn.close()
+    app.logger.info(f"✅ [DELETE] Registro removido do banco: {filename}")
     return jsonify({'success': True, 'deleted_filename': filename})
 
 
 @app.route('/api/files/<int:file_id>', methods=['PUT'])
 def api_update_file(file_id):
     """Atualizar metadados do arquivo (JSON)."""
+    app.logger.info(f"📝 [UPDATE] Atualizando arquivo ID: {file_id}")
     data = request.get_json(silent=True) or {}
+    app.logger.info(f"📋 [UPDATE] Dados recebidos: {data}")
 
     song_name = (data.get('song_name') or '').strip()
     artist = (data.get('artist') or '').strip()
@@ -3905,6 +4428,9 @@ def api_update_file(file_id):
     new_categories = data.get('new_categories') or []
     selected_liturgical_times = data.get('liturgical_times') or []
     new_liturgical_times = data.get('new_liturgical_times') or []
+    
+    app.logger.info(f"🏷️ [UPDATE] Categorias selecionadas: {selected_categories}")
+    app.logger.info(f"🏷️ [UPDATE] Tempos litúrgicos selecionados: {selected_liturgical_times}")
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -3946,8 +4472,47 @@ def api_update_file(file_id):
             liturgical_id = cursor.fetchone()[0]
             cursor.execute('INSERT OR IGNORE INTO file_liturgical_times (file_id, liturgical_time_id) VALUES (?, ?)', (file_id, liturgical_id))
 
+    # Atualizar nome do arquivo se nome da música ou artista mudaram
+    cursor.execute('SELECT filename, file_path, category FROM pdf_files WHERE id = ?', (file_id,))
+    file_data = cursor.fetchone()
+    if file_data and song_name and artist:
+        current_filename, current_file_path, current_category = file_data
+        current_file_path_abs = to_absolute_organized_path(current_file_path)
+        new_filename = generate_filename(song_name, artist, current_filename, musical_key)
+        
+        if new_filename != current_filename:
+            app.logger.info(f"📝 [UPDATE] Renomeando arquivo: {current_filename} → {new_filename}")
+            
+            # Determinar nova pasta baseada na categoria principal
+            new_category_folder = os.path.join(ORGANIZED_FOLDER, primary_category)
+            os.makedirs(new_category_folder, exist_ok=True)
+            
+            new_file_path = os.path.join(new_category_folder, new_filename)
+            
+            # Verificar se já existe arquivo com o novo nome
+            counter = 1
+            base_name = os.path.splitext(new_filename)[0]
+            while os.path.exists(new_file_path) and new_file_path != current_file_path_abs:
+                new_filename = f"{base_name}_{counter}.pdf"
+                new_file_path = os.path.join(new_category_folder, new_filename)
+                counter += 1
+            
+            # Mover/renomear arquivo se necessário
+            if current_file_path_abs != new_file_path and os.path.exists(current_file_path_abs):
+                try:
+                    shutil.move(current_file_path_abs, new_file_path)
+                    # Atualizar nome e caminho no banco
+                    cursor.execute('UPDATE pdf_files SET filename = ?, file_path = ? WHERE id = ?', 
+                                 (new_filename, to_relative_organized_path(new_file_path), file_id))
+                    app.logger.info(f"✅ [UPDATE] Arquivo renomeado: {new_filename}")
+                except Exception as e:
+                    app.logger.error(f"❌ [UPDATE] Erro ao renomear arquivo: {e}")
+
     conn.commit()
     conn.close()
+    app.logger.info(f"✅ [UPDATE] Arquivo {file_id} atualizado com sucesso")
+    app.logger.info(f"📊 [UPDATE] Total categorias salvas: {len(selected_categories)}")
+    app.logger.info(f"📊 [UPDATE] Total tempos litúrgicos salvos: {len(selected_liturgical_times)}")
     return jsonify({'success': True})
 
 
@@ -3965,8 +4530,10 @@ def api_download_file(file_id):
     cursor.execute('SELECT file_path, filename FROM pdf_files WHERE id = ?', (file_id,))
     result = cursor.fetchone()
     conn.close()
-    if result and os.path.exists(result[0]):
-        return send_file(result[0], as_attachment=True, download_name=result[1])
+    if result:
+        abs_path = to_absolute_organized_path(result[0])
+        if os.path.exists(abs_path):
+            return send_file(abs_path, as_attachment=True, download_name=result[1])
     return jsonify({'success': False, 'error': 'Arquivo não encontrado'}), 404
 
 
@@ -3978,9 +4545,393 @@ def api_stream_file(file_id):
     cursor.execute('SELECT file_path, filename FROM pdf_files WHERE id = ?', (file_id,))
     result = cursor.fetchone()
     conn.close()
-    if result and os.path.exists(result[0]):
-        return send_file(result[0], as_attachment=False, download_name=result[1])
+    if result:
+        abs_path = to_absolute_organized_path(result[0])
+        if os.path.exists(abs_path):
+            return send_file(abs_path, as_attachment=False, download_name=result[1])
     return jsonify({'success': False, 'error': 'Arquivo não encontrado'}), 404
+
+
+# ==========================================
+# GOOGLE DRIVE API ENDPOINTS (sincronização básica)
+# ==========================================
+
+from threading import Thread, Lock
+
+SYNC_STATE = {
+    'in_progress': False,
+    'total': 0,
+    'done': 0,
+    'last_file': '',
+    'message': '',
+}
+SYNC_LOCK = Lock()
+
+def _update_sync_state(**kwargs):
+    with SYNC_LOCK:
+        SYNC_STATE.update(kwargs)
+
+def _load_google_credentials():
+    try:
+        import json
+        from google.oauth2.credentials import Credentials
+        # Procurar token.json salvo pelo callback
+        for p in [
+            os.path.join(os.path.dirname(__file__), 'token.json'),
+            os.path.join(os.getcwd(), 'token.json'),
+            '/app/token.json',
+        ]:
+            if os.path.exists(p):
+                with open(p, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                creds = Credentials(
+                    token=data.get('token'),
+                    refresh_token=data.get('refresh_token'),
+                    token_uri=data.get('token_uri'),
+                    client_id=data.get('client_id'),
+                    client_secret=data.get('client_secret'),
+                    scopes=data.get('scopes') or ['https://www.googleapis.com/auth/drive']
+                )
+                return creds
+    except Exception as e:
+        app.logger.error(f"[DRIVE] Falha ao carregar credenciais: {e}")
+    return None
+
+def _ensure_drive_folder(service, parent_id: str, name: str) -> str:
+    # Retorna o ID da subpasta (cria se não existir)
+    from googleapiclient.errors import HttpError
+    try:
+        q = f"name = '{name.replace('\'', "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed = false"
+        res = service.files().list(q=q, fields='files(id, name)', spaces='drive').execute()
+        files = res.get('files', [])
+        if files:
+            return files[0]['id']
+        file_metadata = {
+            'name': name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [parent_id]
+        }
+        folder = service.files().create(body=file_metadata, fields='id').execute()
+        return folder['id']
+    except HttpError as e:
+        app.logger.error(f"[DRIVE] Erro ao garantir pasta '{name}': {e}")
+        raise
+
+def _file_exists_in_folder(service, parent_id: str, name: str) -> bool:
+    from googleapiclient.errors import HttpError
+    try:
+        q = f"name = '{name.replace('\'', "\\'")}' and '{parent_id}' in parents and trashed = false"
+        res = service.files().list(q=q, fields='files(id)', spaces='drive').execute()
+        return len(res.get('files', [])) > 0
+    except HttpError as e:
+        app.logger.error(f"[DRIVE] Erro ao procurar arquivo '{name}': {e}")
+        return False
+
+def _upload_file_to_folder(service, parent_id: str, abs_path: str, name: str):
+    from googleapiclient.http import MediaFileUpload
+    file_metadata = { 'name': name, 'parents': [parent_id] }
+    media = MediaFileUpload(abs_path, mimetype='application/pdf', resumable=False)
+    return service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+def _sync_worker(root_folder_id: str):
+    try:
+        from googleapiclient.discovery import build
+        creds = _load_google_credentials()
+        if not creds:
+            _update_sync_state(in_progress=False, message='Credenciais não encontradas')
+            return
+        service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+
+        # Carregar itens do DB
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, filename, category, file_path FROM pdf_files ORDER BY id')
+        items = cursor.fetchall()
+        conn.close()
+
+        _update_sync_state(in_progress=True, total=len(items), done=0, last_file='', message='Iniciando')
+
+        for _id, filename, category, rel_path in items:
+            abs_path = to_absolute_organized_path(rel_path)
+            _update_sync_state(last_file=filename)
+
+            # Ignorar se arquivo não existe localmente
+            if not abs_path or not os.path.exists(abs_path):
+                _update_sync_state(done=SYNC_STATE['done'] + 1)
+                continue
+
+            # Pasta por categoria
+            category_name = category or 'Diversos'
+            try:
+                cat_folder_id = _ensure_drive_folder(service, root_folder_id, category_name)
+                # Se já existir, pula
+                if not _file_exists_in_folder(service, cat_folder_id, filename):
+                    _upload_file_to_folder(service, cat_folder_id, abs_path, filename)
+            except Exception as e:
+                app.logger.error(f"[DRIVE] Erro ao sincronizar '{filename}': {e}")
+
+            _update_sync_state(done=SYNC_STATE['done'] + 1)
+
+        _update_sync_state(in_progress=False, message='Concluído')
+    except Exception as e:
+        app.logger.error(f"[DRIVE] Falha na sincronização: {e}")
+        _update_sync_state(in_progress=False, message=f'Erro: {e}')
+
+@app.route('/api/google-drive/status', methods=['GET'])
+def api_google_drive_status():
+    """Retorna status simplificado da integração do Google Drive."""
+    try:
+        token_path_candidates = [
+            os.path.join(os.path.dirname(__file__), 'token.json'),
+            os.path.join(os.getcwd(), 'token.json'),
+            '/app/token.json',
+        ]
+        token_exists = any(os.path.exists(p) for p in token_path_candidates)
+        return jsonify({
+            'connected': bool(token_exists),
+            'user_email': None,
+            'message': 'Conectado' if token_exists else 'Não autorizado ou não configurado'
+        })
+    except Exception as e:
+        return jsonify({'connected': False, 'message': f'Erro: {e}'}), 200
+
+
+@app.route('/api/google-drive/settings', methods=['GET'])
+def api_google_drive_settings_get():
+    """Lê configurações do Google Drive a partir de admin_settings (prefixo drive_)."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM admin_settings WHERE key LIKE 'drive_%'")
+    rows = cursor.fetchall()
+    conn.close()
+    settings = {k: v for k, v in rows}
+    # Defaults
+    settings.setdefault('drive_auto_sync_enabled', 'false')
+    settings.setdefault('drive_sync_interval', '30')
+    return jsonify({'settings': settings})
+
+
+@app.route('/api/google-drive/settings', methods=['POST'])
+def api_google_drive_settings_post():
+    """Atualiza configurações do Google Drive em admin_settings."""
+    data = request.get_json(silent=True) or {}
+    allowed_keys = {'drive_sync_folder_id', 'drive_auto_sync_enabled', 'drive_sync_interval'}
+    updates = {k: str(v) for k, v in data.items() if k in allowed_keys}
+
+    if not updates:
+        return jsonify({'success': False, 'error': 'Nenhuma configuração válida fornecida'}), 400
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    for k, v in updates.items():
+        cursor.execute('INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', (k, v))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': 'Configurações salvas'})
+
+
+@app.route('/api/google-drive/auth-url', methods=['GET'])
+def api_google_drive_auth_url():
+    """Gera a URL de autorização OAuth do Google Drive (produção)."""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        import json
+        # Localizar credentials.json
+        candidates = [
+            os.path.join(os.path.dirname(__file__), 'credentials.json'),
+            os.path.join(os.getcwd(), 'credentials.json'),
+            '/app/credentials.json',
+        ]
+        cred_path = next((p for p in candidates if os.path.exists(p)), None)
+        if not cred_path:
+            return jsonify({'success': False, 'error': 'credentials.json não encontrado no servidor'}), 200
+
+        redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+        scopes = ['https://www.googleapis.com/auth/drive']
+
+        flow = Flow.from_client_secrets_file(
+            cred_path,
+            scopes=scopes,
+            redirect_uri=redirect_uri,
+        )
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent',
+        )
+        session['google_oauth_state'] = state
+        return jsonify({'success': True, 'authorization_url': authorization_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Erro ao gerar URL de autorização: {e}'}), 200
+
+
+@app.route('/api/google-drive/callback', methods=['GET'])
+def api_google_drive_callback():
+    """Callback OAuth para receber o código e salvar token.json."""
+    try:
+        from google_auth_oauthlib.flow import Flow
+        import json
+        candidates = [
+            os.path.join(os.path.dirname(__file__), 'credentials.json'),
+            os.path.join(os.getcwd(), 'credentials.json'),
+            '/app/credentials.json',
+        ]
+        cred_path = next((p for p in candidates if os.path.exists(p)), None)
+        if not cred_path:
+            return jsonify({'success': False, 'error': 'credentials.json não encontrado'}), 400
+
+        state = session.get('google_oauth_state')
+        redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+        scopes = ['https://www.googleapis.com/auth/drive']
+        flow = Flow.from_client_secrets_file(
+            cred_path,
+            scopes=scopes,
+            redirect_uri=redirect_uri,
+            state=state,
+        )
+        flow.fetch_token(authorization_response=request.url)
+
+        creds = flow.credentials
+        token_data = {
+            'token': creds.token,
+            'refresh_token': creds.refresh_token,
+            'token_uri': creds.token_uri,
+            'client_id': creds.client_id,
+            'client_secret': creds.client_secret,
+            'scopes': creds.scopes,
+        }
+
+        # Salvar token.json próximo ao app
+        token_save_candidates = [
+            os.path.join(os.path.dirname(__file__), 'token.json'),
+            os.path.join(os.getcwd(), 'token.json'),
+            '/app/token.json',
+        ]
+        saved = False
+        error_save = ''
+        for p in token_save_candidates:
+            try:
+                with open(p, 'w', encoding='utf-8') as f:
+                    json.dump(token_data, f, ensure_ascii=False, indent=2)
+                saved = True
+                break
+            except Exception as e:
+                error_save = str(e)
+                continue
+
+        html = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset=\"utf-8\" />
+    <title>Google Drive Auth</title>
+  </head>
+  <body>
+    <p>Autorização concluída. Esta janela fechará automaticamente.</p>
+    <script>
+      try { if (window.opener) { window.opener.postMessage({ type: 'DRIVE_AUTH_SUCCESS' }, '*'); } } catch (e) {}
+      setTimeout(function(){ try { window.close(); } catch(e){} }, 500);
+    </script>
+  </body>
+  </html>
+        """
+        response = app.make_response(html)
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+        response.headers['Vary'] = 'Origin'
+        return response
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Erro no callback: {e}'}), 400
+
+
+@app.route('/api/google-drive/mock-auth', methods=['GET'])
+def api_google_drive_mock_auth():
+    """Página simples que simula autorização bem-sucedida do Google e notifica o opener."""
+    html = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset=\"utf-8\" />
+    <title>Google Drive Mock Auth</title>
+  </head>
+  <body>
+    <p>Autorização simulada com sucesso. Esta janela fechará automaticamente.</p>
+    <script>
+      try {
+        if (window.opener) {
+          window.opener.postMessage({ type: 'DRIVE_AUTH_SUCCESS' }, '*');
+        }
+      } catch (e) { /* ignore */ }
+      setTimeout(function(){ try { window.close(); } catch(e){} }, 500);
+    </script>
+  </body>
+  </html>
+    """
+    response = app.make_response(html)
+    response.headers['Content-Type'] = 'text/html; charset=utf-8'
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    response.headers['Vary'] = 'Origin'
+    return response
+
+
+@app.route('/api/google-drive/sync', methods=['POST'])
+def api_google_drive_sync():
+    """Inicia sincronização em background com Google Drive.
+    Requer token.json e drive_sync_folder_id configurados.
+    """
+    # Verificar configuração
+    token_exists = any(os.path.exists(p) for p in [
+        os.path.join(os.path.dirname(__file__), 'token.json'),
+        os.path.join(os.getcwd(), 'token.json'),
+        '/app/token.json',
+    ])
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM admin_settings WHERE key = 'drive_sync_folder_id'")
+    row = cursor.fetchone()
+    conn.close()
+    folder_id = row[0] if row else ''
+
+    if not token_exists:
+        return jsonify({'success': False, 'error': 'Credenciais ausentes (token.json)'}), 400
+    if not folder_id:
+        return jsonify({'success': False, 'error': 'ID da pasta do Google Drive não configurado'}), 400
+
+    with SYNC_LOCK:
+        if SYNC_STATE.get('in_progress'):
+            return jsonify({'success': True, 'message': 'Sincronização já em andamento'}), 200
+        # reset state e iniciar thread
+        SYNC_STATE.update({'in_progress': True, 'total': 0, 'done': 0, 'last_file': '', 'message': 'Preparando'})
+
+    Thread(target=_sync_worker, args=(folder_id,), daemon=True).start()
+    return jsonify({'success': True, 'message': 'Sincronização iniciada'}), 200
+
+
+@app.route('/api/google-drive/debug', methods=['GET'])
+def api_google_drive_debug():
+    """Retorna informações de debug/progresso da sincronização."""
+    with SYNC_LOCK:
+        state = dict(SYNC_STATE)
+    return jsonify({'sync_progress': state})
+
+
+@app.route('/api/google-drive/clear-cache', methods=['POST'])
+def api_google_drive_clear_cache():
+    """Remove token.json para forçar nova autorização."""
+    removed = False
+    errors = []
+    for p in [
+        os.path.join(os.path.dirname(__file__), 'token.json'),
+        os.path.join(os.getcwd(), 'token.json'),
+        '/app/token.json',
+    ]:
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+                removed = True
+        except Exception as e:
+            errors.append(str(e))
+    return jsonify({'success': True, 'removed': removed, 'errors': errors})
 
 
 @app.route('/api/categories', methods=['GET'])
@@ -4071,7 +5022,7 @@ def api_get_merge_list(list_id):
         conn.close()
         return jsonify({'success': False, 'error': 'Lista não encontrada'}), 404
     cursor.execute('''
-        SELECT mli.id, mli.order_position, pf.id as file_id, pf.filename, pf.song_name, pf.artist
+        SELECT mli.id, mli.order_position, pf.id as file_id, pf.filename, pf.song_name, pf.artist, pf.musical_key
         FROM merge_list_items mli
         JOIN pdf_files pf ON mli.pdf_file_id = pf.id
         WHERE mli.merge_list_id = ?
@@ -4086,7 +5037,8 @@ def api_get_merge_list(list_id):
                 'id': row[2],
                 'filename': row[3],
                 'song_name': row[4],
-                'artist': row[5]
+                'artist': row[5],
+                'musical_key': row[6]
             }
         })
     conn.close()
@@ -4121,6 +5073,67 @@ def api_delete_merge_list(list_id):
     conn.commit()
     conn.close()
     return jsonify({'success': True})
+
+
+@app.route('/api/merge_lists/<int:list_id>/duplicate', methods=['POST'])
+def api_duplicate_merge_list(list_id):
+    """Duplicar uma lista com novo nome."""
+    app.logger.info(f"📋 [DUPLICATE] Duplicando lista ID: {list_id}")
+    
+    data = request.get_json(silent=True) or {}
+    new_name = (data.get('name') or '').strip()
+    
+    if not new_name:
+        return jsonify({'success': False, 'error': 'Nome da nova lista é obrigatório'}), 400
+    
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    
+    try:
+        # Verificar se a lista original existe
+        cursor.execute('SELECT name, observations FROM merge_lists WHERE id = ?', (list_id,))
+        original_list = cursor.fetchone()
+        if not original_list:
+            return jsonify({'success': False, 'error': 'Lista original não encontrada'}), 404
+        
+        original_observations = original_list[1] or ''
+        
+        # Criar nova lista
+        cursor.execute('''
+            INSERT INTO merge_lists (name, observations, created_date, updated_date)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ''', (new_name, original_observations))
+        
+        new_list_id = cursor.lastrowid
+        app.logger.info(f"✅ [DUPLICATE] Nova lista criada com ID: {new_list_id}")
+        
+        # Copiar todos os itens da lista original
+        cursor.execute('''
+            INSERT INTO merge_list_items (merge_list_id, pdf_file_id, order_position)
+            SELECT ?, pdf_file_id, order_position
+            FROM merge_list_items
+            WHERE merge_list_id = ?
+            ORDER BY order_position
+        ''', (new_list_id, list_id))
+        
+        items_copied = cursor.rowcount
+        app.logger.info(f"📁 [DUPLICATE] {items_copied} itens copiados")
+        
+        conn.commit()
+        
+        return jsonify({
+            'success': True, 
+            'new_list_id': new_list_id,
+            'items_copied': items_copied,
+            'message': f'Lista "{new_name}" criada com {items_copied} música(s)'
+        })
+        
+    except Exception as e:
+        app.logger.error(f"❌ [DUPLICATE] Erro: {e}")
+        conn.rollback()
+        return jsonify({'success': False, 'error': 'Erro interno do servidor'}), 500
+    finally:
+        conn.close()
 
 
 @app.route('/api/merge_lists/<int:list_id>/items', methods=['POST'])
@@ -4317,6 +5330,8 @@ def health_check():
         }), 503
 
 if __name__ == '__main__':
+    # Em modo desenvolvimento, evite duplicação de logs por causa do reloader do Flask
+    # O setup_logging já é chamado no import; aqui só reforçamos caso necessário
     setup_logging()
     init_db()
     
@@ -4353,4 +5368,6 @@ if __name__ == '__main__':
     print("="*60)
     print()
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Evita duplicação: desative o reloader se já estiver em IDE/ambiente que reexecuta
+    use_reloader = False if os.environ.get('DISABLE_FLASK_RELOADER', '1') == '1' else True
+    app.run(debug=debug, host=host, port=port, use_reloader=use_reloader)

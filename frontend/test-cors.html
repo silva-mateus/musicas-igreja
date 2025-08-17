@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test CORS</title>
+</head>
+
+<body>
+    <h1>Testing CORS to Backend</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            try {
+                console.log('🔍 Testing fetch to backend...');
+                const response = await fetch('http://127.0.0.1:5000/api/merge_lists');
+                console.log('✅ Response received:', response);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('📊 Data:', data);
+
+                document.getElementById('result').innerHTML =
+                    `<h3>Success!</h3><p>Received ${data.length} lists</p>`;
+            } catch (error) {
+                console.error('❌ Error:', error);
+                document.getElementById('result').innerHTML =
+                    `<h3>Error!</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

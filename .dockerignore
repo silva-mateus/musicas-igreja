@@ -1,72 +1,30 @@
-# Git
 .git
 .gitignore
+**/.DS_Store
+**/Thumbs.db
 
-# Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-.pytest_cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
+# Backend runtime/state we don't need in image
+backend/uploads/
+backend/organized/
+backend/flask_session/
+backend/logs/
+backend/**/*.log
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Frontend caches/build outputs
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+frontend/out/
 
-# IDE
-.vscode
-.idea
-*.swp
-*.swo
-*~
-
-# Documentation
-*.md
-!README.md
-!README_IGREJA.md
-
-# Logs (exceto diretório)
-logs/*.log
-
-# Database em desenvolvimento
-*.db-journal
-
-# CI/CD
-.github
-docker-compose.override.yml
-
-# Environment files
+# Local env and secrets (db will be included for first deploy separately)
 .env
-.env.local
-.env.production
-.env.staging
+frontend/.env.local
+backend/credentials.json
+backend/token.json
 
-# Node.js (caso tenha)
-node_modules
-npm-debug.log
-yarn-error.log
-
-# Temporary files
-*.tmp
-*.temp
+# Virtual envs
+.venv/
+backend/.venv/
+venv/
+backend/venv/

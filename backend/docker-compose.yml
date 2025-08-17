@@ -2,7 +2,7 @@ services:
   musicas-igreja:
     # A seção 'build' foi removida porque a imagem é construída e empurrada para o GHCR
     # pelo GitHub Actions 'build' job, e depois puxada pelo 'deploy' job.
-    image: ghcr.io/silva-mateus/musicas-igreja:latest # <-- ATENÇÃO: SUBSTITUA COM SEU USUÁRIO E NOME DO REPOSITÓRIO
+    image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja:latest
     container_name: musicas-igreja-app # Nome único para o seu contêiner
     restart: unless-stopped # Reinicia o contêiner a menos que ele seja parado manualmente
     ports:
@@ -12,13 +12,15 @@ services:
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY} # A variável SECRET_KEY será injetada do ambiente do host (via GitHub Actions)
-      - DATABASE_PATH=/app/data/pdf_organizer.db
-      - UPLOAD_FOLDER=/app/data/uploads
-      - ORGANIZED_FOLDER=/app/data/organized
-      - LOG_FOLDER=/app/data/logs
+      - DATABASE_PATH=/data/pdf_organizer.db
+      - UPLOAD_FOLDER=/data/uploads
+      - ORGANIZED_FOLDER=/app/organized
+      - LOG_FOLDER=/data/logs
     volumes:
       # Volume para persistir os dados da aplicação (banco de dados, uploads, logs)
-      - musicas_data:/app/data
+      - musicas_data:/data
+      # Pasta organizada compartilhada com o host (usar mesmo caminho em dev/prod)
+      - ./organized:/app/organized
       # Montagem opcional de um diretório 'config' do host para dentro do contêiner (somente leitura)
       - ./config:/app/config:ro
     networks:
@@ -29,6 +31,21 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s # Tempo para a aplicação iniciar antes de começar a verificar
+
+  frontend:
+    image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja-frontend:latest
+    container_name: musicas-igreja-front
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=${BACKEND_URL}
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - musicas-igreja
+    networks:
+      - musicas-network
 
 # A seção 'traefik' e seus volumes relacionados foram REMOVIDOS, pois você não precisa de um proxy reverso para acesso local.
 

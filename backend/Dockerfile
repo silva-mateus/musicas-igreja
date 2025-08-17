@@ -39,11 +39,9 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copiar aplicação
 COPY --chown=appuser:appuser . .
 
-# Criar diretórios necessários DENTRO DO CONTÊINER (se não estiverem montados como volume)
-# Estes comandos são menos relevantes para volumes montados, mas mantidos para clareza
-# e para o caso de o volume não ser montado.
-RUN mkdir -p /app/data/logs /app/data/uploads /app/data/organized && \
-    chown -R appuser:appuser /app/data
+# Criar diretórios padrão em /data (compatível com volume montado)
+RUN mkdir -p /data/logs /data/uploads /data/organized && \
+    chown -R appuser:appuser /data
 
 # Configurar variáveis de ambiente
 ENV FLASK_APP=app.py

@@ -308,7 +308,7 @@ You can add more categories through the application interface.
 
 ### Database
 - Uses SQLite for simplicity
-- Database file: `pdf_organizer.db`
+- Database file: `/data/pdf_organizer.db`
 - Automatically created on first run
 
 ## Troubleshooting

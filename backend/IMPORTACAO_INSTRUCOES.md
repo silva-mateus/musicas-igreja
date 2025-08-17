@@ -16,7 +16,7 @@ cd ~/musicas-igreja
 docker compose exec musicas-igreja bash
 
 # 3. Dentro do container, executar o script
-sqlite3 /app/data/pdf_organizer.db < /app/music_data_export.sql
+sqlite3 /data/pdf_organizer.db < /app/music_data_export.sql
 ```
 
 ### Opção 2: Via terminal local (se tiver acesso SSH)
@@ -26,7 +26,7 @@ scp music_data_export.sql seu-servidor:~/
 
 # 2. No servidor, executar
 cd ~/musicas-igreja
-docker compose exec musicas-igreja sqlite3 /app/data/pdf_organizer.db < /tmp/music_data_export.sql
+docker compose exec musicas-igreja sqlite3 /data/pdf_organizer.db < /tmp/music_data_export.sql
 ```
 
 ### Opção 3: Via container local e depois copiar DB
@@ -51,7 +51,7 @@ docker compose up -d
 # Verificar se os dados foram importados
 docker compose exec musicas-igreja python -c "
 import sqlite3
-conn = sqlite3.connect('/app/data/pdf_organizer.db')
+conn = sqlite3.connect('/data/pdf_organizer.db')
 cursor = conn.cursor()
 cursor.execute('SELECT COUNT(*) FROM pdf_files')
 print(f'Músicas: {cursor.fetchone()[0]}')
