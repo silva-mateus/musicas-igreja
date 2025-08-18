@@ -39,13 +39,19 @@ services:
     environment:
       - NODE_ENV=production
       - BACKEND_URL=${BACKEND_URL}
-      - PORT=3000
+      - PORT=3001
     ports:
-      - "3000:3000"
+      - "3001:3001"
     depends_on:
       - musicas-igreja
     networks:
       - musicas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"] 
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 # A seção 'traefik' e seus volumes relacionados foram REMOVIDOS, pois você não precisa de um proxy reverso para acesso local.
 
