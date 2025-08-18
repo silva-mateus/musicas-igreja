@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path')
+
 const nextConfig = {
     reactStrictMode: false, // Desabilitado para evitar execuções duplas em desenvolvimento
     swcMinify: true,
@@ -36,6 +38,15 @@ const nextConfig = {
 
     // Output standalone para Docker
     output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+
+    // Garantir alias '@' -> 'src' no webpack (corrige build em ambiente Docker)
+    webpack: (config) => {
+        config.resolve.alias = {
+            ...(config.resolve.alias || {}),
+            '@': path.resolve(__dirname, 'src'),
+        }
+        return config
+    }
 }
 
 module.exports = nextConfig
