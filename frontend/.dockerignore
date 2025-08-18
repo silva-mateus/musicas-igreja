@@ -31,8 +31,8 @@ logs
 # Testing
 .nyc_output
 
-# Ignore root lib folder to avoid conflicts with src/lib
-/lib/
+# Keep lib/ directory - it contains essential api.ts and utils.ts files
+# /lib/
 
 # Runtime data
 pids

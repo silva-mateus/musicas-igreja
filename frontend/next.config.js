@@ -51,15 +51,18 @@ const nextConfig = {
         
         // Verificar se src existe
         const fs = require('fs')
+        const libPath = path.resolve(process.cwd(), 'lib')
         console.log('src exists:', fs.existsSync(srcPath))
-        console.log('api.ts exists:', fs.existsSync(path.join(srcPath, 'lib', 'api.ts')))
-        console.log('utils.ts exists:', fs.existsSync(path.join(srcPath, 'lib', 'utils.ts')))
+        console.log('lib path:', libPath)
+        console.log('lib exists:', fs.existsSync(libPath))
+        console.log('api.ts exists:', fs.existsSync(path.join(libPath, 'api.ts')))
+        console.log('utils.ts exists:', fs.existsSync(path.join(libPath, 'utils.ts')))
         
         // Configurar aliases de múltiplas formas
         config.resolve.alias = {
             ...(config.resolve.alias || {}),
             '@': srcPath,
-            '@/lib': path.join(srcPath, 'lib'),
+            '@/lib': path.resolve(process.cwd(), 'lib'),
             '@/components': path.join(srcPath, 'components'),
             '@/hooks': path.join(srcPath, 'hooks'),
             '@/types': path.join(srcPath, 'types'),
