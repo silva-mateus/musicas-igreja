@@ -72,7 +72,7 @@ jobs:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/musicas-igreja:latest
       FRONT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/musicas-igreja-frontend:latest
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
-      BACKEND_URL: ${{ secrets.BACKEND_URL || 'http://musicas-igreja:5000' }}
+      BACKEND_URL: http://musicas-igreja:5000
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,25 +103,48 @@ jobs:
           echo "UPLOAD_FOLDER=/data/uploads" >> .env
           echo "ORGANIZED_FOLDER=/app/organized" >> .env
           echo "LOG_FOLDER=/data/logs" >> .env
-          echo "BACKEND_URL=${BACKEND_URL}" >> .env
+          echo "BACKEND_URL=http://musicas-igreja:5000" >> .env
 
       - name: Pull and start services
         working-directory: ./backend
         run: |
           set -e
+          echo "=== Environment file content ==="
+          cat .env
+          echo "=== Pulling images ==="
           docker compose pull
+          echo "=== Starting services ==="
           docker compose up -d
+          echo "=== Waiting 10 seconds for startup ==="
+          sleep 10
+          echo "=== Container status ==="
           docker compose ps
+          echo "=== Container logs (last 20 lines) ==="
+          docker compose logs --tail=20
 
       - name: Health check
         working-directory: ./backend
         run: |
           set -e
-          # Check backend health (internal port 5000)
-          docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health
-          # Check external access on new port 5001
-          sleep 5
-          curl -fsS http://localhost:5001/health || echo "External health check failed, but internal passed"
+          echo "=== Checking if containers are running ==="
+          docker compose ps
+          echo "=== Backend logs (last 50 lines) ==="
+          docker compose logs --tail=50 musicas-igreja || true
+          echo "=== Frontend logs (last 30 lines) ==="  
+          docker compose logs --tail=30 frontend || true
+          echo "=== Attempting health check ==="
+          # Wait a bit more for services to stabilize
+          sleep 15
+          # Check if backend container is running
+          if docker compose ps | grep musicas-igreja-app | grep -q "Up"; then
+            echo "Backend container is running, testing health endpoint..."
+            docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health || echo "Internal health check failed"
+            sleep 5
+            curl -fsS http://localhost:5001/health || echo "External health check failed"
+          else
+            echo "Backend container is not running properly"
+            exit 1
+          fi
 
       - name: Show recent logs on failure
         if: failure()

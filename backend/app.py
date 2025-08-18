@@ -22,8 +22,8 @@ app = Flask(__name__)
 # Configuração CORS para desenvolvimento
 @app.after_request
 def after_request(response):
-    # Permitir requisições do frontend durante desenvolvimento
-    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+    # Permitir requisições do frontend (porta atualizada para 3001)
+    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3001')
     response.headers.add('Vary', 'Origin')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
@@ -34,7 +34,7 @@ def after_request(response):
 @app.route('/api/<path:any_path>', methods=['OPTIONS'])
 def cors_preflight(any_path):
     response = app.make_response(('', 204))
-    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3001'
     response.headers['Vary'] = 'Origin'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
@@ -4837,7 +4837,7 @@ def api_google_drive_callback():
         """
         response = app.make_response(html)
         response.headers['Content-Type'] = 'text/html; charset=utf-8'
-        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3001'
         response.headers['Vary'] = 'Origin'
         return response
     except Exception as e:
@@ -4869,7 +4869,7 @@ def api_google_drive_mock_auth():
     """
     response = app.make_response(html)
     response.headers['Content-Type'] = 'text/html; charset=utf-8'
-    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3001'
     response.headers['Vary'] = 'Origin'
     return response
 
