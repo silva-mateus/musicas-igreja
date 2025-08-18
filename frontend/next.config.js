@@ -41,19 +41,32 @@ const nextConfig = {
 
     // Garantir alias '@' -> 'src' no webpack (corrige build em ambiente Docker)
     webpack: (config) => {
-        // Usar path absoluto baseado no diretório atual de trabalho
-        const srcPath = path.resolve(process.cwd(), 'src')
+        // Debug dos caminhos no build
+        console.log('=== Webpack Debug ===')
+        console.log('process.cwd():', process.cwd())
+        console.log('__dirname:', __dirname)
         
+        const srcPath = path.resolve(process.cwd(), 'src')
+        console.log('srcPath:', srcPath)
+        
+        // Verificar se src existe
+        const fs = require('fs')
+        console.log('src exists:', fs.existsSync(srcPath))
+        console.log('api.ts exists:', fs.existsSync(path.join(srcPath, 'lib', 'api.ts')))
+        console.log('utils.ts exists:', fs.existsSync(path.join(srcPath, 'lib', 'utils.ts')))
+        
+        // Configurar aliases de múltiplas formas
         config.resolve.alias = {
             ...(config.resolve.alias || {}),
             '@': srcPath,
+            '@/lib': path.join(srcPath, 'lib'),
+            '@/components': path.join(srcPath, 'components'),
+            '@/hooks': path.join(srcPath, 'hooks'),
+            '@/types': path.join(srcPath, 'types'),
         }
         
-        // Também garantir que webpack procure em src/
-        if (!config.resolve.modules) {
-            config.resolve.modules = []
-        }
-        config.resolve.modules.push(srcPath)
+        console.log('Final aliases:', config.resolve.alias)
+        console.log('=== End Debug ===')
         
         return config
     }
