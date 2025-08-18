@@ -22,6 +22,6 @@ ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app .
 EXPOSE 3001
-CMD ["npm", "start"]
+CMD ["node", ".next/standalone/server.js"]
 
 
