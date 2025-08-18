@@ -4601,7 +4601,8 @@ def _ensure_drive_folder(service, parent_id: str, name: str) -> str:
     # Retorna o ID da subpasta (cria se não existir)
     from googleapiclient.errors import HttpError
     try:
-        q = f"name = '{name.replace('\'', "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed = false"
+        safe_name = name.replace("'", "\\'")
+        q = f"name = '{safe_name}' and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed = false"
         res = service.files().list(q=q, fields='files(id, name)', spaces='drive').execute()
         files = res.get('files', [])
         if files:
