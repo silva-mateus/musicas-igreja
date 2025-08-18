@@ -99,6 +99,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+**/venv/
+**/.venv/
 
 # Spyder project settings
 .spyderproject
@@ -120,9 +122,21 @@ dmypy.json
 
 # Project specific
 
-logs/*.log
+# Python/Flask runtime (backend)
+backend/uploads/
+#backend/organized/
+backend/flask_session/
+backend/logs/
+backend/**/*.log
+backend/templates/
 
-*.db-journal
+# Databases (SQLite)
+# Atenção: vamos COMMITAR o db atual no primeiro deploy. Depois reativar ignores.
+# *.db
+# backend/*.db
+# backend/data/*.db
+# *.db-journal
+*.db.bkp
 
 # IDE
 .vscode/
@@ -130,6 +144,22 @@ logs/*.log
 *.swp
 *.swo
 *~
+
+# Frontend build artifacts
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+frontend/.eslintcache
+frontend/coverage/
+
+# Local env files
+.env.local
+.env.*.local
+*.env.example
+frontend/.env.local
 
 # OS
 .DS_Store

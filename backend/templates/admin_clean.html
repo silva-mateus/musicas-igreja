@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Limpeza Administrativa - DESENVOLVIMENTO{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Limpeza Completa do Sistema
+                    </h3>
+                    <small>APENAS MODO DE DESENVOLVIMENTO</small>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger" role="alert">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-skull-crossbones"></i> ATENÇÃO: OPERAÇÃO DESTRUTIVA
+                        </h5>
+                        <p>Esta operação irá:</p>
+                        <ul>
+                            <li><strong>Deletar TODOS os arquivos PDF</strong> organizados</li>
+                            <li><strong>Limpar COMPLETAMENTE</strong> o banco de dados</li>
+                            <li><strong>Remover TODOS os uploads</strong> temporários</li>
+                            <li><strong>Resetar</strong> todas as categorias, artistas e listas</li>
+                        </ul>
+                        <hr>
+                        <p class="mb-0"><strong>Esta ação NÃO PODE ser desfeita!</strong></p>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-shield-alt"></i> Medidas de Segurança:</h6>
+                        <ul class="mb-0">
+                            <li>Esta funcionalidade só funciona em <strong>modo de desenvolvimento</strong></li>
+                            <li>Requer confirmação textual específica</li>
+                            <li>Ideal para resetar o sistema durante testes</li>
+                        </ul>
+                    </div>
+
+                    <form method="POST" onsubmit="return validateForm()">
+                        <div class="mb-3">
+                            <label for="confirmation" class="form-label">
+                                <strong>Para confirmar, digite exatamente:</strong> 
+                                <code>CONFIRMAR_LIMPEZA</code>
+                            </label>
+                            <input type="text" class="form-control" id="confirmation" name="confirmation" 
+                                   placeholder="Digite a confirmação..." autocomplete="off" required>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-bomb"></i> EXECUTAR LIMPEZA COMPLETA
+                            </button>
+                                            <button type="button" class="btn btn-secondary" onclick="goBack()">
+                    <i class="fas fa-arrow-left"></i> Cancelar e Voltar
+                </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Informações Adicionais -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle text-primary"></i> O que acontece após a limpeza?
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-database text-success"></i> Banco de Dados</h6>
+                            <ul class="small">
+                                <li>Todas as tabelas recriadas</li>
+                                <li>Categorias padrão restauradas</li>
+                                <li>Tempos litúrgicos padrão</li>
+                                <li>Sistema pronto para uso</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-folder text-warning"></i> Arquivos</h6>
+                            <ul class="small">
+                                <li>Diretório "organized" recriado</li>
+                                <li>Uploads temporários limpos</li>
+                                <li>Estrutura de pastas resetada</li>
+                                <li>Pronto para novos uploads</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function validateForm() {
+    const confirmation = document.getElementById('confirmation').value;
+    if (confirmation !== 'CONFIRMAR_LIMPEZA') {
+        alert('Confirmação incorreta! Digite exatamente: CONFIRMAR_LIMPEZA');
+        return false;
+    }
+    
+    return confirm('ÚLTIMA CONFIRMAÇÃO: Tem certeza absoluta de que deseja limpar TUDO? Esta ação não pode ser desfeita!');
+}
+</script>
+{% endblock %} 

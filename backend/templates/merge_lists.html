@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block title %}Lista de Músicas - Organizador de Música Litúrgica{% endblock %}
+
+{% block content %}
+<style>
+/* Aplicar cores dos botões aos itens do dropdown mobile - Versão corrigida */
+.actions-dropdown-item.btn-info-style {
+    color: #17a2b8 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-info-style:hover {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-primary-style {
+    color: #007bff !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-primary-style:hover {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-danger-style {
+    color: #dc3545 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-danger-style:hover {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.actions-dropdown-item.btn-warning-style {
+    color: #ffc107 !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-warning-style:hover {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.actions-dropdown-item.btn-secondary-style {
+    color: #6c757d !important;
+    background: transparent !important;
+    border: none !important;
+}
+.actions-dropdown-item.btn-secondary-style:hover {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+</style>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-list-alt"></i> Lista de Músicas</h1>
+                <div class="mobile-icon-only">
+                    <!-- View Mode Toggle -->
+                    <div class="btn-group me-2" role="group">
+                        <a href="{{ url_for('merge_lists', view='card') }}" 
+                           class="btn btn-outline-secondary {% if request.args.get('view', 'list') == 'card' %}active{% endif %}"
+                           title="Visualização em Cards">
+                            <i class="fas fa-th-large"></i> <span class="btn-text">Cards</span>
+                        </a>
+                        <a href="{{ url_for('merge_lists', view='list') }}" 
+                           class="btn btn-outline-secondary {% if request.args.get('view', 'list') == 'list' %}active{% endif %}"
+                           title="Visualização em Lista">
+                            <i class="fas fa-list"></i> <span class="btn-text">Lista</span>
+                        </a>
+                    </div>
+                    
+                    <a href="{{ url_for('edit_merge_list', list_id=0) }}" class="btn btn-success me-2"
+                       title="Criar Nova Lista">
+                        <i class="fas fa-plus"></i> <span class="btn-text">Criar Nova Lista</span>
+                    </a>
+                    
+                    <button type="button" class="btn btn-outline-secondary" onclick="goBack()"
+                       title="Voltar">
+                        <i class="fas fa-arrow-left"></i> <span class="btn-text">Voltar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('merge_lists') }}">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label for="search" class="form-label"><i class="fas fa-search"></i> Buscar Lista</label>
+                                <input type="text" class="form-control" id="search" name="search" 
+                                       placeholder="Digite o nome da lista..." 
+                                       value="{{ request.args.get('search', '') }}">
+                                <input type="hidden" name="view" value="{{ request.args.get('view', 'list') }}">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="btn-group w-100">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
+                                    {% if request.args.get('search') %}
+                                        <a href="{{ url_for('merge_lists', view=request.args.get('view', 'list')) }}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times"></i> Limpar
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if lists %}
+        {% set view_mode = request.args.get('view', 'list') %}
+        {% set search_query = request.args.get('search', '') %}
+            {% if view_mode == 'list' %}
+                <!-- List View -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Lista de Músicas ({{ lists|length }})</h6>
+                            </div>
+                            <!-- Desktop Table View -->
+                            <div class="table-responsive music-table-responsive">
+                                <table class="table table-hover mb-0 music-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Nome da Lista</th>
+                                            <th>Quantidade de Músicas</th>
+                                            <th>Atualizada</th>
+                                            <th style="width: 180px;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for list in lists %}
+                                            {% if not search_query or search_query.lower() in list[1].lower() %}
+                                            <tr>
+                                                <td>
+                                                    <strong><i class="fas fa-music text-primary me-2"></i>{{ list[1] }}</strong>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-primary">{{ list[5] }} música(s)</span>
+                                                </td>
+                                                <td><small>{{ list[4][:16] if list[4] else 'N/A' }}</small></td>
+                                                <td>
+                                                    <!-- Dropdown de ações para tablet/mobile -->
+                                                    <div class="actions-dropdown d-lg-none">
+                                                        <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('list-actions-{{ list[0] }}', event)">
+                                                            <i class="fas fa-ellipsis-v"></i>
+                                                        </button>
+                                                        <div class="actions-dropdown-menu" id="list-actions-{{ list[0] }}">
+                                                            <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" class="actions-dropdown-item btn-primary-style">
+                                                                <i class="fas fa-edit"></i> Editar Lista
+                                                            </a>
+                                                            <button type="button" class="actions-dropdown-item btn-secondary-style" 
+                                                                    onclick="duplicateList({{ list[0] }}, '{{ list[1] }}')" 
+                                                                    data-list-name="{{ list[1] }}">
+                                                                <i class="fas fa-copy"></i> Duplicar Lista
+                                                            </button>
+                                                            <button type="button" class="actions-dropdown-item btn-info-style" onclick="generateListReport({{ list[0] }})">
+                                                                <i class="fas fa-file-export"></i> Gerar Relatório
+                                                            </button>
+                                                            <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: contents;">
+                                                                <button type="submit" class="actions-dropdown-item btn-warning-style">
+                                                                    <i class="fas fa-download"></i> Baixar PDF
+                                                                </button>
+                                                            </form>
+                                                            <button type="button" class="actions-dropdown-item btn-danger-style"
+                                                                    onclick="deleteList({{ list[0] }}, '{{ list[1] }}')">
+                                                                <i class="fas fa-trash"></i> Deletar Lista
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Botões individuais para desktop -->
+                                                    <div class="btn-group btn-group-sm d-none d-lg-flex">
+                                                        <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" 
+                                                           class="btn btn-outline-primary action-btn" title="Editar Lista">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                        <button type="button" class="btn btn-outline-secondary action-btn" 
+                                                                onclick="duplicateList({{ list[0] }}, '{{ list[1] }}')" 
+                                                                data-list-name="{{ list[1] }}" title="Duplicar Lista">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-info action-btn" 
+                                                                onclick="generateListReport({{ list[0] }})" title="Gerar Relatório">
+                                                            <i class="fas fa-file-export"></i>
+                                                        </button>
+                                                        <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: inline;">
+                                                            <button type="submit" class="btn btn-outline-warning action-btn" title="Baixar PDF Unificado">
+                                                                <i class="fas fa-download"></i>
+                                                            </button>
+                                                        </form>
+                                                        <button type="button" class="btn btn-outline-danger action-btn"
+                                                                onclick="deleteList({{ list[0] }}, '{{ list[1] }}')" title="Deletar Lista">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Mobile Cards View -->
+                            <div class="music-cards-mobile">
+                                {% for list in lists %}
+                                    {% if not search_query or search_query.lower() in list[1].lower() %}
+                                        <div class="recent-list-card-mobile">
+                                            <div class="list-info">
+                                                <div class="list-title">
+                                                    <i class="fas fa-music text-primary me-2"></i>{{ list[1] }}
+                                                </div>
+                                                <div class="list-meta">
+                                                    <span class="badge bg-primary">{{ list[5] }} música(s)</span>
+                                                    <span class="text-muted ms-2">{{ list[4][:16] if list[4] else 'N/A' }}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="list-actions">
+                                                <div class="actions-dropdown">
+                                                    <button class="actions-dropdown-btn" onclick="toggleActionsDropdown('mobile-list-actions-{{ list[0] }}', event)">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div class="actions-dropdown-menu" id="mobile-list-actions-{{ list[0] }}">
+                                                        <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" class="actions-dropdown-item btn-primary-style">
+                                                            <i class="fas fa-edit"></i> Editar Lista
+                                                        </a>
+                                                        <button type="button" class="actions-dropdown-item btn-secondary-style" 
+                                                                onclick="duplicateList({{ list[0] }}, '{{ list[1] }}')" 
+                                                                data-list-name="{{ list[1] }}">
+                                                            <i class="fas fa-copy"></i> Duplicar Lista
+                                                        </button>
+                                                        <button type="button" class="actions-dropdown-item btn-info-style" onclick="generateListReport({{ list[0] }})">
+                                                            <i class="fas fa-file-export"></i> Gerar Relatório
+                                                        </button>
+                                                        <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: contents;">
+                                                            <button type="submit" class="actions-dropdown-item btn-warning-style">
+                                                                <i class="fas fa-download"></i> Baixar PDF
+                                                            </button>
+                                                        </form>
+                                                        <button type="button" class="actions-dropdown-item btn-danger-style"
+                                                                onclick="deleteList({{ list[0] }}, '{{ list[1] }}')">
+                                                            <i class="fas fa-trash"></i> Deletar Lista
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Card View -->
+                <div class="row">
+                    {% for list in lists %}
+                        {% if not search_query or search_query.lower() in list[1].lower() %}
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title text-truncate" title="{{ list[1] }}">
+                                            <i class="fas fa-music text-primary me-2"></i>
+                                            {{ list[1][:30] }}{% if list[1]|length > 30 %}...{% endif %}
+                                        </h5>
+                                        <span class="badge bg-primary">{{ list[5] }} música(s)</span>
+                                    </div>
+                                    
+                                    {% if list[2] %}
+                                        <p class="text-muted small mb-2"><strong>Observações:</strong> {{ list[2][:100] }}{% if list[2]|length > 100 %}...{% endif %}</p>
+                                    {% endif %}
+                                    
+                                    <div class="row text-muted small mb-3">
+                                        <div class="col-12">
+                                            <strong>Atualizada:</strong> {{ list[4][:16] if list[4] else 'N/A' }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="card-footer bg-transparent">
+                                    <div class="btn-group w-100 mb-2" role="group">
+                                        <a href="{{ url_for('edit_merge_list', list_id=list[0]) }}" 
+                                           class="btn btn-outline-primary btn-sm action-btn" title="Editar Lista">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm action-btn" 
+                                                onclick="duplicateList({{ list[0] }}, '{{ list[1] }}')" 
+                                                data-list-name="{{ list[1] }}" title="Duplicar Lista">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-info btn-sm action-btn" 
+                                                onclick="generateListReport({{ list[0] }})" title="Gerar Relatório">
+                                            <i class="fas fa-file-export"></i>
+                                        </button>
+                                        <form method="POST" action="{{ url_for('download_merged_list', list_id=list[0]) }}" style="display: inline;" class="flex-fill">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm action-btn w-100" title="Baixar PDF Unificado">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </form>
+                                        <button type="button" class="btn btn-outline-danger btn-sm action-btn"
+                                                onclick="deleteList({{ list[0] }}, '{{ list[1] }}')" 
+                                                data-list-name="{{ list[1] }}" title="Deletar Lista">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+    {% else %}
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas fa-list-alt fa-3x text-muted mb-3"></i>
+                    <h3 class="text-muted">Nenhuma lista de música encontrada</h3>
+                    <p class="text-muted">Crie listas selecionando múltiplas músicas na página inicial.</p>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> Ir para Início
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja deletar a lista <strong id="deleteListName"></strong>?</p>
+                <p class="text-muted">Esta ação não pode ser desfeita e todas as músicas da lista serão removidas.</p>
+            </div>
+            <div class="modal-footer">
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Deletar Lista</button>
+                </form>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicate Confirmation Modal -->
+<div class="modal fade" id="duplicateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Duplicar Lista</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="duplicateForm" method="POST">
+                    <div class="mb-3">
+                        <label for="duplicateListName" class="form-label">Nome da nova lista</label>
+                        <input type="text" class="form-control" id="duplicateListName" name="new_list_name" required>
+                        <div class="form-text">Será criada uma cópia da lista <strong id="originalListName"></strong></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="submitDuplicateForm()">Duplicar Lista</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteList(listId, listName) {
+    document.getElementById('deleteListName').textContent = listName;
+    document.getElementById('deleteForm').action = '/delete_merge_list/' + listId;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+function duplicateList(listId, listName) {
+    document.getElementById('originalListName').textContent = listName;
+    document.getElementById('duplicateListName').value = listName + ' (Cópia)';
+    document.getElementById('duplicateForm').action = '/duplicate_merge_list/' + listId;
+    new bootstrap.Modal(document.getElementById('duplicateModal')).show();
+}
+
+function submitDuplicateForm() {
+    document.getElementById('duplicateForm').submit();
+}
+
+// Sistema de toast (igual ao da página inicial)
+function showToast(message, type = 'success') {
+    // Remover toast anterior se existir
+    const existingToast = document.getElementById('toast-notification');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Criar toast
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = `toast-notification ${type}`;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        background: ${type === 'success' ? '#28a745' : '#dc3545'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-in-out;
+        min-width: 250px;
+    `;
+    
+    const icon = type === 'success' ? '<i class="fas fa-check-circle"></i>' : '<i class="fas fa-exclamation-circle"></i>';
+    toast.innerHTML = `${icon} ${message}`;
+    
+    document.body.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 50);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Função para gerar relatório de lista
+function generateListReport(listId) {
+    // Encontrar o botão que foi clicado
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    
+    // Mostrar indicador de carregamento
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    fetch(`/api/generate_report/${listId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Tentar copiar para o clipboard com fallback
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(data.report).then(() => {
+                        // Mostrar sucesso temporário no botão
+                        button.innerHTML = '<i class="fas fa-check"></i>';
+                        button.className = button.className.replace('btn-outline-secondary', 'btn-success');
+                        
+                        // Mostrar toast de sucesso
+                        showToast('Relatório copiado para a área de transferência!', 'success');
+                        
+                        // Restaurar botão após 2 segundos
+                        setTimeout(() => {
+                            button.innerHTML = originalContent;
+                            button.className = button.className.replace('btn-success', 'btn-outline-secondary');
+                            button.disabled = false;
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Erro ao copiar para clipboard:', err);
+                        fallbackCopyText(data.report);
+                        showToast('Relatório copiado (fallback)', 'success');
+                        button.innerHTML = originalContent;
+                        button.disabled = false;
+                    });
+                } else {
+                    // Fallback para navegadores que não suportam clipboard API
+                    fallbackCopyText(data.report);
+                    showToast('Relatório copiado (fallback)', 'success');
+                    button.innerHTML = '<i class="fas fa-check"></i>';
+                    button.className = button.className.replace('btn-outline-secondary', 'btn-success');
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalContent;
+                        button.className = button.className.replace('btn-success', 'btn-outline-secondary');
+                        button.disabled = false;
+                    }, 2000);
+                }
+            } else {
+                showToast('Erro ao gerar relatório: ' + data.message, 'error');
+                button.innerHTML = originalContent;
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('Erro ao gerar relatório', 'error');
+            button.innerHTML = originalContent;
+            button.disabled = false;
+        });
+}
+
+// Função fallback para copiar texto
+function fallbackCopyText(text) {
+    // Criar elemento temporário
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
+        // Mostrar modal com o conteúdo para copiar manualmente
+        showCopyModal(text);
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+// Modal para copiar manualmente
+function showCopyModal(text) {
+    const modalHtml = `
+        <div class="modal fade" id="copyModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Copiar Relatório</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Não foi possível copiar automaticamente. Selecione o texto abaixo e copie manualmente:</p>
+                        <textarea class="form-control" rows="10" readonly>${text}</textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remover modal anterior se existir
+    const existingModal = document.getElementById('copyModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('copyModal'));
+    modal.show();
+}
+</script>
+{% endblock %} 
