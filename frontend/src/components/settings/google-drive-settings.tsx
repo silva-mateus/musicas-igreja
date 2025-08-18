@@ -267,7 +267,8 @@ export function GoogleDriveSettings() {
             DEBUG && console.log('🔍 [DEBUG] Testando direto no backend...')
             if (DEBUG) {
                 try {
-                    const directResponse = await fetch('http://127.0.0.1:5000/api/google-drive/status', {
+                    const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
+                    const directResponse = await fetch(`${BACKEND_URL}/api/google-drive/status`, {
                         method: 'GET',
                         // Evitar preflight no modo DEBUG
                         // Não enviar Content-Type para GET simples

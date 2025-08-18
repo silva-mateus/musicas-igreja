@@ -4,7 +4,8 @@ export async function POST(request: NextRequest) {
     try {
         console.log('🧹 [PROXY-CLEAR-CACHE] Limpando cache...')
 
-        const response = await fetch('http://127.0.0.1:5000/api/google-drive/clear-cache', {
+        const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5000'
+        const response = await fetch(`${BACKEND_URL}/api/google-drive/clear-cache`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

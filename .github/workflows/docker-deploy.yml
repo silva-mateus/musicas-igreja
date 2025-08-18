@@ -73,6 +73,7 @@ jobs:
       FRONT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/musicas-igreja-frontend:latest
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       BACKEND_URL: http://musicas-igreja:5000
+      NEXT_PUBLIC_BACKEND_URL: http://musicas-igreja:5000
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -97,13 +98,15 @@ jobs:
           if [ -n "${SECRET_KEY}" ]; then
             echo "SECRET_KEY=${SECRET_KEY}" >> .env
           fi
-          # Defaults (override here if needed)
+          # Backend configuration
           echo "FLASK_ENV=production" >> .env
           echo "DATABASE_PATH=/data/pdf_organizer.db" >> .env
           echo "UPLOAD_FOLDER=/data/uploads" >> .env
           echo "ORGANIZED_FOLDER=/app/organized" >> .env
           echo "LOG_FOLDER=/data/logs" >> .env
+          # Frontend-Backend communication URLs
           echo "BACKEND_URL=http://musicas-igreja:5000" >> .env
+          echo "NEXT_PUBLIC_BACKEND_URL=http://musicas-igreja:5000" >> .env
 
       - name: Pull and start services
         working-directory: ./backend
