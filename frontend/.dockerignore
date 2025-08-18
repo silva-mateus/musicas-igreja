@@ -32,7 +32,7 @@ logs
 .nyc_output
 
 # Ignore root lib folder to avoid conflicts with src/lib
-lib/
+/lib/
 
 # Runtime data
 pids
