@@ -17,6 +17,9 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 
+# Frontend lib conflicts (use src/lib instead)
+frontend/lib/
+
 # Local env and secrets (db will be included for first deploy separately)
 .env
 frontend/.env.local
