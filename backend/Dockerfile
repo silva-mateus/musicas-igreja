@@ -65,4 +65,4 @@ RUN chmod +x /entrypoint.sh
 
 # Comando de inicialização
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "app.py"]
+CMD ["python", "-u", "app.py"]

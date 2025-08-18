@@ -5331,10 +5331,15 @@ def health_check():
         }), 503
 
 if __name__ == '__main__':
-    # Em modo desenvolvimento, evite duplicação de logs por causa do reloader do Flask
-    # O setup_logging já é chamado no import; aqui só reforçamos caso necessário
-    setup_logging()
-    init_db()
+    try:
+        print("🎵 [DEBUG] Iniciando aplicação Flask...")
+        
+        # Em modo desenvolvimento, evite duplicação de logs por causa do reloader do Flask
+        # O setup_logging já é chamado no import; aqui só reforçamos caso necessário
+        setup_logging()
+        print("🎵 [DEBUG] Setup de logging concluído")
+        
+        init_db()
     
     # Informações de configuração para Docker/Produção
     app.logger.info("="*50)
@@ -5369,6 +5374,14 @@ if __name__ == '__main__':
     print("="*60)
     print()
     
-    # Evita duplicação: desative o reloader se já estiver em IDE/ambiente que reexecuta
-    use_reloader = False if os.environ.get('DISABLE_FLASK_RELOADER', '1') == '1' else True
-    app.run(debug=debug, host=host, port=port, use_reloader=use_reloader)
+        # Evita duplicação: desative o reloader se já estiver em IDE/ambiente que reexecuta
+        use_reloader = False if os.environ.get('DISABLE_FLASK_RELOADER', '1') == '1' else True
+        
+        print(f"🎵 [DEBUG] Iniciando Flask: host={host}, port={port}, debug={debug}")
+        app.run(debug=debug, host=host, port=port, use_reloader=use_reloader)
+        
+    except Exception as e:
+        print(f"🚨 [ERROR] Erro durante inicialização: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
