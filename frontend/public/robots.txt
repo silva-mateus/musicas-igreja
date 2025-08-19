@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# Sistema de Músicas da Igreja
