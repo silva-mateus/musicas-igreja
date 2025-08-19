@@ -20,8 +20,22 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV HOSTNAME=0.0.0.0
-COPY --from=builder /app .
+
+# Create app user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy standalone output from builder
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Copy static files for Next.js
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Copy public files
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
 EXPOSE 3001
-CMD ["node", ".next/standalone/server.js"]
+
+CMD ["node", "server.js"]
 
 
