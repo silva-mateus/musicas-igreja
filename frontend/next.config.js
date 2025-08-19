@@ -36,29 +36,25 @@ const nextConfig = {
         unoptimized: true,
     },
 
-    // Output standalone para Docker
-    output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+    // Disable experimental features that might cause routing issues
+    experimental: {
+        esmExternals: false,
+    },
 
-    // Garantir alias '@' -> 'src' no webpack (corrige build em ambiente Docker)
+    // Output standalone para Docker
+    output: 'standalone',
+
+    // Ensure trailing slashes for consistent routing
+    trailingSlash: false,
+
+    // Generate all static routes at build time
+    generateBuildId: () => 'musicas-igreja-build',
+
+    // Garantir alias '@' -> 'src' no webpack
     webpack: (config) => {
-        // Debug dos caminhos no build
-        console.log('=== Webpack Debug ===')
-        console.log('process.cwd():', process.cwd())
-        console.log('__dirname:', __dirname)
-        
         const srcPath = path.resolve(process.cwd(), 'src')
-        console.log('srcPath:', srcPath)
-        
-        // Verificar se src existe
-        const fs = require('fs')
-        const libPath = path.resolve(process.cwd(), 'lib')
-        console.log('src exists:', fs.existsSync(srcPath))
-        console.log('lib path:', libPath)
-        console.log('lib exists:', fs.existsSync(libPath))
-        console.log('api.ts exists:', fs.existsSync(path.join(libPath, 'api.ts')))
-        console.log('utils.ts exists:', fs.existsSync(path.join(libPath, 'utils.ts')))
-        
-        // Configurar aliases de múltiplas formas
+
+        // Configurar aliases
         config.resolve.alias = {
             ...(config.resolve.alias || {}),
             '@': srcPath,
@@ -67,10 +63,7 @@ const nextConfig = {
             '@/hooks': path.join(srcPath, 'hooks'),
             '@/types': path.join(srcPath, 'types'),
         }
-        
-        console.log('Final aliases:', config.resolve.alias)
-        console.log('=== End Debug ===')
-        
+
         return config
     }
 }
