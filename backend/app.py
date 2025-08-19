@@ -5341,40 +5341,40 @@ if __name__ == '__main__':
         print("🎵 [DEBUG] Setup de logging concluído")
         
         init_db()
-    
-    # Informações de configuração para Docker/Produção
-    app.logger.info("="*50)
-    app.logger.info("🎵 MÚSICAS IGREJA - Iniciando aplicação...")
-    app.logger.info("="*50)
-    app.logger.info(f"Ambiente: {os.environ.get('FLASK_ENV', 'development')}")
-    app.logger.info(f"Banco de dados: {DATABASE}")
-    app.logger.info(f"Upload folder: {UPLOAD_FOLDER}")
-    app.logger.info(f"Organized folder: {ORGANIZED_FOLDER}")
-    app.logger.info(f"Log folder: {LOG_FOLDER}")
-    
-    # Configuração flexível para Docker e desenvolvimento
-    host = '0.0.0.0'  # Permite acesso externo
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV') != 'production'
-    
-    print("="*60)
-    print("🎵 SISTEMA MÚSICAS IGREJA - SERVIDOR INICIADO 🎵")
-    print("="*60)
-    print()
-    print("📍 Acesse o sistema através dos seguintes endereços:")
-    print("   • http://localhost:5000")
-    print("   • http://127.0.0.1:5000") 
-    print("   • http://musicas-igreja.local:5000")
-    print("   • http://192.168.15.11:5000 (rede local)")
-    print()
-    print("🔧 Para configurar o domínio customizado:")
-    print("   1. Execute como Administrador: start_musicas_igreja.bat")
-    print("   2. Ou siga as instruções no README")
-    print()
-    print("⏹️  Para parar o servidor: Ctrl+C")
-    print("="*60)
-    print()
-    
+        
+        # Informações de configuração para Docker/Produção
+        app.logger.info("="*50)
+        app.logger.info("🎵 MÚSICAS IGREJA - Iniciando aplicação...")
+        app.logger.info("="*50)
+        app.logger.info(f"Ambiente: {os.environ.get('FLASK_ENV', 'development')}")
+        app.logger.info(f"Banco de dados: {DATABASE}")
+        app.logger.info(f"Upload folder: {UPLOAD_FOLDER}")
+        app.logger.info(f"Organized folder: {ORGANIZED_FOLDER}")
+        app.logger.info(f"Log folder: {LOG_FOLDER}")
+        
+        # Configuração flexível para Docker e desenvolvimento
+        host = '0.0.0.0'  # Permite acesso externo
+        port = int(os.environ.get('PORT', 5000))
+        debug = os.environ.get('FLASK_ENV') != 'production'
+        
+        print("="*60)
+        print("🎵 SISTEMA MÚSICAS IGREJA - SERVIDOR INICIADO 🎵")
+        print("="*60)
+        print()
+        print("📍 Acesse o sistema através dos seguintes endereços:")
+        print("   • http://localhost:5000")
+        print("   • http://127.0.0.1:5000") 
+        print("   • http://musicas-igreja.local:5000")
+        print("   • http://192.168.15.11:5000 (rede local)")
+        print()
+        print("🔧 Para configurar o domínio customizado:")
+        print("   1. Execute como Administrador: start_musicas_igreja.bat")
+        print("   2. Ou siga as instruções no README")
+        print()
+        print("⏹️  Para parar o servidor: Ctrl+C")
+        print("="*60)
+        print()
+        
         # Evita duplicação: desative o reloader se já estiver em IDE/ambiente que reexecuta
         use_reloader = False if os.environ.get('DISABLE_FLASK_RELOADER', '1') == '1' else True
         
