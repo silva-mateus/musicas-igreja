@@ -35,7 +35,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     const SidebarContent = () => (
         <div className="flex h-full flex-col bg-card border-r border-border">
-            <div className="flex h-16 items-center border-b border-border px-6">
+            <div className="flex h-16 items-center border-b border-border px-4 sm:px-6">
                 <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
                     <FileMusic className="h-6 w-6 text-primary" />
                     <span className="text-lg">Músicas Igreja</span>
@@ -78,7 +78,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </Sheet>
             <div className="lg:pl-72">
                 <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                    <div className="flex h-16 items-center gap-4 px-6">
+                    <div className="flex h-16 items-center gap-4 px-4 sm:px-6">
                         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                             <SheetTrigger asChild>
                                 <Button variant="ghost" size="icon" className="lg:hidden">
@@ -92,11 +92,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                             <Link href="/music">
                                 <Search className="h-4 w-4" />
                                 <span className="hidden sm:inline">Buscar músicas</span>
+                                <span className="sm:hidden">Buscar</span>
                             </Link>
                         </Button>
                     </div>
                 </header>
-                <main className="p-6">{children}</main>
+                <main className="p-4 sm:p-6">{children}</main>
             </div>
         </div>
     )
