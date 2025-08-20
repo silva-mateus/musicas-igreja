@@ -63,18 +63,18 @@ export default function MusicPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-bold flex items-center gap-2">
-                            <Music className="h-8 w-8 text-primary" />
-                            Gerenciar Músicas
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                    <div className="flex-1">
+                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                            <Music className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                            <span className="line-clamp-1">Gerenciar Músicas</span>
                         </h1>
-                        <p className="text-muted-foreground mt-2">Busque, visualize e organize suas músicas</p>
+                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">Busque, visualize e organize suas músicas</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                         <Button onClick={loadMusics} variant="outline" size="sm" className="gap-2">
                             <RefreshCw className="h-4 w-4" />
-                            Atualizar
+                            <span className="hidden sm:inline">Atualizar</span>
                         </Button>
                         <Button asChild>
                             <Link href="/upload" className="gap-2">
@@ -88,14 +88,15 @@ export default function MusicPage() {
                 {/* Search and Filters */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
+                        <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <span className="flex items-center gap-2">
                                 <Search className="h-5 w-5" />
                                 Buscar Músicas
                             </span>
-                            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2 self-start sm:self-auto">
                                 <Filter className="h-4 w-4" />
-                                {showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+                                <span className="hidden sm:inline">{showFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}</span>
+                                <span className="sm:hidden">Filtros</span>
                             </Button>
                         </CardTitle>
                     </CardHeader>
@@ -114,8 +115,8 @@ export default function MusicPage() {
                 {/* Results */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                            <span>
+                        <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <span className="text-base sm:text-lg">
                                 Resultados ({musics?.pagination?.total || 0} música{(musics?.pagination?.total || 0) !== 1 ? 's' : ''})
                             </span>
                             <div className="text-sm text-muted-foreground">

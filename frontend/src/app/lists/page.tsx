@@ -108,24 +108,25 @@ export default function ListsPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-bold flex items-center gap-2">
-                            <List className="h-8 w-8 text-primary" />
-                            Listas de Música
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                    <div className="flex-1">
+                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                            <List className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                            <span className="line-clamp-1">Listas de Música</span>
                         </h1>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
                             Organize suas músicas em listas personalizadas
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0">
                         <Button onClick={loadLists} variant="outline" size="sm" className="gap-2">
                             <RefreshCw className="h-4 w-4" />
-                            Atualizar
+                            <span className="hidden sm:inline">Atualizar</span>
                         </Button>
                         <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
                             <Plus className="h-4 w-4" />
-                            Nova Lista
+                            <span className="hidden sm:inline">Nova Lista</span>
+                            <span className="sm:hidden">Nova</span>
                         </Button>
                     </div>
                 </div>
@@ -133,12 +134,12 @@ export default function ListsPage() {
                 {/* Search and Stats */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
+                        <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <span className="flex items-center gap-2">
                                 <Search className="h-5 w-5" />
                                 Buscar Listas
                             </span>
-                            <Badge variant="secondary">
+                            <Badge variant="secondary" className="self-start sm:self-auto">
                                 {lists.pagination.total} lista{lists.pagination.total !== 1 ? 's' : ''}
                             </Badge>
                         </CardTitle>
@@ -194,8 +195,8 @@ export default function ListsPage() {
                 {(lists.pagination.total > 0 || isLoading || error) && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                                <span>
+                            <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <span className="text-base sm:text-lg">
                                     Suas Listas ({lists.pagination.total})
                                 </span>
                                 {lists.pagination.pages > 1 && (
