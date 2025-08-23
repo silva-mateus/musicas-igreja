@@ -48,18 +48,26 @@ fi
 log "🔍 Verificando conectividade do banco de dados..."
 python -c "
 import sys
+import time
 sys.path.insert(0, '/app')
 import sqlite3
-try:
-    conn = sqlite3.connect('/data/pdf_organizer.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=\"table\"')
-    tables = cursor.fetchone()[0]
-    conn.close()
-    print(f'✅ Banco conectado. {tables} tabelas encontradas.')
-except Exception as e:
-    print(f'❌ Erro ao conectar ao banco: {e}')
-    sys.exit(1)
+
+max_retries = 3
+for attempt in range(max_retries):
+    try:
+        conn = sqlite3.connect('/data/pdf_organizer.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM sqlite_master WHERE type=\"table\"')
+        tables = cursor.fetchone()[0]
+        conn.close()
+        print(f'✅ Banco conectado. {tables} tabelas encontradas.')
+        break
+    except Exception as e:
+        print(f'⚠️  Tentativa {attempt + 1}/{max_retries} - Erro ao conectar ao banco: {e}')
+        if attempt == max_retries - 1:
+            print('❌ Falha após todas as tentativas. Continuando mesmo assim...')
+        else:
+            time.sleep(2)
 "
 
 # Verificar dependências Python
@@ -70,12 +78,14 @@ missing = []
 for pkg in packages:
     try:
         __import__(pkg)
+        print(f'✅ {pkg} - OK')
     except ImportError:
         missing.append(pkg)
+        print(f'❌ {pkg} - FALTANDO')
 
 if missing:
-    print(f'❌ Dependências faltando: {missing}')
-    exit(1)
+    print(f'⚠️  ATENÇÃO: Dependências faltando: {missing}')
+    print('⚠️  A aplicação pode não funcionar corretamente.')
 else:
     print('✅ Todas as dependências estão instaladas.')
 "
@@ -96,15 +106,25 @@ export UPLOAD_FOLDER=${UPLOAD_FOLDER:-/data/uploads}
 export ORGANIZED_FOLDER=${ORGANIZED_FOLDER:-/app/organized}
 export LOG_FOLDER=${LOG_FOLDER:-/data/logs}
 
-# Usar o diretório organized existente no repositório (/app/organized)
-log "📁 Usando diretório organized existente: $ORGANIZED_FOLDER"
+# Verificar e configurar diretório organized
+log "📁 Configurando diretório organized: $ORGANIZED_FOLDER"
 if [ -d "/app/organized" ]; then
     log "✅ Diretório /app/organized encontrado"
     chmod -R 777 /app/organized
     log "✅ Permissões ajustadas para /app/organized"
+    
+    # Verificar se tem conteúdo (pelo menos uma pasta de categoria)
+    if [ -z "$(ls -A /app/organized 2>/dev/null)" ]; then
+        log "📂 Diretório organized vazio. Criando estrutura básica de categorias..."
+        mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório}
+        chmod -R 777 /app/organized
+        log "✅ Estrutura básica criada"
+    fi
 else
-    log "❌ Diretório /app/organized não encontrado!"
-    exit 1
+    log "⚠️  Diretório /app/organized não encontrado. Criando estrutura..."
+    mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório}
+    chmod -R 777 /app/organized
+    log "✅ Diretório /app/organized criado com estrutura básica"
 fi
 
 log "📝 Configurações:"

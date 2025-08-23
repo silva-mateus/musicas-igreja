@@ -41,7 +41,9 @@ COPY --chown=appuser:appuser . .
 
 # Criar diretórios padrão em /data (compatível com volume montado)
 RUN mkdir -p /data/logs /data/uploads /data/organized && \
-    chown -R appuser:appuser /data
+    chown -R appuser:appuser /data && \
+    mkdir -p /app/organized && \
+    chown -R appuser:appuser /app/organized
 
 # Configurar variáveis de ambiente
 ENV FLASK_APP=app.py
