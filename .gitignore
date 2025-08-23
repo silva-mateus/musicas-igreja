@@ -54,8 +54,8 @@ coverage.xml
 # Django stuff:
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
+*db.sqlite3
+*db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -134,10 +134,10 @@ backend/templates/
 
 # Databases (SQLite)
 # Atenção: vamos COMMITAR o db atual no primeiro deploy. Depois reativar ignores.
-# *.db
+*.db
 # backend/*.db
 # backend/data/*.db
-# *.db-journal
+*.db-journal
 *.db.bkp
 
 # IDE

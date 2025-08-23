@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import type { MusicList } from '@/types'
 import {
     Eye,
@@ -21,8 +20,7 @@ import {
     Copy,
     ClipboardList,
     Download,
-    Check,
-    MoreHorizontal
+    Check
 } from 'lucide-react'
 import { listsApi, handleApiError } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
@@ -57,14 +55,6 @@ export function ListsTable({
     const [isDeleting, setIsDeleting] = useState(false)
     const [generatingReport, setGeneratingReport] = useState<number | null>(null)
     const [reportCopied, setReportCopied] = useState<number | null>(null)
-    const [isMobile, setIsMobile] = useState(false)
-
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 640)
-        checkMobile()
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
 
     // Debug logs (reduzido)
     console.log('📋 [TABLE] ListsTable rendered with', lists?.length, 'lists, loading:', isLoading)
@@ -213,74 +203,49 @@ export function ListsTable({
         <>
             <div className="space-y-4">
                 {/* Table */}
-                <div>
+                <div className="rounded-md border">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nome da Lista</TableHead>
-                                <TableHead className="hidden md:table-cell">Descrição</TableHead>
-                                <TableHead className="hidden sm:table-cell">Músicas</TableHead>
-                                <TableHead className="hidden lg:table-cell">Criada em</TableHead>
-                                <TableHead className="hidden xl:table-cell">Última Atualização</TableHead>
+                                <TableHead>Descrição</TableHead>
+                                <TableHead>Músicas</TableHead>
+                                <TableHead>Criada em</TableHead>
+                                <TableHead>Última Atualização</TableHead>
                                 <TableHead className="text-right">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {lists.map((list) => (
                                 <TableRow key={list.id} className="hover:bg-muted/50">
-                                    <TableCell className="font-medium w-full max-w-0">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <Music2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                <span className="line-clamp-2">{list.name}</span>
-                                            </div>
-                                            {/* Show mobile info */}
-                                            <div className="mt-2 space-y-1">
-                                                {/* Show music count on mobile */}
-                                                <div className="sm:hidden">
-                                                    <Badge variant="secondary" className="gap-1 text-xs">
-                                                        <Music2 className="h-3 w-3" />
-                                                        {list.file_count ?? 0} música{(list.file_count ?? 0) !== 1 ? 's' : ''}
-                                                    </Badge>
-                                                </div>
-                                                {/* Show created date on mobile */}
-                                                {list.created_date && (
-                                                    <div className="lg:hidden text-xs text-muted-foreground">
-                                                        <Calendar className="h-3 w-3 inline mr-1" />
-                                                        {new Date(list.created_date).toLocaleDateString('pt-BR')}
-                                                    </div>
-                                                )}
-                                                {/* Show description on mobile */}
-                                                {list.observations && (
-                                                    <div className="md:hidden text-xs text-muted-foreground line-clamp-2">
-                                                        {list.observations}
-                                                    </div>
-                                                )}
-                                            </div>
+                                    <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <Music2 className="h-4 w-4 text-muted-foreground" />
+                                            {list.name}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="hidden md:table-cell">
+                                    <TableCell>
                                         {list.observations ? (
-                                            <div className="max-w-xs line-clamp-2 text-sm text-muted-foreground">
+                                            <div className="max-w-xs truncate text-sm text-muted-foreground">
                                                 {list.observations}
                                             </div>
                                         ) : (
                                             <span className="text-muted-foreground text-sm">-</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="hidden sm:table-cell">
+                                    <TableCell>
                                         <Badge variant="secondary" className="gap-1">
                                             <Music2 className="h-3 w-3" />
                                             {list.file_count ?? 0}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                                    <TableCell className="text-sm text-muted-foreground">
                                         <div className="flex items-center gap-1">
                                             <Calendar className="h-3 w-3" />
                                             {list.created_date ? new Date(list.created_date).toLocaleDateString('pt-BR') : '-'}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
+                                    <TableCell className="text-sm text-muted-foreground">
                                         {list.updated_date ? (
                                             <div className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3" />
@@ -290,9 +255,8 @@ export function ListsTable({
                                             <span>-</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-right w-auto">
-                                        {/* Desktop Actions - Inline Buttons */}
-                                        <div className="hidden sm:flex justify-end gap-1">
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
@@ -359,68 +323,6 @@ export function ListsTable({
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
-
-                                        {/* Mobile Actions - Dropdown Menu */}
-                                        <div className="sm:hidden">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Abrir menu de ações</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-56">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/lists/${list.id}`} className="flex items-center">
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            Visualizar Lista
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/lists/${list.id}/edit`} className="flex items-center">
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            Editar Lista
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleGenerateReport(list)}
-                                                        disabled={generatingReport === list.id}
-                                                    >
-                                                        {reportCopied === list.id ? (
-                                                            <Check className="mr-2 h-4 w-4 text-green-600" />
-                                                        ) : (
-                                                            <ClipboardList className="mr-2 h-4 w-4" />
-                                                        )}
-                                                        Gerar Relatório
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleDownloadPDF(list)}>
-                                                        <Download className="mr-2 h-4 w-4" />
-                                                        Baixar PDF
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DuplicateListDialog
-                                                        listId={list.id}
-                                                        listName={list.name}
-                                                        onSuccess={() => window.location.reload()}
-                                                        trigger={
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                                <Copy className="mr-2 h-4 w-4" />
-                                                                Duplicar Lista
-                                                            </DropdownMenuItem>
-                                                        }
-                                                    />
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleDeleteClick(list)}
-                                                        className="text-destructive focus:text-destructive"
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        Excluir Lista
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -430,50 +332,42 @@ export function ListsTable({
 
                 {/* Pagination */}
                 {pagination.pages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="text-sm text-muted-foreground order-2 sm:order-1">
-                            <span className="hidden sm:inline">
-                                Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
-                                {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
-                                {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
-                            </span>
-                            <span className="sm:hidden">
-                                {pagination.page} de {pagination.pages}
-                            </span>
+                    <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                            Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
+                            {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+                            {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
                         </div>
 
-                        <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
+                        <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onPageChange(1)}
                                 disabled={pagination.page === 1}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                                <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <ChevronsLeft className="h-4 w-4" />
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onPageChange(pagination.page - 1)}
                                 disabled={pagination.page === 1}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <ChevronLeft className="h-4 w-4" />
                             </Button>
 
                             <div className="flex items-center gap-1">
-                                {Array.from({ length: Math.min(isMobile ? 3 : 5, pagination.pages) }, (_, i) => {
+                                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
                                     let pageNum
-                                    const maxPages = isMobile ? 3 : 5
-                                    if (pagination.pages <= maxPages) {
+                                    if (pagination.pages <= 5) {
                                         pageNum = i + 1
-                                    } else if (pagination.page <= Math.floor(maxPages / 2) + 1) {
+                                    } else if (pagination.page <= 3) {
                                         pageNum = i + 1
-                                    } else if (pagination.page >= pagination.pages - Math.floor(maxPages / 2)) {
-                                        pageNum = pagination.pages - maxPages + 1 + i
+                                    } else if (pagination.page >= pagination.pages - 2) {
+                                        pageNum = pagination.pages - 4 + i
                                     } else {
-                                        pageNum = pagination.page - Math.floor(maxPages / 2) + i
+                                        pageNum = pagination.page - 2 + i
                                     }
 
                                     return (
@@ -482,7 +376,7 @@ export function ListsTable({
                                             variant={pageNum === pagination.page ? "default" : "outline"}
                                             size="sm"
                                             onClick={() => onPageChange(pageNum)}
-                                            className="w-8 h-8 p-0 sm:w-9 sm:h-9"
+                                            className="w-8 h-8 p-0"
                                         >
                                             {pageNum}
                                         </Button>
@@ -495,18 +389,16 @@ export function ListsTable({
                                 size="sm"
                                 onClick={() => onPageChange(pagination.page + 1)}
                                 disabled={pagination.page === pagination.pages}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <ChevronRight className="h-4 w-4" />
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onPageChange(pagination.pages)}
                                 disabled={pagination.page === pagination.pages}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                             >
-                                <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <ChevronsRight className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>

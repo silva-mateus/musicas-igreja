@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import type { MusicFile } from '@/types'
 import {
     Eye,
@@ -23,10 +22,9 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
-    ListPlus,
-    MoreHorizontal
+    ListPlus
 } from 'lucide-react'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { AddToListModal } from './add-to-list-modal'
 
 interface MusicTableProps {
@@ -58,14 +56,6 @@ export function MusicTable({
 }: MusicTableProps) {
     const router = useRouter()
     const [sortState, setSortState] = useState<SortState>({ field: 'upload_date', order: 'desc' })
-    const [isMobile, setIsMobile] = useState(false)
-
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 640)
-        checkMobile()
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
 
     const handleSort = (field: string) => {
         const newOrder = sortState.field === field && sortState.order === 'asc' ? 'desc' : 'asc'
@@ -99,9 +89,9 @@ export function MusicTable({
         document.body.removeChild(link)
     }
 
-    const SortableHeader = ({ field, children, className }: { field: string, children: React.ReactNode, className?: string }) => (
+    const SortableHeader = ({ field, children }: { field: string, children: React.ReactNode }) => (
         <TableHead
-            className={cn("cursor-pointer hover:bg-muted/50 transition-colors", className)}
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => handleSort(field)}
         >
             <div className="flex items-center gap-2">
@@ -120,9 +110,9 @@ export function MusicTable({
                             <TableRow>
                                 <TableHead>Título</TableHead>
                                 <TableHead>Artista</TableHead>
-                                <TableHead className="hidden sm:table-cell">Tom</TableHead>
-                                <TableHead className="hidden md:table-cell">Categoria</TableHead>
-                                <TableHead className="hidden lg:table-cell">Tempo</TableHead>
+                                <TableHead>Categoria</TableHead>
+                                <TableHead>Tempo</TableHead>
+                                <TableHead>Links</TableHead>
                                 <TableHead>Ações</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -131,9 +121,9 @@ export function MusicTable({
                                 <TableRow key={i}>
                                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
-                                    <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                                    <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                                     <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                                 </TableRow>
                             ))}
@@ -159,81 +149,44 @@ export function MusicTable({
     return (
         <div className="space-y-4">
             {/* Table */}
-            <div>
+            <div className="rounded-md border">
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <SortableHeader field="title">Título</SortableHeader>
                             <SortableHeader field="artist">Artista</SortableHeader>
-                            <TableHead className="hidden sm:table-cell">Tom</TableHead>
-                            <TableHead className="hidden md:table-cell">Categoria</TableHead>
-                            <TableHead className="hidden lg:table-cell">Tempo</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Tempo</TableHead>
+                            <TableHead>Links</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {musics.map((music) => (
                             <TableRow key={music.id} className="hover:bg-muted/50">
-                                <TableCell className="font-medium w-full max-w-0">
+                                <TableCell className="font-medium">
                                     <div>
-                                        <div className="font-medium line-clamp-2">
+                                        <div className="font-medium">
                                             {music.title || music.original_name}
                                         </div>
-
-                                        {/* Show key, categories and times on mobile below the title */}
-                                        <div className="sm:hidden mt-2">
-                                            <div className="flex flex-wrap gap-1">
-                                                {music.musical_key && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        {music.musical_key}
-                                                    </Badge>
-                                                )}
-
-                                                {music.categories && music.categories.length > 0
-                                                    ? music.categories.map((cat, idx) => (
-                                                        <Badge key={idx} variant="secondary" className="text-xs">
-                                                            {cat}
-                                                        </Badge>
-                                                    ))
-                                                    : music.category && (
-                                                        <Badge variant="secondary" className="text-xs">{music.category}</Badge>
-                                                    )
-                                                }
-
-                                                {music.liturgical_times && music.liturgical_times.length > 0
-                                                    ? music.liturgical_times.map((time, idx) => (
-                                                        <Badge key={idx} variant="outline" className="text-xs">
-                                                            {time}
-                                                        </Badge>
-                                                    ))
-                                                    : music.liturgical_time && (
-                                                        <Badge variant="outline" className="text-xs">{music.liturgical_time}</Badge>
-                                                    )
-                                                }
-                                            </div>
-                                        </div>
+                                        {music.musical_key && (
+                                            <Badge variant="outline" className="text-xs mt-1">
+                                                {music.musical_key}
+                                            </Badge>
+                                        )}
                                     </div>
                                 </TableCell>
                                 <TableCell>
                                     {music.artist ? (
                                         <div className="flex items-center gap-2">
                                             <User className="h-4 w-4 text-muted-foreground" />
-                                            <span className="truncate">{music.artist}</span>
+                                            {music.artist}
                                         </div>
                                     ) : (
                                         <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="hidden sm:table-cell">
-                                    {music.musical_key ? (
-                                        <Badge variant="outline" className="text-xs">
-                                            {music.musical_key}
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">-</span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell">
+                                <TableCell>
                                     {music.categories && music.categories.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
                                             {music.categories.map((cat, idx) => (
@@ -248,7 +201,7 @@ export function MusicTable({
                                         <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="hidden lg:table-cell">
+                                <TableCell>
                                     {music.liturgical_times && music.liturgical_times.length > 0 ? (
                                         <div className="flex flex-wrap gap-1">
                                             {music.liturgical_times.map((time, idx) => (
@@ -263,9 +216,29 @@ export function MusicTable({
                                         <span className="text-muted-foreground">-</span>
                                     )}
                                 </TableCell>
-                                <TableCell className="text-right w-auto">
-                                    {/* Desktop Actions - Inline Buttons */}
-                                    <div className="hidden sm:flex justify-end gap-1">
+                                <TableCell>
+                                    {music.youtube_link ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            asChild
+                                            className="text-red-600 hover:text-red-700"
+                                        >
+                                            <a
+                                                href={music.youtube_link}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title="Ver no YouTube"
+                                            >
+                                                <Youtube className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex justify-end gap-1">
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -282,23 +255,6 @@ export function MusicTable({
                                         >
                                             <Download className="h-4 w-4" />
                                         </Button>
-                                        {music.youtube_link && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                                title="Ver no YouTube"
-                                                className="text-red-600 hover:text-red-700"
-                                            >
-                                                <a
-                                                    href={music.youtube_link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    <Youtube className="h-4 w-4" />
-                                                </a>
-                                            </Button>
-                                        )}
                                         <AddToListModal
                                             musicId={music.id}
                                             musicTitle={music.title || music.original_name}
@@ -313,58 +269,6 @@ export function MusicTable({
                                             <Edit className="h-4 w-4" />
                                         </Button>
                                     </div>
-
-                                    {/* Mobile Actions - Dropdown Menu */}
-                                    <div className="sm:hidden">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">Abrir menu de ações</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-48">
-                                                <DropdownMenuItem onClick={() => handleView(music)}>
-                                                    <Eye className="mr-2 h-4 w-4" />
-                                                    Visualizar
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleDownload(music)}>
-                                                    <Download className="mr-2 h-4 w-4" />
-                                                    Download
-                                                </DropdownMenuItem>
-                                                {music.youtube_link && (
-                                                    <DropdownMenuItem asChild>
-                                                        <a
-                                                            href={music.youtube_link}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center text-red-600 hover:text-red-700"
-                                                        >
-                                                            <Youtube className="mr-2 h-4 w-4" />
-                                                            Ver no YouTube
-                                                        </a>
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuSeparator />
-                                                <AddToListModal
-                                                    musicId={music.id}
-                                                    musicTitle={music.title || music.original_name}
-                                                    onSuccess={onMusicUpdate}
-                                                    trigger={
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                            <ListPlus className="mr-2 h-4 w-4" />
-                                                            Adicionar à Lista
-                                                        </DropdownMenuItem>
-                                                    }
-                                                />
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => handleEdit(music)}>
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    Editar
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -374,50 +278,42 @@ export function MusicTable({
 
             {/* Pagination */}
             {pagination && pagination.pages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-sm text-muted-foreground order-2 sm:order-1">
-                        <span className="hidden sm:inline">
-                            Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
-                            {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
-                            {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
-                        </span>
-                        <span className="sm:hidden">
-                            {pagination.page} de {pagination.pages}
-                        </span>
+                <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                        Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
+                        {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+                        {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
                     </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
+                    <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => onPageChange(1)}
                             disabled={pagination.page === 1}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                         >
-                            <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <ChevronsLeft className="h-4 w-4" />
                         </Button>
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => onPageChange(pagination.page - 1)}
                             disabled={pagination.page === 1}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                         >
-                            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <ChevronLeft className="h-4 w-4" />
                         </Button>
 
                         <div className="flex items-center gap-1">
-                            {Array.from({ length: Math.min(isMobile ? 3 : 5, pagination.pages) }, (_, i) => {
+                            {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
                                 let pageNum
-                                const maxPages = isMobile ? 3 : 5
-                                if (pagination.pages <= maxPages) {
+                                if (pagination.pages <= 5) {
                                     pageNum = i + 1
-                                } else if (pagination.page <= Math.floor(maxPages / 2) + 1) {
+                                } else if (pagination.page <= 3) {
                                     pageNum = i + 1
-                                } else if (pagination.page >= pagination.pages - Math.floor(maxPages / 2)) {
-                                    pageNum = pagination.pages - maxPages + 1 + i
+                                } else if (pagination.page >= pagination.pages - 2) {
+                                    pageNum = pagination.pages - 4 + i
                                 } else {
-                                    pageNum = pagination.page - Math.floor(maxPages / 2) + i
+                                    pageNum = pagination.page - 2 + i
                                 }
 
                                 return (
@@ -426,7 +322,7 @@ export function MusicTable({
                                         variant={pageNum === pagination.page ? "default" : "outline"}
                                         size="sm"
                                         onClick={() => onPageChange(pageNum)}
-                                        className="w-8 h-8 p-0 sm:w-9 sm:h-9"
+                                        className="w-8 h-8 p-0"
                                     >
                                         {pageNum}
                                     </Button>
@@ -439,18 +335,16 @@ export function MusicTable({
                             size="sm"
                             onClick={() => onPageChange(pagination.page + 1)}
                             disabled={pagination.page === pagination.pages}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                         >
-                            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <ChevronRight className="h-4 w-4" />
                         </Button>
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => onPageChange(pagination.pages)}
                             disabled={pagination.page === pagination.pages}
-                            className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                         >
-                            <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <ChevronsRight className="h-4 w-4" />
                         </Button>
                     </div>
                 </div>
