@@ -74,9 +74,40 @@ jobs:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       BACKEND_URL: http://musicas-igreja:5000
       NEXT_PUBLIC_BACKEND_URL: http://musicas-igreja:5000
+      PERSISTENT_DATA_PATH: /home/runner/musicas-igreja-data
     steps:
+      - name: Setup persistent data directories
+        run: |
+          echo "🗂️ === Setting up persistent data directories ==="
+          
+          # Criar diretórios persistentes fora do workspace
+          mkdir -p "$PERSISTENT_DATA_PATH"/{organized,data}
+          
+          # Verificar se já existem dados
+          if [ -d "$PERSISTENT_DATA_PATH/organized" ]; then
+            echo "✅ Persistent organized directory exists"
+            pdf_count=$(find "$PERSISTENT_DATA_PATH/organized" -name "*.pdf" 2>/dev/null | wc -l)
+            echo "📄 Found $pdf_count PDF files"
+          else
+            echo "📁 Creating organized directory structure"
+            mkdir -p "$PERSISTENT_DATA_PATH/organized"
+          fi
+          
+          if [ -d "$PERSISTENT_DATA_PATH/data" ]; then
+            echo "✅ Persistent data directory exists"
+          else
+            echo "📁 Creating data directory"
+            mkdir -p "$PERSISTENT_DATA_PATH/data"
+          fi
+          
+          # Exibir estrutura
+          echo "📊 Persistent data structure:"
+          ls -la "$PERSISTENT_DATA_PATH/"
+      
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          clean: false  # Não limpar workspace para preservar dados
 
       - name: Docker info
         run: |
@@ -121,7 +152,7 @@ jobs:
             
             # Usar Docker para corrigir permissões (roda como root dentro do container)
             docker run --rm \
-              -v "$(pwd)/$target_dir:/target" \
+              -v "$target_dir:/target" \
               alpine:latest \
               sh -c "
                 echo 'Current permissions:'
@@ -135,27 +166,40 @@ jobs:
               "
           }
           
-          # Verificar se diretório organized existe e suas permissões
-          if [ -d "./organized" ]; then
-            echo "✅ Directory ./organized exists"
-            current_owner=$(stat -c '%u:%g' ./organized 2>/dev/null || echo "unknown")
+          # Usar diretório persistente em vez do workspace
+          ORGANIZED_DIR="$PERSISTENT_DATA_PATH/organized"
+          DATA_DIR="$PERSISTENT_DATA_PATH/data"
+          
+          echo "📂 Using persistent directories:"
+          echo "   Organized: $ORGANIZED_DIR"
+          echo "   Data: $DATA_DIR"
+          
+          # Verificar se diretório organized persistente existe
+          if [ -d "$ORGANIZED_DIR" ]; then
+            echo "✅ Persistent organized directory exists"
+            current_owner=$(stat -c '%u:%g' "$ORGANIZED_DIR" 2>/dev/null || echo "unknown")
             echo "📋 Current owner: $current_owner"
             
             if [ "$current_owner" != "1000:1000" ]; then
               echo "🔧 Fixing permissions (current: $current_owner, needed: 1000:1000)"
-              fix_permissions_with_docker "organized"
+              fix_permissions_with_docker "$ORGANIZED_DIR"
               echo "✅ Permissions fixed"
             else
               echo "✅ Permissions already correct"
             fi
           else
-            echo "📁 Creating organized directory with correct permissions"
-            mkdir -p ./organized
-            fix_permissions_with_docker "organized"
-            echo "✅ Directory created with correct permissions"
+            echo "📁 Creating organized directory structure"
+            mkdir -p "$ORGANIZED_DIR"
+            # Copiar estrutura básica do repo se ela não existir
+            if [ -d "./organized" ]; then
+              echo "🔄 Copying directory structure from repo"
+              cp -r ./organized/* "$ORGANIZED_DIR/" 2>/dev/null || echo "No files to copy"
+            fi
+            fix_permissions_with_docker "$ORGANIZED_DIR"
+            echo "✅ Persistent directory created with correct permissions"
           fi
           
-          # Verificar e corrigir volume Docker se existir
+          # Verificar e corrigir volume Docker se existir  
           if docker volume ls | grep -q musicas_data; then
             echo "🗃️ Checking Docker volume permissions"
             docker run --rm -v musicas_data:/data alpine sh -c "
@@ -170,6 +214,76 @@ jobs:
             echo "✅ Docker volume permissions fixed"
           fi
 
+      - name: Create production docker-compose
+        working-directory: ./backend
+        run: |
+          echo "🐳 === Creating production docker-compose with persistent paths ==="
+          
+          # Criar docker-compose específico para produção usando diretórios persistentes
+          cat > docker-compose.production.yml << EOF
+          services:
+            musicas-igreja:
+              image: ghcr.io/\${GHCR_NAMESPACE}/musicas-igreja:latest
+              container_name: musicas-igreja-app
+              restart: unless-stopped
+              ports:
+                - "5001:5000"
+              environment:
+                - FLASK_ENV=production
+                - SECRET_KEY=\${SECRET_KEY}
+                - DATABASE_PATH=/data/pdf_organizer.db
+                - UPLOAD_FOLDER=/data/uploads
+                - ORGANIZED_FOLDER=/app/organized
+                - LOG_FOLDER=/data/logs
+              volumes:
+                - musicas_data:/data
+                - $PERSISTENT_DATA_PATH/organized:/app/organized
+                - ./config:/app/config:ro
+              networks:
+                - musicas-network
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+
+            frontend:
+              image: ghcr.io/\${GHCR_NAMESPACE}/musicas-igreja-frontend:latest
+              container_name: musicas-igreja-front
+              restart: unless-stopped
+              environment:
+                - NODE_ENV=production
+                - BACKEND_URL=\${BACKEND_URL}
+                - NEXT_PUBLIC_BACKEND_URL=\${NEXT_PUBLIC_BACKEND_URL}
+                - PORT=3001
+              ports:
+                - "3001:3001"
+              depends_on:
+                - musicas-igreja
+              networks:
+                - musicas-network
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3001"] 
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+
+          networks:
+            musicas-network:
+              driver: bridge
+
+          volumes:
+            musicas_data:
+              driver: local
+          EOF
+          
+          echo "✅ Production docker-compose created"
+          echo "📊 Using persistent directories:"
+          echo "   Organized: $PERSISTENT_DATA_PATH/organized"
+          echo "   Data: musicas_data volume"
+
       - name: Pull and start services
         working-directory: ./backend
         run: |
@@ -177,15 +291,15 @@ jobs:
           echo "=== Environment file content ==="
           cat .env
           echo "=== Pulling images ==="
-          docker compose pull
+          docker compose -f docker-compose.production.yml pull
           echo "=== Starting services ==="
-          docker compose up -d
+          docker compose -f docker-compose.production.yml up -d
           echo "=== Waiting 15 seconds for startup ==="
           sleep 15
           echo "=== Container status ==="
-          docker compose ps
+          docker compose -f docker-compose.production.yml ps
           echo "=== Container logs (last 20 lines) ==="
-          docker compose logs --tail=20
+          docker compose -f docker-compose.production.yml logs --tail=20
 
       - name: Health check with auto-recovery
         working-directory: ./backend
@@ -214,14 +328,76 @@ jobs:
             echo "🚨 RESTART LOOP DETECTED - Attempting automatic recovery"
             
             echo "📋 Container logs before recovery:"
-            docker compose logs --tail=50 musicas-igreja || true
+            docker compose -f docker-compose.production.yml logs --tail=50 musicas-igreja || true
             
             echo "🔧 Step 1: Stopping containers"
-            docker compose down || true
+            docker compose -f docker-compose.production.yml down || true
             
             echo "🔧 Step 2: Using root permissions mode for recovery"
             echo "FIX_PERMISSIONS=true" >> .env
             cat .env
+            
+            # Criar docker-compose para fix de permissões
+            cat > docker-compose.fix-permissions.yml << EOF
+          services:
+            musicas-igreja:
+              image: ghcr.io/\${GHCR_NAMESPACE}/musicas-igreja:latest
+              container_name: musicas-igreja-app
+              restart: unless-stopped
+              user: "0:0"
+              ports:
+                - "5001:5000"
+              environment:
+                - FLASK_ENV=production
+                - SECRET_KEY=\${SECRET_KEY}
+                - DATABASE_PATH=/data/pdf_organizer.db
+                - UPLOAD_FOLDER=/data/uploads
+                - ORGANIZED_FOLDER=/app/organized
+                - LOG_FOLDER=/data/logs
+                - FIX_PERMISSIONS=true
+              volumes:
+                - musicas_data:/data
+                - $PERSISTENT_DATA_PATH/organized:/app/organized
+                - ./config:/app/config:ro
+              networks:
+                - musicas-network
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+
+            frontend:
+              image: ghcr.io/\${GHCR_NAMESPACE}/musicas-igreja-frontend:latest
+              container_name: musicas-igreja-front
+              restart: unless-stopped
+              environment:
+                - NODE_ENV=production
+                - BACKEND_URL=\${BACKEND_URL}
+                - NEXT_PUBLIC_BACKEND_URL=\${NEXT_PUBLIC_BACKEND_URL}
+                - PORT=3001
+              ports:
+                - "3001:3001"
+              depends_on:
+                - musicas-igreja
+              networks:
+                - musicas-network
+              healthcheck:
+                test: ["CMD", "curl", "-f", "http://localhost:3001"] 
+                interval: 30s
+                timeout: 10s
+                retries: 3
+                start_period: 40s
+
+          networks:
+            musicas-network:
+              driver: bridge
+
+          volumes:
+            musicas_data:
+              driver: local
+          EOF
             
             echo "🔧 Step 3: Starting with permission fix mode"
             docker compose -f docker-compose.fix-permissions.yml up -d
@@ -230,10 +406,10 @@ jobs:
             sleep 30
             
             echo "📊 Status after recovery attempt:"
-            docker compose ps
+            docker compose -f docker-compose.production.yml ps
             
             echo "📋 Container logs after recovery:"
-            docker compose logs --tail=20 musicas-igreja || true
+            docker compose -f docker-compose.production.yml logs --tail=20 musicas-igreja || true
           fi
           
           echo "=== Final health verification ==="
@@ -243,13 +419,13 @@ jobs:
           sleep 20
           
           echo "=== Backend logs (last 100 lines) ==="
-          docker compose logs --tail=100 musicas-igreja || true
+          docker compose -f docker-compose.production.yml logs --tail=100 musicas-igreja || true
           
           echo "=== Backend container health ==="
           docker inspect musicas-igreja-app --format='{{.State.Health.Status}}' 2>/dev/null || echo "Health status not available"
           
           echo "=== Frontend logs (last 30 lines) ==="  
-          docker compose logs --tail=30 frontend || true
+          docker compose -f docker-compose.production.yml logs --tail=30 frontend || true
           
           # Verificação final
           echo "🎯 === Final health check ==="
@@ -260,11 +436,11 @@ jobs:
             retry_count=$((retry_count + 1))
             echo "🔄 Health check attempt $retry_count/$max_retries"
             
-            if docker compose ps | grep musicas-igreja-app | grep -q "Up"; then
+            if docker compose -f docker-compose.production.yml ps | grep musicas-igreja-app | grep -q "Up"; then
               echo "✅ Backend container is running"
               
               # Teste interno
-              if docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health 2>/dev/null; then
+              if docker compose -f docker-compose.production.yml exec -T musicas-igreja curl -fsS http://localhost:5000/health 2>/dev/null; then
                 echo "✅ Internal health check passed"
               else
                 echo "⚠️ Internal health check failed"
@@ -280,7 +456,7 @@ jobs:
               fi
             else
               echo "❌ Backend container is not running on attempt $retry_count"
-              docker compose ps
+              docker compose -f docker-compose.production.yml ps
             fi
             
             if [ $retry_count -lt $max_retries ]; then
@@ -291,9 +467,9 @@ jobs:
           
           echo "❌ === DEPLOY FAILED AFTER $max_retries ATTEMPTS ==="
           echo "📋 Final container status:"
-          docker compose ps
+          docker compose -f docker-compose.production.yml ps
           echo "📋 Final logs:"
-          docker compose logs --tail=100 musicas-igreja || true
+          docker compose -f docker-compose.production.yml logs --tail=100 musicas-igreja || true
           exit 1
 
       - name: Emergency diagnostics and final recovery attempt
@@ -303,13 +479,13 @@ jobs:
           echo "🚨 === EMERGENCY DIAGNOSTICS ==="
           
           echo "📋 Container status:"
-          docker compose ps || true
+          docker compose -f docker-compose.production.yml ps || true
           
           echo "📋 Docker processes:"
           docker ps -a | grep musicas || true
           
           echo "📋 Recent logs (last 200 lines):"
-          docker compose logs --tail=200 musicas-igreja || true
+          docker compose -f docker-compose.production.yml logs --tail=200 musicas-igreja || true
           
           echo "📋 System resources:"
           df -h
@@ -322,29 +498,41 @@ jobs:
           docker run --rm -v musicas_data:/data alpine ls -la /data || true
           
           echo "📋 Host organized directory:"
-          ls -la ./organized || echo "Directory not found"
+          ls -la ./organized || echo "Workspace directory not found"
+          
+          echo "📋 Persistent organized directory:"
+          ls -la "$PERSISTENT_DATA_PATH/organized" || echo "Persistent directory not found"
           
           echo "🔄 === FINAL RECOVERY ATTEMPT ==="
           
           # Último recurso: reset completo
           echo "🔥 Nuclear option: complete reset"
-          docker compose down || true
+          docker compose -f docker-compose.production.yml down || true
           docker container prune -f || true
           
-          # Recriar com permissões corretas usando Docker (sem sudo)
-          echo "🔧 Recreating with correct permissions..."
-          rm -rf ./organized || true
-          mkdir -p ./organized
-          
-          # Usar Docker para corrigir permissões
-          docker run --rm \
-            -v "$(pwd)/organized:/target" \
-            alpine:latest \
-            sh -c "
-              chown -R 1000:1000 /target
-              chmod -R 755 /target
-              echo 'Emergency permissions fixed'
-            "
+          # Verificar e corrigir permissões do diretório persistente
+          echo "🔧 Fixing persistent directory permissions..."
+          if [ -d "$PERSISTENT_DATA_PATH/organized" ]; then
+            docker run --rm \
+              -v "$PERSISTENT_DATA_PATH/organized:/target" \
+              alpine:latest \
+              sh -c "
+                chown -R 1000:1000 /target
+                chmod -R 755 /target
+                echo 'Emergency permissions fixed on persistent directory'
+              "
+          else
+            echo "Creating persistent directory structure..."
+            mkdir -p "$PERSISTENT_DATA_PATH/organized"
+            docker run --rm \
+              -v "$PERSISTENT_DATA_PATH/organized:/target" \
+              alpine:latest \
+              sh -c "
+                chown -R 1000:1000 /target
+                chmod -R 755 /target
+                echo 'Persistent directory created and fixed'
+              "
+          fi
           
           # Tentar subir uma última vez
           echo "🚀 Final attempt..."
@@ -355,8 +543,8 @@ jobs:
           sleep 45
           
           echo "📊 Final status:"
-          docker compose ps
-          docker compose logs --tail=50 musicas-igreja || true
+          docker compose -f docker-compose.production.yml ps
+          docker compose -f docker-compose.production.yml logs --tail=50 musicas-igreja || true
           
           # Health check final
           if curl -fsS http://localhost:5001/health 2>/dev/null; then
@@ -367,10 +555,11 @@ jobs:
             echo ""
             echo "🛠️  MANUAL RECOVERY STEPS:"
             echo "1. SSH into the server"
-            echo "2. cd to project directory" 
-            echo "3. Run: docker run --rm -v \"\$(pwd)/organized:/target\" alpine:latest sh -c \"chown -R 1000:1000 /target; chmod -R 755 /target\""
-            echo "4. Run: docker compose down && docker compose up -d"
-            echo "5. Check logs: docker compose logs -f musicas-igreja"
+            echo "2. cd to project directory"
+            echo "3. Check persistent data: ls -la /home/runner/musicas-igreja-data/organized"
+            echo "4. Fix permissions: docker run --rm -v \"/home/runner/musicas-igreja-data/organized:/target\" alpine:latest sh -c \"chown -R 1000:1000 /target; chmod -R 755 /target\""
+            echo "5. Restart containers: docker compose -f docker-compose.production.yml down && docker compose -f docker-compose.production.yml up -d"
+            echo "6. Check logs: docker compose -f docker-compose.production.yml logs -f musicas-igreja"
             echo ""
             exit 1
           fi
