@@ -231,6 +231,9 @@ jobs:
             
             echo "📊 Status after recovery attempt:"
             docker compose ps
+            
+            echo "📋 Container logs after recovery:"
+            docker compose logs --tail=20 musicas-igreja || true
           fi
           
           echo "=== Final health verification ==="
