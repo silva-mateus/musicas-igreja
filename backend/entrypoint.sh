@@ -106,25 +106,69 @@ export UPLOAD_FOLDER=${UPLOAD_FOLDER:-/data/uploads}
 export ORGANIZED_FOLDER=${ORGANIZED_FOLDER:-/app/organized}
 export LOG_FOLDER=${LOG_FOLDER:-/data/logs}
 
+# Verificar se estamos rodando como root e devemos corrigir permissões
+if [ "$(id -u)" = "0" ] && [ "${FIX_PERMISSIONS}" = "true" ]; then
+    log "🔧 Rodando como root - corrigindo permissões de volumes..."
+    
+    # Corrigir permissões do volume /data
+    if [ -d "/data" ]; then
+        chown -R 1000:1000 /data
+        chmod -R 755 /data
+        log "✅ Permissões de /data corrigidas"
+    fi
+    
+    # Corrigir permissões do volume /app/organized
+    if [ -d "/app/organized" ]; then
+        chown -R 1000:1000 /app/organized
+        chmod -R 755 /app/organized
+        log "✅ Permissões de /app/organized corrigidas"
+    fi
+    
+    log "🔄 Reiniciando como usuário appuser..."
+    exec su-exec 1000:1000 "$0" "$@"
+fi
+
 # Verificar e configurar diretório organized
 log "📁 Configurando diretório organized: $ORGANIZED_FOLDER"
 if [ -d "/app/organized" ]; then
     log "✅ Diretório /app/organized encontrado"
-    chmod -R 777 /app/organized
-    log "✅ Permissões ajustadas para /app/organized"
+    
+    # Tentar ajustar permissões (pode falhar se for volume mount)
+    if chmod -R 777 /app/organized 2>/dev/null; then
+        log "✅ Permissões ajustadas para /app/organized"
+    else
+        log "⚠️  Não foi possível ajustar permissões (provavelmente volume mount)"
+        log "   Isso é normal para volumes Docker. Testando acesso..."
+    fi
+    
+    # Verificar se conseguimos escrever no diretório
+    test_file="/app/organized/.write_test_$$"
+    if echo "test" > "$test_file" 2>/dev/null; then
+        rm -f "$test_file" 2>/dev/null
+        log "✅ Diretório /app/organized tem acesso de escrita"
+    else
+        log "❌ Sem acesso de escrita em /app/organized"
+        log "   DICA: Execute 'sudo chown -R 1000:1000 ./organized' no host"
+    fi
     
     # Verificar se tem conteúdo (pelo menos uma pasta de categoria)
     if [ -z "$(ls -A /app/organized 2>/dev/null)" ]; then
-        log "📂 Diretório organized vazio. Criando estrutura básica de categorias..."
-        mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório}
-        chmod -R 777 /app/organized
-        log "✅ Estrutura básica criada"
+        log "📂 Diretório organized vazio. Tentando criar estrutura básica..."
+        if mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório} 2>/dev/null; then
+            log "✅ Estrutura básica criada"
+        else
+            log "⚠️  Não foi possível criar estrutura (sem permissões)"
+        fi
     fi
 else
-    log "⚠️  Diretório /app/organized não encontrado. Criando estrutura..."
-    mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório}
-    chmod -R 777 /app/organized
-    log "✅ Diretório /app/organized criado com estrutura básica"
+    log "⚠️  Diretório /app/organized não encontrado. Tentando criar..."
+    if mkdir -p "/app/organized"/{Aclamação,Adoração,Animação,Casamento,Comunhão,Entrada,Final,Ofertório} 2>/dev/null; then
+        log "✅ Diretório /app/organized criado com estrutura básica"
+    else
+        log "❌ Não foi possível criar /app/organized"
+        log "   Verificando se diretório pai existe..."
+        ls -la /app/ 2>/dev/null || log "   Diretório /app não acessível"
+    fi
 fi
 
 log "📝 Configurações:"
@@ -151,11 +195,16 @@ for dir in "/data/uploads" "/app/organized"; do
     if [ -d "$dir" ]; then
         test_file="$dir/.write_test_$$"
         if echo "test" > "$test_file" 2>/dev/null; then
-            rm -f "$test_file"
+            rm -f "$test_file" 2>/dev/null
             log "   $dir: ✅ escrita OK"
         else
-            log "   $dir: ❌ sem permissão de escrita"
+            log "   $dir: ⚠️  sem permissão de escrita"
+            if [ "$dir" = "/app/organized" ]; then
+                log "      → Execute no host: sudo chown -R 1000:1000 ./organized"
+            fi
         fi
+    else
+        log "   $dir: ❓ não existe"
     fi
 done
 

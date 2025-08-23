@@ -25,6 +25,7 @@ RUN groupadd -r -g ${APP_USER_GID} appuser && useradd -r -g appuser -u ${APP_USE
 # Instalar apenas dependências runtime necessárias
 RUN apt-get update && apt-get install -y \
     curl \
+    su-exec \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar diretório de trabalho

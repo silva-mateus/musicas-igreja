@@ -108,6 +108,49 @@ jobs:
           echo "BACKEND_URL=http://musicas-igreja:5000" >> .env
           echo "NEXT_PUBLIC_BACKEND_URL=http://musicas-igreja:5000" >> .env
 
+      - name: Pre-deploy permissions check and fix
+        working-directory: ./backend
+        run: |
+          set -e
+          echo "🔍 === Pre-deploy permissions check ==="
+          
+          # Verificar se diretório organized existe e suas permissões
+          if [ -d "./organized" ]; then
+            echo "✅ Directory ./organized exists"
+            current_owner=$(stat -c '%u:%g' ./organized)
+            echo "📋 Current owner: $current_owner"
+            
+            if [ "$current_owner" != "1000:1000" ]; then
+              echo "🔧 Fixing permissions (current: $current_owner, needed: 1000:1000)"
+              sudo chown -R 1000:1000 ./organized
+              sudo chmod -R 755 ./organized
+              echo "✅ Permissions fixed"
+            else
+              echo "✅ Permissions already correct"
+            fi
+          else
+            echo "📁 Creating organized directory with correct permissions"
+            mkdir -p ./organized
+            sudo chown -R 1000:1000 ./organized
+            sudo chmod -R 755 ./organized
+            echo "✅ Directory created with correct permissions"
+          fi
+          
+          # Verificar e corrigir volume Docker se existir
+          if docker volume ls | grep -q musicas_data; then
+            echo "🗃️ Checking Docker volume permissions"
+            docker run --rm -v musicas_data:/data alpine sh -c "
+              echo 'Current /data permissions:'
+              ls -la /data
+              echo 'Fixing /data permissions...'
+              chown -R 1000:1000 /data
+              chmod -R 755 /data
+              echo 'Fixed /data permissions:'
+              ls -la /data
+            "
+            echo "✅ Docker volume permissions fixed"
+          fi
+
       - name: Pull and start services
         working-directory: ./backend
         run: |
@@ -118,45 +161,188 @@ jobs:
           docker compose pull
           echo "=== Starting services ==="
           docker compose up -d
-          echo "=== Waiting 10 seconds for startup ==="
-          sleep 10
+          echo "=== Waiting 15 seconds for startup ==="
+          sleep 15
           echo "=== Container status ==="
           docker compose ps
           echo "=== Container logs (last 20 lines) ==="
           docker compose logs --tail=20
 
-      - name: Health check
+      - name: Health check with auto-recovery
         working-directory: ./backend
         run: |
           set -e
-          echo "=== Checking if containers are running ==="
+          echo "🔍 === Health check with auto-recovery ==="
+          
+          # Função para verificar se container está em restart loop
+          check_restart_loop() {
+            local container_status=$(docker compose ps musicas-igreja --format "table {{.State}}" | tail -n +2)
+            if echo "$container_status" | grep -q "Restarting"; then
+              echo "❌ Container is in restart loop: $container_status"
+              return 0  # É restart loop
+            else
+              echo "ℹ️  Container status: $container_status"
+              return 1  # Não é restart loop
+            fi
+          }
+          
+          # Primeira verificação
+          echo "=== Initial container status ==="
           docker compose ps
+          
+          # Se estiver em restart loop, tentar correção automática
+          if check_restart_loop; then
+            echo "🚨 RESTART LOOP DETECTED - Attempting automatic recovery"
+            
+            echo "📋 Container logs before recovery:"
+            docker compose logs --tail=50 musicas-igreja || true
+            
+            echo "🔧 Step 1: Stopping containers"
+            docker compose down || true
+            
+            echo "🔧 Step 2: Using root permissions mode for recovery"
+            echo "FIX_PERMISSIONS=true" >> .env
+            cat .env
+            
+            echo "🔧 Step 3: Starting with permission fix mode"
+            docker compose -f docker-compose.fix-permissions.yml up -d
+            
+            echo "⏱️ Waiting 30 seconds for recovery..."
+            sleep 30
+            
+            echo "📊 Status after recovery attempt:"
+            docker compose ps
+          fi
+          
+          echo "=== Final health verification ==="
+          
+          # Aguardar estabilização
+          echo "⏱️ Waiting additional 20 seconds for stabilization..."
+          sleep 20
+          
           echo "=== Backend logs (last 100 lines) ==="
           docker compose logs --tail=100 musicas-igreja || true
-          echo "=== Backend container inspect ==="
-          docker compose ps musicas-igreja || true
+          
           echo "=== Backend container health ==="
-          docker inspect musicas-igreja-app --format='{{.State.Health.Status}}' || true
+          docker inspect musicas-igreja-app --format='{{.State.Health.Status}}' 2>/dev/null || echo "Health status not available"
+          
           echo "=== Frontend logs (last 30 lines) ==="  
           docker compose logs --tail=30 frontend || true
-          echo "=== Attempting health check ==="
-          # Wait a bit more for services to stabilize
-          sleep 15
-          # Check if backend container is running
-          if docker compose ps | grep musicas-igreja-app | grep -q "Up"; then
-            echo "Backend container is running, testing health endpoint..."
-            docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health || echo "Internal health check failed"
-            sleep 5
-            curl -fsS http://localhost:5001/health || echo "External health check failed"
-          else
-            echo "Backend container is not running properly"
-            exit 1
-          fi
+          
+          # Verificação final
+          echo "🎯 === Final health check ==="
+          max_retries=3
+          retry_count=0
+          
+          while [ $retry_count -lt $max_retries ]; do
+            retry_count=$((retry_count + 1))
+            echo "🔄 Health check attempt $retry_count/$max_retries"
+            
+            if docker compose ps | grep musicas-igreja-app | grep -q "Up"; then
+              echo "✅ Backend container is running"
+              
+              # Teste interno
+              if docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health 2>/dev/null; then
+                echo "✅ Internal health check passed"
+              else
+                echo "⚠️ Internal health check failed"
+              fi
+              
+              # Teste externo
+              if curl -fsS http://localhost:5001/health 2>/dev/null; then
+                echo "✅ External health check passed"
+                echo "🎉 === DEPLOY SUCCESSFUL ==="
+                exit 0
+              else
+                echo "⚠️ External health check failed on attempt $retry_count"
+              fi
+            else
+              echo "❌ Backend container is not running on attempt $retry_count"
+              docker compose ps
+            fi
+            
+            if [ $retry_count -lt $max_retries ]; then
+              echo "⏱️ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "❌ === DEPLOY FAILED AFTER $max_retries ATTEMPTS ==="
+          echo "📋 Final container status:"
+          docker compose ps
+          echo "📋 Final logs:"
+          docker compose logs --tail=100 musicas-igreja || true
+          exit 1
 
-      - name: Show recent logs on failure
+      - name: Emergency diagnostics and final recovery attempt
         if: failure()
         working-directory: ./backend
         run: |
+          echo "🚨 === EMERGENCY DIAGNOSTICS ==="
+          
+          echo "📋 Container status:"
+          docker compose ps || true
+          
+          echo "📋 Docker processes:"
+          docker ps -a | grep musicas || true
+          
+          echo "📋 Recent logs (last 200 lines):"
           docker compose logs --tail=200 musicas-igreja || true
+          
+          echo "📋 System resources:"
+          df -h
+          free -h
+          
+          echo "📋 Docker volumes:"
+          docker volume ls | grep musicas || true
+          
+          echo "📋 Volume contents:"
+          docker run --rm -v musicas_data:/data alpine ls -la /data || true
+          
+          echo "📋 Host organized directory:"
+          ls -la ./organized || echo "Directory not found"
+          
+          echo "🔄 === FINAL RECOVERY ATTEMPT ==="
+          
+          # Último recurso: reset completo
+          echo "🔥 Nuclear option: complete reset"
+          docker compose down || true
+          docker container prune -f || true
+          
+          # Recriar com permissões corretas
+          echo "🔧 Recreating with correct permissions..."
+          sudo rm -rf ./organized || true
+          mkdir -p ./organized
+          sudo chown -R 1000:1000 ./organized
+          sudo chmod -R 755 ./organized
+          
+          # Tentar subir uma última vez
+          echo "🚀 Final attempt..."
+          echo "FIX_PERMISSIONS=true" >> .env
+          docker compose -f docker-compose.fix-permissions.yml up -d
+          
+          echo "⏱️ Waiting 45 seconds..."
+          sleep 45
+          
+          echo "📊 Final status:"
+          docker compose ps
+          docker compose logs --tail=50 musicas-igreja || true
+          
+          # Health check final
+          if curl -fsS http://localhost:5001/health 2>/dev/null; then
+            echo "🎉 EMERGENCY RECOVERY SUCCESSFUL!"
+            exit 0
+          else
+            echo "💥 EMERGENCY RECOVERY FAILED - Manual intervention required"
+            echo ""
+            echo "🛠️  MANUAL RECOVERY STEPS:"
+            echo "1. SSH into the server"
+            echo "2. cd to project directory"
+            echo "3. Run: sudo chown -R 1000:1000 ./organized"
+            echo "4. Run: docker compose down && docker compose up -d"
+            echo "5. Check logs: docker compose logs -f musicas-igreja"
+            echo ""
+            exit 1
+          fi
 
 

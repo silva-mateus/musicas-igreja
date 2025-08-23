@@ -1,0 +1,58 @@
+services:
+  musicas-igreja:
+    image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja:latest
+    container_name: musicas-igreja-app
+    restart: unless-stopped
+    user: root  # Rodar como root para corrigir permissões
+    ports:
+      - "5001:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_PATH=/data/pdf_organizer.db
+      - UPLOAD_FOLDER=/data/uploads
+      - ORGANIZED_FOLDER=/app/organized
+      - LOG_FOLDER=/data/logs
+      - FIX_PERMISSIONS=true  # Flag para entrypoint saber que deve corrigir permissões
+    volumes:
+      - musicas_data:/data
+      - ./organized:/app/organized
+      - ./config:/app/config:ro
+    networks:
+      - musicas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja-frontend:latest
+    container_name: musicas-igreja-front
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=${BACKEND_URL}
+      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+      - PORT=3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      - musicas-igreja
+    networks:
+      - musicas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"] 
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  musicas-network:
+    driver: bridge
+
+volumes:
+  musicas_data:
+    driver: local
