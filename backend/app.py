@@ -4087,127 +4087,160 @@ def api_uploads_timeline():
 @app.route('/api/files', methods=['GET'])
 def api_list_files():
     """Listar arquivos com filtros e paginação (JSON)."""
-    query = request.args.get('q', '').strip()
-    category = request.args.get('category', '').strip()
-    liturgical_time = request.args.get('liturgical_time', '').strip()
-    page = max(1, int(request.args.get('page', 1)))
-    per_page = int(request.args.get('per_page', 10))
-    if per_page not in [10, 25, 50]:
-        per_page = 10
+    try:
+        query = request.args.get('q', '').strip()
+        category = request.args.get('category', '').strip()
+        liturgical_time = request.args.get('liturgical_time', '').strip()
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = int(request.args.get('per_page', 10))
+        if per_page not in [10, 25, 50]:
+            per_page = 10
 
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-
-    base_query = '''
-        SELECT DISTINCT pf.id, pf.filename, pf.original_name, pf.song_name, pf.artist, pf.category, pf.liturgical_time,
-               pf.musical_key, pf.youtube_link, pf.file_size, pf.upload_date, pf.page_count, pf.description, pf.file_path
-        FROM pdf_files pf
-    '''
-    count_query = 'SELECT COUNT(DISTINCT pf.id) FROM pdf_files pf'
-    joins = []
-    where_conditions = ['1=1']
-    params = []
-
-    if category:
-        joins.append('LEFT JOIN file_categories fc ON pf.id = fc.file_id')
-        joins.append('LEFT JOIN categories c ON fc.category_id = c.id')
-        where_conditions.append('(pf.category = ? OR c.name = ?)')
-        params.extend([category, category])
-
-    if liturgical_time:
-        joins.append('LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id')
-        joins.append('LEFT JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id')
-        where_conditions.append('(pf.liturgical_time = ? OR lt.name = ?)')
-        params.extend([liturgical_time, liturgical_time])
-
-    if joins:
-        join_clause = ' ' + ' '.join(joins)
-        base_query += join_clause
-        count_query += join_clause
-
-    where_clause = ' WHERE ' + ' AND '.join(where_conditions)
-    base_query += where_clause
-    count_query += where_clause
-
-    if query:
-        search_condition = ''' AND (
-            LOWER(pf.song_name) LIKE LOWER(?) OR 
-            LOWER(pf.artist) LIKE LOWER(?) OR 
-            LOWER(pf.filename) LIKE LOWER(?) OR 
-            LOWER(pf.description) LIKE LOWER(?)
-        )'''
-        base_query += search_condition
-        count_query += search_condition
-        search_param = f'%{query}%'
-        params.extend([search_param, search_param, search_param, search_param])
-
-    cursor.execute(count_query, params)
-    total_count = cursor.fetchone()[0]
-    total_pages = (total_count + per_page - 1) // per_page
-    offset = (page - 1) * per_page
-
-    base_query += ' ORDER BY upload_date DESC LIMIT ? OFFSET ?'
-    params_with_limit = params + [per_page, offset]
-    cursor.execute(base_query, params_with_limit)
-    rows = cursor.fetchall()
-
-    files = []
-    for row in rows:
-        file_id = row[0]
-        # categorias
-        cursor.execute('''
-            SELECT c.name FROM categories c
-            JOIN file_categories fc ON c.id = fc.category_id
-            WHERE fc.file_id = ? ORDER BY c.name
-        ''', (file_id,))
-        file_categories = [r[0] for r in cursor.fetchall()]
-        if not file_categories and row[5]:
-            file_categories = [row[5]]
-        # tempos litúrgicos
-        cursor.execute('''
-            SELECT lt.name FROM liturgical_times lt
-            JOIN file_liturgical_times flt ON lt.id = flt.liturgical_time_id
-            WHERE flt.file_id = ? ORDER BY lt.name
-        ''', (file_id,))
-        file_times = [r[0] for r in cursor.fetchall()]
-        if not file_times and row[6]:
-            file_times = [row[6]]
-
-        file_data = {
-            'id': row[0],
-            'filename': row[1],
-            'original_name': row[2],
-            'song_name': row[3],
-            'artist': row[4],
-            'primary_category': row[5],
-            'primary_liturgical_time': row[6],
-            'categories': file_categories,
-            'liturgical_times': file_times,
-            'musical_key': row[7],
-            'youtube_link': row[8],
-            'file_size': row[9],
-            'upload_date': row[10],
-            'page_count': row[11],
-            'description': row[12],
-            'file_path': row[13]
-        }
+        # Log de debug
+        app.logger.info(f"📋 [FILES API] Connecting to database: {DATABASE}")
+        app.logger.info(f"📋 [FILES API] Query params: q='{query}', category='{category}', liturgical_time='{liturgical_time}', page={page}, per_page={per_page}")
         
-        # Debug log para verificar dados
-        if len(file_categories) > 1 or len(file_times) > 1:
-            app.logger.info(f"🔍 [FILES] Arquivo {row[0]} tem múltiplas categorias/tempos: cats={file_categories}, times={file_times}")
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
         
-        files.append(file_data)
+        # Verificar se as tabelas existem
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        tables = [row[0] for row in cursor.fetchall()]
+        app.logger.info(f"📋 [FILES API] Available tables: {tables}")
+        
+        if 'pdf_files' not in tables:
+            app.logger.error("❌ [FILES API] Tabela pdf_files não encontrada!")
+            return jsonify({'error': 'Database not properly initialized', 'details': 'pdf_files table missing'}), 500
 
-    conn.close()
-    return jsonify({
-        'files': files,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total': total_count,
-            'total_pages': total_pages
-        }
-    })
+        base_query = '''
+            SELECT DISTINCT pf.id, pf.filename, pf.original_name, pf.song_name, pf.artist, pf.category, pf.liturgical_time,
+                   pf.musical_key, pf.youtube_link, pf.file_size, pf.upload_date, pf.page_count, pf.description, pf.file_path
+            FROM pdf_files pf
+        '''
+        count_query = 'SELECT COUNT(DISTINCT pf.id) FROM pdf_files pf'
+        joins = []
+        where_conditions = ['1=1']
+        params = []
+
+        if category:
+            joins.append('LEFT JOIN file_categories fc ON pf.id = fc.file_id')
+            joins.append('LEFT JOIN categories c ON fc.category_id = c.id')
+            where_conditions.append('(pf.category = ? OR c.name = ?)')
+            params.extend([category, category])
+
+        if liturgical_time:
+            joins.append('LEFT JOIN file_liturgical_times flt ON pf.id = flt.file_id')
+            joins.append('LEFT JOIN liturgical_times lt ON flt.liturgical_time_id = lt.id')
+            where_conditions.append('(pf.liturgical_time = ? OR lt.name = ?)')
+            params.extend([liturgical_time, liturgical_time])
+
+        if joins:
+            join_clause = ' ' + ' '.join(joins)
+            base_query += join_clause
+            count_query += join_clause
+
+        where_clause = ' WHERE ' + ' AND '.join(where_conditions)
+        base_query += where_clause
+        count_query += where_clause
+
+        if query:
+            search_condition = ''' AND (
+                LOWER(pf.song_name) LIKE LOWER(?) OR 
+                LOWER(pf.artist) LIKE LOWER(?) OR 
+                LOWER(pf.filename) LIKE LOWER(?) OR 
+                LOWER(pf.description) LIKE LOWER(?)
+            )'''
+            base_query += search_condition
+            count_query += search_condition
+            search_param = f'%{query}%'
+            params.extend([search_param, search_param, search_param, search_param])
+
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        total_pages = (total_count + per_page - 1) // per_page
+        offset = (page - 1) * per_page
+
+        base_query += ' ORDER BY upload_date DESC LIMIT ? OFFSET ?'
+        params_with_limit = params + [per_page, offset]
+        cursor.execute(base_query, params_with_limit)
+        rows = cursor.fetchall()
+
+        files = []
+        for row in rows:
+            file_id = row[0]
+            # categorias
+            cursor.execute('''
+                SELECT c.name FROM categories c
+                JOIN file_categories fc ON c.id = fc.category_id
+                WHERE fc.file_id = ? ORDER BY c.name
+            ''', (file_id,))
+            file_categories = [r[0] for r in cursor.fetchall()]
+            if not file_categories and row[5]:
+                file_categories = [row[5]]
+            # tempos litúrgicos
+            cursor.execute('''
+                SELECT lt.name FROM liturgical_times lt
+                JOIN file_liturgical_times flt ON lt.id = flt.liturgical_time_id
+                WHERE flt.file_id = ? ORDER BY lt.name
+            ''', (file_id,))
+            file_times = [r[0] for r in cursor.fetchall()]
+            if not file_times and row[6]:
+                file_times = [row[6]]
+
+            file_data = {
+                'id': row[0],
+                'filename': row[1],
+                'original_name': row[2],
+                'song_name': row[3],
+                'artist': row[4],
+                'primary_category': row[5],
+                'primary_liturgical_time': row[6],
+                'categories': file_categories,
+                'liturgical_times': file_times,
+                'musical_key': row[7],
+                'youtube_link': row[8],
+                'file_size': row[9],
+                'upload_date': row[10],
+                'page_count': row[11],
+                'description': row[12],
+                'file_path': row[13]
+            }
+            
+            # Debug log para verificar dados
+            if len(file_categories) > 1 or len(file_times) > 1:
+                app.logger.info(f"🔍 [FILES] Arquivo {row[0]} tem múltiplas categorias/tempos: cats={file_categories}, times={file_times}")
+            
+            files.append(file_data)
+
+        conn.close()
+        app.logger.info(f"✅ [FILES API] Returning {len(files)} files")
+        return jsonify({
+            'files': files,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_count,
+                'total_pages': total_pages
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f"❌ [FILES API] Erro: {str(e)}")
+        import traceback
+        app.logger.error(f"❌ [FILES API] Traceback: {traceback.format_exc()}")
+        
+        # Fechar conexão se aberta
+        try:
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
+            
+        return jsonify({
+            'error': 'Internal server error', 
+            'details': str(e),
+            'database_path': DATABASE if 'DATABASE' in globals() else 'undefined'
+        }), 500
 
 
 @app.route('/api/files', methods=['POST'])
@@ -5303,31 +5336,66 @@ def health_check():
         # Verificar conectividade do banco de dados
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
-        cursor.execute('SELECT 1')
+        cursor.execute('SELECT COUNT(*) FROM sqlite_master WHERE type="table"')
+        table_count = cursor.fetchone()[0]
+        
+        # Verificar se tabela principal existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pdf_files'")
+        pdf_files_table = cursor.fetchone() is not None
+        
+        # Contar arquivos no banco
+        file_count = 0
+        if pdf_files_table:
+            cursor.execute('SELECT COUNT(*) FROM pdf_files')
+            file_count = cursor.fetchone()[0]
+        
         conn.close()
         
-        # Verificar se os diretórios essenciais existem
-        dirs_ok = all(os.path.exists(d) for d in [UPLOAD_FOLDER, ORGANIZED_FOLDER, LOG_FOLDER])
+        # Verificar se os diretórios essenciais existem e são escribíveis
+        dirs_status = {}
+        for dir_name, dir_path in [
+            ('upload', UPLOAD_FOLDER),
+            ('organized', ORGANIZED_FOLDER), 
+            ('logs', LOG_FOLDER)
+        ]:
+            exists = os.path.exists(dir_path)
+            writable = os.access(dir_path, os.W_OK) if exists else False
+            dirs_status[dir_name] = {
+                'path': dir_path,
+                'exists': exists,
+                'writable': writable
+            }
         
-        if dirs_ok:
-            return jsonify({
-                'status': 'healthy',
-                'timestamp': datetime.now().isoformat(),
-                'database': 'connected',
-                'directories': 'ok',
-                'version': '1.0.0'
-            }), 200
+        dirs_ok = all(d['exists'] and d['writable'] for d in dirs_status.values())
+        
+        response_data = {
+            'status': 'healthy' if dirs_ok and pdf_files_table else 'degraded',
+            'timestamp': datetime.now().isoformat(),
+            'database': {
+                'connected': True,
+                'path': DATABASE,
+                'tables': table_count,
+                'pdf_files_table': pdf_files_table,
+                'file_count': file_count
+            },
+            'directories': dirs_status,
+            'version': '1.0.0'
+        }
+        
+        if dirs_ok and pdf_files_table:
+            return jsonify(response_data), 200
         else:
-            return jsonify({
-                'status': 'unhealthy',
-                'timestamp': datetime.now().isoformat(),
-                'error': 'Missing required directories'
-            }), 503
+            return jsonify(response_data), 503
             
     except Exception as e:
         return jsonify({
             'status': 'unhealthy',
             'timestamp': datetime.now().isoformat(),
+            'database': {
+                'connected': False,
+                'path': DATABASE,
+                'error': str(e)
+            },
             'error': str(e)
         }), 503
 
