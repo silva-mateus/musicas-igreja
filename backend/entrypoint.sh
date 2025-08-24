@@ -11,9 +11,14 @@ log "🎵 Iniciando Organizador de Música Litúrgica..."
 # Criar diretórios necessários se não existirem
 mkdir -p /data/logs /data/uploads /data/organized
 
-# Configurar permissões
-chmod 755 /data
-chmod 755 /data/logs /data/uploads /data/organized
+# Configurar permissões (apenas se tivermos permissão de escrita)
+if [ -w /data ]; then
+    chmod 755 /data 2>/dev/null || true
+    chmod 755 /data/logs /data/uploads /data/organized 2>/dev/null || true
+    log "📁 Permissões configuradas nos diretórios"
+else
+    log "⚠️  Sem permissão de escrita em /data - usando permissões padrão"
+fi
 
 # Verificar se o banco de dados existe; se não, tentar copiar snapshot do repositório antes de inicializar
 if [ ! -f "/data/pdf_organizer.db" ]; then
@@ -21,12 +26,12 @@ if [ ! -f "/data/pdf_organizer.db" ]; then
     if [ -f "/app/data/pdf_organizer.db" ]; then
         log "📦 DB encontrado em /app/data do repositório. Copiando para /data..."
         cp -f /app/data/pdf_organizer.db /data/pdf_organizer.db
-        chmod 644 /data/pdf_organizer.db
+        chmod 644 /data/pdf_organizer.db 2>/dev/null || true
         log "✅ DB copiado para /data/pdf_organizer.db"
     elif [ -f "/app/pdf_organizer.db" ]; then
         log "📦 DB encontrado em /app do repositório. Copiando para /data..."
         cp -f /app/pdf_organizer.db /data/pdf_organizer.db
-        chmod 644 /data/pdf_organizer.db
+        chmod 644 /data/pdf_organizer.db 2>/dev/null || true
         log "✅ DB copiado para /data/pdf_organizer.db"
     fi
 
