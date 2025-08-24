@@ -158,5 +158,3 @@ jobs:
         working-directory: ./backend
         run: |
           docker compose logs --tail=200 musicas-igreja || true
-
-
