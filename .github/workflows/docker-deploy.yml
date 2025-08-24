@@ -59,6 +59,8 @@ jobs:
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_BACKEND_URL=http://localhost:5001
           tags: |
             ${{ env.FRONT_IMAGE_NAME }}:latest
             ${{ env.FRONT_IMAGE_NAME }}:${{ github.sha }}
@@ -90,6 +92,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Stop and remove old containers
+        working-directory: ./backend
+        run: |
+          set -e
+          echo "=== Stopping existing services ==="
+          docker compose down --remove-orphans || true
+          echo "=== Pruning unused containers ==="
+          docker container prune -f || true
+
       - name: Prepare environment file for docker-compose
         working-directory: ./backend
         run: |
@@ -106,7 +117,7 @@ jobs:
           echo "LOG_FOLDER=/data/logs" >> .env
           # Frontend-Backend communication URLs
           echo "BACKEND_URL=http://musicas-igreja:5000" >> .env
-          echo "NEXT_PUBLIC_BACKEND_URL=http://musicas-igreja:5000" >> .env
+          echo "NEXT_PUBLIC_BACKEND_URL=http://localhost:5001" >> .env
 
       - name: Pull and start services
         working-directory: ./backend
@@ -118,8 +129,8 @@ jobs:
           docker compose pull
           echo "=== Starting services ==="
           docker compose up -d
-          echo "=== Waiting 10 seconds for startup ==="
-          sleep 10
+          echo "=== Waiting 20 seconds for startup ==="
+          sleep 20
           echo "=== Container status ==="
           docker compose ps
           echo "=== Container logs (last 20 lines) ==="
@@ -143,7 +154,7 @@ jobs:
           # Wait a bit more for services to stabilize
           sleep 15
           # Check if backend container is running
-          if docker compose ps | grep musicas-igreja-app | grep -q "Up"; then
+          if docker compose ps | grep musicas-igreja | grep -q "Up"; then
             echo "Backend container is running, testing health endpoint..."
             docker compose exec -T musicas-igreja curl -fsS http://localhost:5000/health || echo "Internal health check failed"
             sleep 5

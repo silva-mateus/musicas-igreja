@@ -36,6 +36,10 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Configurar PATH para incluir pacotes Python locais
 ENV PATH=/home/appuser/.local/bin:$PATH
 
+# Copiar e configurar entrypoint primeiro (como root)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Copiar aplicação
 COPY --chown=appuser:appuser . .
 
@@ -58,10 +62,6 @@ USER appuser
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
-
-# Copiar e configurar entrypoint
-COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Comando de inicialização
 ENTRYPOINT ["/entrypoint.sh"]

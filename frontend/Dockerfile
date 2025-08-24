@@ -11,6 +11,9 @@ WORKDIR /app
 # Update npm to version 10+ (same as deps stage)
 RUN npm install -g npm@11.5.2
 ENV NODE_ENV=production
+# Accept build args for environment variables
+ARG NEXT_PUBLIC_BACKEND_URL
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
