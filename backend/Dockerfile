@@ -41,19 +41,13 @@ COPY --chown=appuser:appuser . .
 
 # Criar diretórios padrão em /data (compatível com volume montado)
 RUN mkdir -p /data/logs /data/uploads /data/organized && \
-    chown -R appuser:appuser /data && \
-    mkdir -p /app/organized && \
-    chown -R appuser:appuser /app/organized
+    chown -R appuser:appuser /data
 
 # Configurar variáveis de ambiente
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-
-# Copiar e configurar entrypoint (como root antes de trocar usuário)
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown appuser:appuser /entrypoint.sh
 
 # Expor porta
 EXPOSE 5000
@@ -64,6 +58,10 @@ USER appuser
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
+
+# Copiar e configurar entrypoint
+COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Comando de inicialização
 ENTRYPOINT ["/entrypoint.sh"]
