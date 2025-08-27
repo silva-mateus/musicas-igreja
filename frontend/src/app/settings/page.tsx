@@ -21,10 +21,16 @@ import {
     Shield,
     CheckCircle,
     AlertCircle,
-    Loader2
+    Loader2,
+    Search,
+    User,
+    Music,
+    Hash,
+    Database
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { GoogleDriveSettings } from '@/components/settings/google-drive-settings'
+import { adminApi } from '@/lib/api'
 
 interface MismatchedFile {
     id: number
@@ -42,6 +48,25 @@ interface VerificationResult {
     mismatched_files: MismatchedFile[]
 }
 
+interface DiscoveryResult {
+    discovered: {
+        artists: string[]
+        categories: string[]
+        liturgical_times: string[]
+        musical_keys: string[]
+    }
+    registered: {
+        artists: string[]
+        categories: string[]
+        liturgical_times: string[]
+        musical_keys: string[]
+    }
+    stats: {
+        total_files: number
+        files_processed: number
+    }
+}
+
 export default function SettingsPage() {
     const { toast } = useToast()
 
@@ -50,6 +75,20 @@ export default function SettingsPage() {
     const [isVerifying, setIsVerifying] = useState(false)
     const [isFixing, setIsFixing] = useState(false)
     const [selectedFiles, setSelectedFiles] = useState<number[]>([])
+
+    // Entity Discovery
+    const [discoveryResult, setDiscoveryResult] = useState<DiscoveryResult | null>(null)
+    const [isDiscovering, setIsDiscovering] = useState(false)
+    const [isRegistering, setIsRegistering] = useState(false)
+    const [selectedEntities, setSelectedEntities] = useState<{
+        artists: string[]
+        categories: string[]
+        liturgical_times: string[]
+    }>({
+        artists: [],
+        categories: [],
+        liturgical_times: []
+    })
 
     const [isLoading, setIsLoading] = useState(false)
 
@@ -130,6 +169,116 @@ export default function SettingsPage() {
                 ? prev.filter(id => id !== fileId)
                 : [...prev, fileId]
         )
+    }
+
+    // Entity Discovery Functions
+    const handleDiscoverEntities = async () => {
+        setIsDiscovering(true)
+        try {
+            const data = await adminApi.discoverEntities()
+
+            if (data.success) {
+                setDiscoveryResult(data.data)
+                setSelectedEntities({
+                    artists: data.data.discovered.artists,
+                    categories: data.data.discovered.categories,
+                    liturgical_times: data.data.discovered.liturgical_times
+                })
+                toast({
+                    title: "Descoberta concluída",
+                    description: `Encontrados ${data.data.discovered.artists.length} artistas, ${data.data.discovered.categories.length} categorias e ${data.data.discovered.liturgical_times.length} tempos litúrgicos não cadastrados.`,
+                })
+            } else {
+                throw new Error(data.error || 'Erro na descoberta')
+            }
+        } catch (error: any) {
+            toast({
+                title: "Erro na descoberta",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsDiscovering(false)
+        }
+    }
+
+    const handleRegisterEntities = async () => {
+        if (Object.values(selectedEntities).every(arr => arr.length === 0)) {
+            toast({
+                title: "Nenhuma entidade selecionada",
+                description: "Selecione pelo menos uma entidade para registrar.",
+                variant: "destructive",
+            })
+            return
+        }
+
+        setIsRegistering(true)
+        try {
+            const data = await adminApi.registerEntities(selectedEntities)
+
+            if (data.success) {
+                toast({
+                    title: "Registro concluído",
+                    description: data.message,
+                })
+                // Refresh discovery after registering
+                handleDiscoverEntities()
+            } else {
+                throw new Error(data.error || 'Erro no registro')
+            }
+        } catch (error: any) {
+            toast({
+                title: "Erro no registro",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsRegistering(false)
+        }
+    }
+
+    const handleCleanupEntities = async () => {
+        try {
+            const data = await adminApi.cleanupEntities()
+
+            if (data.success) {
+                toast({
+                    title: "Limpeza concluída",
+                    description: data.message,
+                })
+                // Refresh discovery after cleanup
+                if (discoveryResult) {
+                    handleDiscoverEntities()
+                }
+            } else {
+                throw new Error(data.error || 'Erro na limpeza')
+            }
+        } catch (error: any) {
+            toast({
+                title: "Erro na limpeza",
+                description: error.message,
+                variant: "destructive",
+            })
+        }
+    }
+
+    const handleEntitySelect = (type: keyof typeof selectedEntities, entity: string) => {
+        setSelectedEntities(prev => ({
+            ...prev,
+            [type]: prev[type].includes(entity)
+                ? prev[type].filter(e => e !== entity)
+                : [...prev[type], entity]
+        }))
+    }
+
+    const handleSelectAllEntities = (type: keyof typeof selectedEntities) => {
+        if (!discoveryResult) return
+
+        const allEntities = discoveryResult.discovered[type]
+        setSelectedEntities(prev => ({
+            ...prev,
+            [type]: prev[type].length === allEntities.length ? [] : allEntities
+        }))
     }
 
 
@@ -254,6 +403,221 @@ export default function SettingsPage() {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Entity Discovery Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Database className="h-5 w-5" />
+                            Descoberta de Entidades
+                        </CardTitle>
+                        <CardDescription>
+                            Descubra e cadastre automaticamente artistas, categorias, tempos litúrgicos e tons musicais presentes nos arquivos
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            onClick={handleDiscoverEntities}
+                                            disabled={isDiscovering}
+                                            className="gap-2"
+                                        >
+                                            {isDiscovering ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Search className="h-4 w-4" />
+                                            )}
+                                            {isDiscovering ? 'Descobrindo...' : 'Descobrir Entidades'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Analisar o banco de dados para encontrar entidades não cadastradas</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            onClick={handleCleanupEntities}
+                                            variant="outline"
+                                            className="gap-2"
+                                        >
+                                            <RotateCcw className="h-4 w-4" />
+                                            Limpar Vazios
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Remover entidades vazias ou duplicadas</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+
+                        {discoveryResult && (
+                            <div className="space-y-4 border-t pt-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="outline" className="gap-1">
+                                            <Music className="h-3 w-3" />
+                                            {discoveryResult.stats.total_files} arquivos analisados
+                                        </Badge>
+                                        <Badge variant="outline" className="gap-1">
+                                            <User className="h-3 w-3" />
+                                            {discoveryResult.registered.artists.length} artistas cadastrados
+                                        </Badge>
+                                        <Badge variant="outline" className="gap-1">
+                                            <Hash className="h-3 w-3" />
+                                            {discoveryResult.registered.categories.length} categorias cadastradas
+                                        </Badge>
+                                    </div>
+
+                                    {(discoveryResult.discovered.artists.length > 0 ||
+                                        discoveryResult.discovered.categories.length > 0 ||
+                                        discoveryResult.discovered.liturgical_times.length > 0) && (
+                                            <Button
+                                                onClick={handleRegisterEntities}
+                                                disabled={isRegistering || Object.values(selectedEntities).every(arr => arr.length === 0)}
+                                                className="gap-2"
+                                            >
+                                                {isRegistering ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Save className="h-4 w-4" />
+                                                )}
+                                                Registrar Selecionados ({Object.values(selectedEntities).reduce((sum, arr) => sum + arr.length, 0)})
+                                            </Button>
+                                        )}
+                                </div>
+
+                                {/* Artists Section */}
+                                {discoveryResult.discovered.artists.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="flex items-center gap-2">
+                                                <User className="h-4 w-4" />
+                                                Artistas Descobertos ({discoveryResult.discovered.artists.length})
+                                            </Label>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleSelectAllEntities('artists')}
+                                            >
+                                                {selectedEntities.artists.length === discoveryResult.discovered.artists.length
+                                                    ? 'Desselecionar todos'
+                                                    : 'Selecionar todos'}
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                                            {discoveryResult.discovered.artists.map((artist) => (
+                                                <div
+                                                    key={artist}
+                                                    className="flex items-center gap-2 p-2 border rounded hover:bg-muted/50"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedEntities.artists.includes(artist)}
+                                                        onChange={() => handleEntitySelect('artists', artist)}
+                                                        className="rounded"
+                                                    />
+                                                    <span className="text-sm truncate">{artist}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Categories Section */}
+                                {discoveryResult.discovered.categories.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="flex items-center gap-2">
+                                                <Hash className="h-4 w-4" />
+                                                Categorias Descobertas ({discoveryResult.discovered.categories.length})
+                                            </Label>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleSelectAllEntities('categories')}
+                                            >
+                                                {selectedEntities.categories.length === discoveryResult.discovered.categories.length
+                                                    ? 'Desselecionar todos'
+                                                    : 'Selecionar todos'}
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                                            {discoveryResult.discovered.categories.map((category) => (
+                                                <div
+                                                    key={category}
+                                                    className="flex items-center gap-2 p-2 border rounded hover:bg-muted/50"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedEntities.categories.includes(category)}
+                                                        onChange={() => handleEntitySelect('categories', category)}
+                                                        className="rounded"
+                                                    />
+                                                    <span className="text-sm truncate">{category}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Liturgical Times Section */}
+                                {discoveryResult.discovered.liturgical_times.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="flex items-center gap-2">
+                                                <Music className="h-4 w-4" />
+                                                Tempos Litúrgicos Descobertos ({discoveryResult.discovered.liturgical_times.length})
+                                            </Label>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleSelectAllEntities('liturgical_times')}
+                                            >
+                                                {selectedEntities.liturgical_times.length === discoveryResult.discovered.liturgical_times.length
+                                                    ? 'Desselecionar todos'
+                                                    : 'Selecionar todos'}
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                                            {discoveryResult.discovered.liturgical_times.map((time) => (
+                                                <div
+                                                    key={time}
+                                                    className="flex items-center gap-2 p-2 border rounded hover:bg-muted/50"
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedEntities.liturgical_times.includes(time)}
+                                                        onChange={() => handleEntitySelect('liturgical_times', time)}
+                                                        className="rounded"
+                                                    />
+                                                    <span className="text-sm truncate">{time}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Summary */}
+                                {(discoveryResult.discovered.artists.length === 0 &&
+                                    discoveryResult.discovered.categories.length === 0 &&
+                                    discoveryResult.discovered.liturgical_times.length === 0) && (
+                                        <div className="text-center py-4 text-muted-foreground">
+                                            <CheckCircle className="h-8 w-8 mx-auto mb-2" />
+                                            <p>Todas as entidades já estão cadastradas!</p>
+                                        </div>
+                                    )}
                             </div>
                         )}
                     </CardContent>

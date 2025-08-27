@@ -14,9 +14,33 @@ import type {
 } from '@/types'
 
 const BASE = '/api'
+const BACKEND_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
+        ...init,
+        headers: {
+            'Content-Type': init?.body instanceof FormData ? undefined as any : 'application/json',
+            ...(init?.headers || {}),
+        } as any,
+        cache: 'no-store',
+    })
+    if (!res.ok) {
+        let message = res.statusText
+        try {
+            const data = await res.json()
+            message = data?.error || data?.message || message
+        } catch { }
+        throw new Error(message)
+    }
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) return (await res.json()) as T
+    return (await res.text()) as unknown as T
+}
+
+// Função para chamadas diretas ao backend
+async function backendRequest<T>(path: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(`${BACKEND_BASE}${path}`, {
         ...init,
         headers: {
             'Content-Type': init?.body instanceof FormData ? undefined as any : 'application/json',
@@ -343,7 +367,7 @@ export const healthApi = {
 // ============ CATEGORIES / LITURGICAL TIMES ============
 export const categoriesApi = {
     async getCategories(): Promise<{ data: any[] }> {
-        const data = await request<any[]>('/dashboard/get_categories')
+        const data = await backendRequest<any[]>('/api/dashboard/get_categories')
         return { data }
     },
     async createCategory(name: string): Promise<ApiResponse> {
@@ -359,7 +383,7 @@ export const categoriesApi = {
 
 export const liturgicalTimesApi = {
     async getLiturgicalTimes(): Promise<{ data: any[] }> {
-        const data = await request<any[]>('/dashboard/get_liturgical_times')
+        const data = await backendRequest<any[]>('/api/dashboard/get_liturgical_times')
         return { data }
     },
     async createLiturgicalTime(name: string): Promise<ApiResponse> {
@@ -395,13 +419,13 @@ export const handleApiError = (error: any): string => {
 // ============ ADMIN / DISCOVERY API ============
 export const adminApi = {
     async discoverEntities(): Promise<any> {
-        return await request<any>('/admin/discovery', { method: 'GET' })
+        return await backendRequest<any>('/api/admin/discover-entities', { method: 'POST' })
     },
     async registerEntities(entities: any): Promise<any> {
-        return await request<any>('/admin/discovery', { method: 'POST', body: JSON.stringify({ entities }) })
+        return await backendRequest<any>('/api/admin/register-discovered-entities', { method: 'POST', body: JSON.stringify({ entities }) })
     },
     async cleanupEntities(): Promise<any> {
-        return await request<any>('/admin/cleanup', { method: 'POST' })
+        return await backendRequest<any>('/api/admin/cleanup-entities', { method: 'POST' })
     },
 }
 

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError } from '@/lib/api'
+import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError, request } from '@/lib/api'
 import type { SearchFilters } from '@/types'
 import { Filter, RotateCcw, X } from 'lucide-react'
 
@@ -44,13 +44,15 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
     const loadSuggestions = async () => {
         try {
             setIsLoading(true)
-            // Buscar categorias e tempos reais
-            const [cats, times] = await Promise.all([
+            // Buscar artistas, categorias e tempos reais
+            const [artists, cats, times] = await Promise.all([
+                request<any[]>('/dashboard/get_artists').catch(() => []),
                 categoriesApi.getCategories().catch(() => ({ data: [] })),
                 liturgicalTimesApi.getLiturgicalTimes().catch(() => ({ data: [] })),
             ])
             setSuggestions(prev => ({
                 ...prev,
+                artists: Array.isArray(artists) ? artists : [],
                 categories: Array.isArray(cats.data) ? cats.data : [],
                 liturgical_times: Array.isArray(times.data) ? times.data : [],
             }))
@@ -84,7 +86,9 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
         onFiltersChange({})
     }
 
-    const hasActiveFilters = Object.keys(localFilters).length > 0
+    const hasActiveFilters = Object.values(localFilters).some(value =>
+        value !== '' && value !== null && value !== undefined && value !== false
+    )
 
     return (
         <div className="space-y-4">
@@ -102,9 +106,9 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Artist Filter (desativado por ora por não haver endpoint) */}
-                <div className="space-y-2 opacity-60 pointer-events-none">
-                    <div className="flex items-center justify-between">
+                {/* Artist Filter */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between min-h-[24px]">
                         <Label htmlFor="artist">Artista</Label>
                         {localFilters.artist && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('artist')} className="h-6 w-6 p-0">
@@ -128,7 +132,14 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
 
                 {/* Category Filter */}
                 <div className="space-y-2">
-                    <Label htmlFor="category">Categoria</Label>
+                    <div className="flex items-center justify-between min-h-[24px]">
+                        <Label htmlFor="category">Categoria</Label>
+                        {localFilters.category && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('category')} className="h-6 w-6 p-0">
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
                     <Select value={localFilters.category || ''} onValueChange={(value) => handleFilterChange('category', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder="Selecionar categoria" />
@@ -145,7 +156,14 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
 
                 {/* Liturgical Time Filter */}
                 <div className="space-y-2">
-                    <Label htmlFor="liturgical_time">Tempo Litúrgico</Label>
+                    <div className="flex items-center justify-between min-h-[24px]">
+                        <Label htmlFor="liturgical_time">Tempo Litúrgico</Label>
+                        {localFilters.liturgical_time && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('liturgical_time')} className="h-6 w-6 p-0">
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
                     <Select value={localFilters.liturgical_time || ''} onValueChange={(value) => handleFilterChange('liturgical_time', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder="Selecionar tempo" />
@@ -162,7 +180,14 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
 
                 {/* Musical Key Filter */}
                 <div className="space-y-2">
-                    <Label htmlFor="musical_key">Tonalidade</Label>
+                    <div className="flex items-center justify-between min-h-[24px]">
+                        <Label htmlFor="musical_key">Tonalidade</Label>
+                        {localFilters.musical_key && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('musical_key')} className="h-6 w-6 p-0">
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
                     <Select value={localFilters.musical_key || ''} onValueChange={(value) => handleFilterChange('musical_key', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder="Selecionar tonalidade" />
@@ -179,7 +204,14 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
 
                 {/* YouTube Filter */}
                 <div className="space-y-2">
-                    <Label htmlFor="has_youtube">YouTube</Label>
+                    <div className="flex items-center justify-between min-h-[24px]">
+                        <Label htmlFor="has_youtube">YouTube</Label>
+                        {(localFilters.has_youtube !== undefined && localFilters.has_youtube !== null) && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('has_youtube')} className="h-6 w-6 p-0">
+                                <X className="h-3 w-3" />
+                            </Button>
+                        )}
+                    </div>
                     <Select
                         value={localFilters.has_youtube?.toString() || ''}
                         onValueChange={(value) => {
@@ -203,7 +235,14 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
 
             {/* Custom Title Search */}
             <div className="space-y-2">
-                <Label htmlFor="title">Busca no Título (customizada)</Label>
+                <div className="flex items-center justify-between min-h-[24px]">
+                    <Label htmlFor="title">Busca no Título (customizada)</Label>
+                    {localFilters.title && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('title')} className="h-6 w-6 p-0">
+                            <X className="h-3 w-3" />
+                        </Button>
+                    )}
+                </div>
                 <Input id="title" placeholder="Digite parte do título..." value={localFilters.title || ''} onChange={(e) => handleFilterChange('title', e.target.value)} />
             </div>
 

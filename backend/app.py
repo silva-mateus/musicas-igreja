@@ -59,27 +59,37 @@ DATABASE = os.environ.get('DATABASE_PATH', os.path.join(DEFAULT_DATA_DIR, 'pdf_o
 LOG_FOLDER = os.environ.get('LOG_FOLDER', os.path.join(DEFAULT_DATA_DIR, 'logs'))
 # Helpers para paths organizados: salvar relativo (/organized/...) e resolver para absoluto quando necessário
 def to_relative_organized_path(path: str) -> str:
+    """Converte caminho absoluto para relativo no formato 'organized/[categoria]/[arquivo]' (sempre sem barra inicial)"""
     try:
-        # Já relativo
-        if path.startswith('/organized/') or path.startswith('organized/'):
-            return path if path.startswith('/organized/') else '/' + path
+        # Já relativo sem barra inicial - formato desejado
+        if path.startswith('organized/'):
+            return path
+        # Já relativo com barra inicial - remover barra
+        if path.startswith('/organized/'):
+            return path[1:]  # Remove a barra inicial
         # Se for dentro da pasta organizada absoluta
         if path.startswith(ORGANIZED_FOLDER):
             rel = os.path.relpath(path, ORGANIZED_FOLDER).replace('\\', '/')
-            return f"/organized/{rel}"
+            return f"organized/{rel}"
     except Exception:
         pass
     return path
 
 
 def to_absolute_organized_path(path: str) -> str:
+    """Converte caminho relativo para absoluto, lidando com ambos os formatos antigos e novos"""
     try:
-        if path.startswith('/organized/'):
-            rel = path[len('/organized/'):]
-            return os.path.join(ORGANIZED_FOLDER, rel)
+        # Novo formato: organized/... (sem barra inicial)
         if path.startswith('organized/'):
             rel = path[len('organized/'):]
             return os.path.join(ORGANIZED_FOLDER, rel)
+        # Formato antigo com barra: /organized/...
+        if path.startswith('/organized/'):
+            rel = path[len('/organized/'):]
+            return os.path.join(ORGANIZED_FOLDER, rel)
+        # Se já for caminho absoluto dentro de ORGANIZED_FOLDER
+        if path.startswith(ORGANIZED_FOLDER):
+            return path
     except Exception:
         pass
     return path
@@ -999,24 +1009,24 @@ def upload_file():
             # Processar upload em lote
             if 'file' not in request.files:
                 return 'Nenhum arquivo selecionado', 400
-            
+
             file = request.files['file']
             song_name = request.form.get('song_name', '').strip()
             artist = request.form.get('artist', '').strip()
             new_artist = request.form.get('new_artist', '').strip()
-            
+
             # Processar múltiplas categorias e tempos litúrgicos
             selected_categories = request.form.getlist('categories')
             selected_liturgical_times = request.form.getlist('liturgical_times')
-            
+
             musical_key = request.form.get('musical_key', '')
             youtube_link = request.form.get('youtube_link', '')
             description = request.form.get('description', '')
-            
+
             # Usar primeira categoria como principal (para compatibilidade)
             category = selected_categories[0] if selected_categories else 'Diversos'
             liturgical_time = selected_liturgical_times[0] if selected_liturgical_times else ''
-            
+
             # Criar novo artista se especificado
             if new_artist and not artist:
                 if create_artist(new_artist):
@@ -1024,54 +1034,57 @@ def upload_file():
                 else:
                     # Se artista já existe, usar o existente
                     artist = new_artist
-            
+
             if file.filename == '' or file.filename is None:
                 return 'Nenhum arquivo selecionado', 400
-            
+
             if not file.filename.lower().endswith('.pdf'):
                 return 'Arquivo deve ser PDF', 400
-                
+
             try:
                 # Gerar nome do arquivo baseado nas informações
                 final_filename = generate_filename(song_name, artist, secure_filename(file.filename), musical_key)
-                
+
                 temp_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
                 file.save(temp_path)
-                
+
                 file_hash = get_file_hash(temp_path)
                 conn = sqlite3.connect(DATABASE)
                 cursor = conn.cursor()
                 cursor.execute('SELECT filename FROM pdf_files WHERE file_hash = ?', (file_hash,))
                 existing = cursor.fetchone()
-                
+
                 if existing:
                     os.remove(temp_path)
                     conn.close()
                     return f'Arquivo já existe: {existing[0]}', 400
-                
+
                 category_folder = os.path.join(ORGANIZED_FOLDER, category)
                 os.makedirs(category_folder, exist_ok=True)
-                
+
                 # Garantir nome único
                 counter = 1
                 base_name = os.path.splitext(final_filename)[0]
                 final_path = os.path.join(category_folder, final_filename)
-                
+
                 while os.path.exists(final_path):
                     final_filename = f"{base_name}_{counter}.pdf"
                     final_path = os.path.join(category_folder, final_filename)
                     counter += 1
-                
+
                 shutil.move(temp_path, final_path)
-                
+
                 pdf_info = get_pdf_info(final_path)
                 file_size = os.path.getsize(final_path)
-                
+
+                # Padronizar caminho relativo para formato consistente
+                relative_path = to_relative_organized_path(final_path)
+
                 cursor.execute('''
-                    INSERT INTO pdf_files 
+                    INSERT INTO pdf_files
                     (filename, original_name, song_name, artist, category, liturgical_time, musical_key, youtube_link, file_path, file_size, file_hash, page_count, description)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, final_path, file_size, file_hash, pdf_info['page_count'], description))
+                ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, relative_path, file_size, file_hash, pdf_info['page_count'], description))
                 
                 file_id = cursor.lastrowid
                 
@@ -1112,24 +1125,24 @@ def upload_file():
             if 'file' not in request.files:
                 flash('Nenhum arquivo selecionado')
                 return redirect(request.url)
-            
+
             file = request.files['file']
             song_name = request.form.get('song_name', '').strip()
             artist = request.form.get('artist', '').strip()
             new_artist = request.form.get('new_artist', '').strip()
-            
+
             # Processar múltiplas categorias e tempos litúrgicos
             selected_categories = request.form.getlist('categories')
             selected_liturgical_times = request.form.getlist('liturgical_times')
-            
+
             # Usar primeira categoria como principal (para compatibilidade)
             category = selected_categories[0] if selected_categories else 'Diversos'
             liturgical_time = selected_liturgical_times[0] if selected_liturgical_times else ''
-            
+
             musical_key = request.form.get('musical_key', '')
             youtube_link = request.form.get('youtube_link', '')
             description = request.form.get('description', '')
-            
+
             # Criar novo artista se especificado
             if new_artist and not artist:
                 if create_artist(new_artist):
@@ -1138,53 +1151,56 @@ def upload_file():
                 else:
                     flash(f'Artista "{new_artist}" já existe')
                     artist = new_artist
-            
+
             if file.filename == '' or file.filename is None:
                 flash('Nenhum arquivo selecionado')
                 return redirect(request.url)
-                
+
             if file and file.filename.lower().endswith('.pdf'):
                 # Gerar nome do arquivo baseado nas informações
                 final_filename = generate_filename(song_name, artist, secure_filename(file.filename), musical_key)
-                
+
                 temp_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
                 file.save(temp_path)
-                
+
                 file_hash = get_file_hash(temp_path)
                 conn = sqlite3.connect(DATABASE)
                 cursor = conn.cursor()
                 cursor.execute('SELECT filename FROM pdf_files WHERE file_hash = ?', (file_hash,))
                 existing = cursor.fetchone()
-                
+
                 if existing:
                     os.remove(temp_path)
                     flash(f'Arquivo já existe: {existing[0]}')
                     conn.close()
                     return redirect(url_for('index'))
-                
+
                 category_folder = os.path.join(ORGANIZED_FOLDER, category)
                 os.makedirs(category_folder, exist_ok=True)
-                
+
                 # Garantir nome único
                 counter = 1
                 base_name = os.path.splitext(final_filename)[0]
                 final_path = os.path.join(category_folder, final_filename)
-                
+
                 while os.path.exists(final_path):
                     final_filename = f"{base_name}_{counter}.pdf"
                     final_path = os.path.join(category_folder, final_filename)
                     counter += 1
-                
+
                 shutil.move(temp_path, final_path)
-                
+
                 pdf_info = get_pdf_info(final_path)
                 file_size = os.path.getsize(final_path)
-                
+
+                # Padronizar caminho relativo para formato consistente
+                relative_path = to_relative_organized_path(final_path)
+
                 cursor.execute('''
-                    INSERT INTO pdf_files 
+                    INSERT INTO pdf_files
                     (filename, original_name, song_name, artist, category, liturgical_time, musical_key, youtube_link, file_path, file_size, file_hash, page_count, description)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, final_path, file_size, file_hash, pdf_info['page_count'], description))
+                ''', (final_filename, file.filename, song_name, artist, category, liturgical_time, musical_key, youtube_link, relative_path, file_size, file_hash, pdf_info['page_count'], description))
                 
                 file_id = cursor.lastrowid
                 
@@ -1225,10 +1241,13 @@ def upload_file():
                         if new_filename != final_filename and not os.path.exists(new_path):
                             # Renomear arquivo físico
                             os.rename(final_path, new_path)
-                            
+
+                            # Padronizar caminho relativo para formato consistente
+                            relative_path = to_relative_organized_path(new_path)
+
                             # Atualizar no banco de dados
-                            cursor.execute('UPDATE pdf_files SET filename = ?, file_path = ? WHERE id = ?', 
-                                         (new_filename, new_path, file_id))
+                            cursor.execute('UPDATE pdf_files SET filename = ?, file_path = ? WHERE id = ?',
+                                         (new_filename, relative_path, file_id))
                             final_filename = new_filename
                             app.logger.info(f"Arquivo automaticamente renomeado: {final_filename}")
                         
@@ -1971,8 +1990,9 @@ def api_fix_pdf_names():
             new_filename = generate_filename(song_name, artist, current_filename, musical_key)
             
             # Verificar se o arquivo físico existe
-            if not os.path.exists(file_path):
-                errors.append(f"Arquivo {file_id}: arquivo físico não encontrado em {file_path}")
+            abs_file_path = to_absolute_organized_path(file_path)
+            if not os.path.exists(abs_file_path):
+                errors.append(f"Arquivo {file_id}: arquivo físico não encontrado em {abs_file_path}")
                 continue
             
             # Gerar novo caminho baseado na categoria
@@ -2544,9 +2564,10 @@ def download_merged_list(list_id):
         
         # Adicionar páginas de cada arquivo
         for file_path, filename in files:
-            if os.path.exists(file_path):
+            abs_file_path = to_absolute_organized_path(file_path)
+            if os.path.exists(abs_file_path):
                 try:
-                    reader = PdfReader(file_path)
+                    reader = PdfReader(abs_file_path)
                     for page in reader.pages:
                         writer.add_page(page)
                 except Exception as e:
@@ -2614,8 +2635,9 @@ def delete_file(file_id):
         file_path, filename = result
         
         # Deletar arquivo do sistema
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        abs_file_path = to_absolute_organized_path(file_path)
+        if os.path.exists(abs_file_path):
+            os.remove(abs_file_path)
         
         # Deletar do banco de dados
         cursor.execute('DELETE FROM pdf_files WHERE id = ?', (file_id,))
@@ -3049,8 +3071,10 @@ def download_file(file_id):
     result = cursor.fetchone()
     conn.close()
     
-    if result and os.path.exists(result[0]):
-        return send_file(result[0], as_attachment=True, download_name=result[1])
+    if result:
+        abs_path = to_absolute_organized_path(result[0])
+        if os.path.exists(abs_path):
+            return send_file(abs_path, as_attachment=True, download_name=result[1])
     
     flash('Arquivo não encontrado')
     return redirect(url_for('index'))
@@ -3474,6 +3498,15 @@ def api_dashboard_get_categories():
     
     conn.close()
     return jsonify(categories)
+
+@app.route('/api/get_artists')
+def api_get_artists():
+    """API para obter lista de todos os artistas."""
+    try:
+        artists = get_artists()  # Usa a função existente
+        return jsonify(artists)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/dashboard/get_liturgical_times')
 def api_dashboard_get_liturgical_times():
@@ -5215,8 +5248,10 @@ def api_export_merge_list(list_id):
         return jsonify({'success': False, 'error': 'É necessário pelo menos 2 arquivos para mesclar'}), 400
     writer = PdfWriter()
     for file_path, _ in files_to_merge:
-        if os.path.exists(file_path):
-            reader = PdfReader(file_path)
+        # Converter caminho relativo para absoluto se necessário
+        abs_path = to_absolute_organized_path(file_path)
+        if os.path.exists(abs_path):
+            reader = PdfReader(abs_path)
             for page in reader.pages:
                 writer.add_page(page)
     import tempfile
@@ -5259,8 +5294,10 @@ def api_create_pdf_from_merge_list(list_id):
         return jsonify({'success': False, 'error': 'É necessário pelo menos 2 arquivos para mesclar'}), 400
     writer = PdfWriter()
     for (file_path,) in files_to_merge:
-        if os.path.exists(file_path):
-            reader = PdfReader(file_path)
+        # Converter caminho relativo para absoluto se necessário
+        abs_path = to_absolute_organized_path(file_path)
+        if os.path.exists(abs_path):
+            reader = PdfReader(abs_path)
             for page in reader.pages:
                 writer.add_page(page)
     merged_folder = os.path.join(ORGANIZED_FOLDER, 'Merged')
@@ -5281,20 +5318,335 @@ def api_create_pdf_from_merge_list(list_id):
     file_hash = get_file_hash(output_path)
     file_size = os.path.getsize(output_path)
     pdf_info = get_pdf_info(output_path)
+
+    # Padronizar caminho relativo para formato consistente
+    relative_path = to_relative_organized_path(output_path)
+
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO pdf_files (filename, original_name, category, file_path, file_size, file_hash, page_count, description)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (output_name, output_name, 'Merged', output_path, file_size, file_hash, pdf_info['page_count'], 'Merged PDF document'))
+    ''', (output_name, output_name, 'Merged', relative_path, file_size, file_hash, pdf_info['page_count'], 'Merged PDF document'))
     new_file_id = cursor.lastrowid
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'file_id': new_file_id, 'filename': output_name})
 
 # ==========================================
+# MIGRATION SCRIPT PARA PADRONIZAR FILE_PATH
+# ==========================================
+
+def migrate_file_paths():
+    """Migra caminhos de arquivo antigos para o formato padronizado."""
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    try:
+        # Buscar todos os registros com file_path
+        cursor.execute('SELECT id, file_path FROM pdf_files WHERE file_path IS NOT NULL')
+        records = cursor.fetchall()
+
+        updated_count = 0
+        for record_id, current_path in records:
+            # Aplicar padronização
+            standardized_path = to_relative_organized_path(current_path)
+
+            # Só atualizar se for diferente
+            if standardized_path != current_path:
+                cursor.execute('UPDATE pdf_files SET file_path = ? WHERE id = ?',
+                             (standardized_path, record_id))
+                updated_count += 1
+                print(f"Migrado ID {record_id}: '{current_path}' -> '{standardized_path}'")
+
+        conn.commit()
+        print(f"Migração concluída! {updated_count} registros atualizados.")
+        return updated_count
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro na migração: {e}")
+        raise
+    finally:
+        conn.close()
+
+# Executar migração automaticamente na inicialização (apenas uma vez)
+def init_migration():
+    """Executa migração se necessário."""
+    try:
+        # Verificar se já foi executada
+        migration_flag_file = os.path.join(DEFAULT_DATA_DIR, '.migration_done')
+        if os.path.exists(migration_flag_file):
+            return
+
+        print("Executando migração de caminhos de arquivo...")
+        updated_count = migrate_file_paths()
+
+        # Criar flag para não executar novamente
+        with open(migration_flag_file, 'w') as f:
+            f.write(f"Migration completed at {datetime.now()}\nUpdated {updated_count} records")
+
+        print("Migração concluída com sucesso!")
+
+    except Exception as e:
+        print(f"Erro na migração automática: {e}")
+
+# ==========================================
 # HEALTH CHECK ENDPOINT (Para Docker)
 # ==========================================
+
+@app.route('/api/admin/migrate-file-paths', methods=['POST'])
+def api_migrate_file_paths():
+    """Endpoint para executar migração de caminhos de arquivo (admin)."""
+    try:
+        updated_count = migrate_file_paths()
+        return jsonify({
+            'success': True,
+            'message': f'Migração concluída! {updated_count} registros atualizados.',
+            'updated_count': updated_count
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/admin/discover-entities', methods=['POST'])
+def api_admin_discover_entities():
+    """Analisa o banco de dados e descobre entidades não cadastradas (artistas, categorias, tempos, tons)."""
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        results = {
+            'discovered': {
+                'artists': [],
+                'categories': [],
+                'liturgical_times': [],
+                'musical_keys': []
+            },
+            'registered': {
+                'artists': [],
+                'categories': [],
+                'liturgical_times': [],
+                'musical_keys': []
+            },
+            'stats': {
+                'total_files': 0,
+                'files_processed': 0
+            }
+        }
+
+        # Buscar estatísticas gerais
+        cursor.execute('SELECT COUNT(*) FROM pdf_files')
+        results['stats']['total_files'] = cursor.fetchone()[0]
+
+        # 1. DESCOBRIR ARTISTAS
+        app.logger.info("🔍 [DISCOVERY] Buscando artistas...")
+        cursor.execute('''
+            SELECT DISTINCT artist FROM pdf_files
+            WHERE artist IS NOT NULL AND artist != '' AND TRIM(artist) != ''
+            ORDER BY artist
+        ''')
+        all_artists_in_files = [row[0] for row in cursor.fetchall()]
+
+        # Artistas já cadastrados
+        cursor.execute('SELECT name FROM artists ORDER BY name')
+        registered_artists = [row[0] for row in cursor.fetchall()]
+
+        # Artistas descobertos (não cadastrados)
+        discovered_artists = []
+        for artist in all_artists_in_files:
+            if artist not in registered_artists:
+                discovered_artists.append(artist)
+
+        results['discovered']['artists'] = discovered_artists
+        results['registered']['artists'] = registered_artists
+
+        # 2. DESCOBRIR CATEGORIAS
+        app.logger.info("🔍 [DISCOVERY] Buscando categorias...")
+        cursor.execute('''
+            SELECT DISTINCT category FROM pdf_files
+            WHERE category IS NOT NULL AND category != '' AND TRIM(category) != ''
+            ORDER BY category
+        ''')
+        all_categories_in_files = [row[0] for row in cursor.fetchall()]
+
+        # Categorias já cadastradas
+        cursor.execute('SELECT name FROM categories ORDER BY name')
+        registered_categories = [row[0] for row in cursor.fetchall()]
+
+        # Categorias descobertas
+        discovered_categories = []
+        for category in all_categories_in_files:
+            if category not in registered_categories:
+                discovered_categories.append(category)
+
+        results['discovered']['categories'] = discovered_categories
+        results['registered']['categories'] = registered_categories
+
+        # 3. DESCOBRIR TEMPOS LITÚRGICOS
+        app.logger.info("🔍 [DISCOVERY] Buscando tempos litúrgicos...")
+        cursor.execute('''
+            SELECT DISTINCT liturgical_time FROM pdf_files
+            WHERE liturgical_time IS NOT NULL AND liturgical_time != '' AND TRIM(liturgical_time) != ''
+            ORDER BY liturgical_time
+        ''')
+        all_liturgical_times_in_files = [row[0] for row in cursor.fetchall()]
+
+        # Tempos já cadastrados
+        cursor.execute('SELECT name FROM liturgical_times ORDER BY name')
+        registered_liturgical_times = [row[0] for row in cursor.fetchall()]
+
+        # Tempos descobertos
+        discovered_liturgical_times = []
+        for liturgical_time in all_liturgical_times_in_files:
+            if liturgical_time not in registered_liturgical_times:
+                discovered_liturgical_times.append(liturgical_time)
+
+        results['discovered']['liturgical_times'] = discovered_liturgical_times
+        results['registered']['liturgical_times'] = registered_liturgical_times
+
+        # 4. DESCOBRIR TONALIDADES MUSICAIS
+        app.logger.info("🔍 [DISCOVERY] Buscando tonalidades...")
+        cursor.execute('''
+            SELECT DISTINCT musical_key FROM pdf_files
+            WHERE musical_key IS NOT NULL AND musical_key != '' AND TRIM(musical_key) != ''
+            ORDER BY musical_key
+        ''')
+        discovered_musical_keys = [row[0] for row in cursor.fetchall()]
+        results['discovered']['musical_keys'] = discovered_musical_keys
+
+        conn.close()
+
+        app.logger.info("✅ [DISCOVERY] Descoberta concluída!")
+        return jsonify({
+            'success': True,
+            'message': 'Análise concluída com sucesso',
+            'data': results
+        })
+
+    except Exception as e:
+        app.logger.error(f"❌ [DISCOVERY] Erro na descoberta: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/admin/register-discovered-entities', methods=['POST'])
+def api_admin_register_discovered_entities():
+    """Registra as entidades descobertas no banco de dados."""
+    try:
+        data = request.get_json()
+        if not data or 'entities' not in data:
+            return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+
+        entities = data['entities']
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        registered = {
+            'artists': 0,
+            'categories': 0,
+            'liturgical_times': 0
+        }
+
+        # Registrar artistas descobertos
+        if 'artists' in entities and entities['artists']:
+            for artist_name in entities['artists']:
+                if artist_name and artist_name.strip():
+                    try:
+                        cursor.execute('INSERT INTO artists (name) VALUES (?)', (artist_name.strip(),))
+                        registered['artists'] += 1
+                        app.logger.info(f"✅ [REGISTER] Artista registrado: {artist_name}")
+                    except sqlite3.IntegrityError:
+                        # Artista já existe (por conta de concorrência)
+                        pass
+
+        # Registrar categorias descobertas
+        if 'categories' in entities and entities['categories']:
+            for category_name in entities['categories']:
+                if category_name and category_name.strip():
+                    try:
+                        cursor.execute('INSERT INTO categories (name) VALUES (?)', (category_name.strip(),))
+                        registered['categories'] += 1
+                        app.logger.info(f"✅ [REGISTER] Categoria registrada: {category_name}")
+                    except sqlite3.IntegrityError:
+                        pass
+
+        # Registrar tempos litúrgicos descobertos
+        if 'liturgical_times' in entities and entities['liturgical_times']:
+            for liturgical_time_name in entities['liturgical_times']:
+                if liturgical_time_name and liturgical_time_name.strip():
+                    try:
+                        cursor.execute('INSERT INTO liturgical_times (name) VALUES (?)', (liturgical_time_name.strip(),))
+                        registered['liturgical_times'] += 1
+                        app.logger.info(f"✅ [REGISTER] Tempo litúrgico registrado: {liturgical_time_name}")
+                    except sqlite3.IntegrityError:
+                        pass
+
+        conn.commit()
+        conn.close()
+
+        total_registered = sum(registered.values())
+        app.logger.info(f"✅ [REGISTER] Registro concluído: {total_registered} entidades registradas")
+
+        return jsonify({
+            'success': True,
+            'message': f'Registro concluído: {total_registered} entidades registradas',
+            'registered': registered
+        })
+
+    except Exception as e:
+        app.logger.error(f"❌ [REGISTER] Erro no registro: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/admin/cleanup-entities', methods=['POST'])
+def api_admin_cleanup_entities():
+    """Remove entidades duplicadas ou vazias."""
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+
+        cleaned = {
+            'artists': 0,
+            'categories': 0,
+            'liturgical_times': 0
+        }
+
+        # Limpar artistas vazios ou apenas espaços
+        cursor.execute('DELETE FROM artists WHERE TRIM(name) = "" OR name IS NULL')
+        cleaned['artists'] = cursor.rowcount
+
+        # Limpar categorias vazias ou apenas espaços
+        cursor.execute('DELETE FROM categories WHERE TRIM(name) = "" OR name IS NULL')
+        cleaned['categories'] = cursor.rowcount
+
+        # Limpar tempos litúrgicos vazios ou apenas espaços
+        cursor.execute('DELETE FROM liturgical_times WHERE TRIM(name) = "" OR name IS NULL')
+        cleaned['liturgical_times'] = cursor.rowcount
+
+        conn.commit()
+        conn.close()
+
+        total_cleaned = sum(cleaned.values())
+        app.logger.info(f"✅ [CLEANUP] Limpeza concluída: {total_cleaned} entidades removidas")
+
+        return jsonify({
+            'success': True,
+            'message': f'Limpeza concluída: {total_cleaned} entidades removidas',
+            'cleaned': cleaned
+        })
+
+    except Exception as e:
+        app.logger.error(f"❌ [CLEANUP] Erro na limpeza: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/health')
 def health_check():
@@ -5341,7 +5693,10 @@ if __name__ == '__main__':
         print("🎵 [DEBUG] Setup de logging concluído")
         
         init_db()
-        
+
+        # Executar migração de caminhos se necessário
+        init_migration()
+
         # Informações de configuração para Docker/Produção
         app.logger.info("="*50)
         app.logger.info("🎵 MÚSICAS IGREJA - Iniciando aplicação...")

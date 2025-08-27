@@ -15,7 +15,7 @@ import type {
 
 const BASE = '/api'
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
         ...init,
         headers: {
