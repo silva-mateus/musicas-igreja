@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { GoogleDriveSettings } from '@/components/settings/google-drive-settings'
-import { adminApi } from '@/lib/api'
+import { adminApi, request } from '@/lib/api'
 
 interface MismatchedFile {
     id: number
@@ -67,6 +67,27 @@ interface DiscoveryResult {
     }
 }
 
+interface PermissionsResult {
+    data_dir: {
+        path: string
+        exists: boolean
+        writable: boolean
+        permissions: any
+    }
+    organized_dir: {
+        path: string
+        exists: boolean
+        writable: boolean
+        permissions: any
+    }
+    uploads_dir: {
+        path: string
+        exists: boolean
+        writable: boolean
+        permissions: any
+    }
+}
+
 export default function SettingsPage() {
     const { toast } = useToast()
 
@@ -89,6 +110,11 @@ export default function SettingsPage() {
         categories: [],
         liturgical_times: []
     })
+
+    // Permissions Check
+    const [permissionsResult, setPermissionsResult] = useState<PermissionsResult | null>(null)
+    const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
+    const [isFixingPermissions, setIsFixingPermissions] = useState(false)
 
     const [isLoading, setIsLoading] = useState(false)
 
@@ -279,6 +305,48 @@ export default function SettingsPage() {
             ...prev,
             [type]: prev[type].length === allEntities.length ? [] : allEntities
         }))
+    }
+
+    // Permissions Functions
+    const handleCheckPermissions = async () => {
+        setIsCheckingPermissions(true)
+        try {
+            const data = await request<any>('/admin/check-permissions')
+            setPermissionsResult(data)
+            toast({
+                title: "Verificação concluída",
+                description: "Permissões dos diretórios foram verificadas.",
+            })
+        } catch (error: any) {
+            toast({
+                title: "Erro na verificação",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsCheckingPermissions(false)
+        }
+    }
+
+    const handleFixPermissions = async () => {
+        setIsFixingPermissions(true)
+        try {
+            const data = await request<any>('/admin/fix-permissions')
+            toast({
+                title: "Correção concluída",
+                description: "Tentativa de correção de permissões realizada.",
+            })
+            // Refresh permissions check
+            handleCheckPermissions()
+        } catch (error: any) {
+            toast({
+                title: "Erro na correção",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsFixingPermissions(false)
+        }
     }
 
 
@@ -618,6 +686,128 @@ export default function SettingsPage() {
                                             <p>Todas as entidades já estão cadastradas!</p>
                                         </div>
                                     )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Permissions Diagnostic Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Shield className="h-5 w-5" />
+                            Diagnóstico de Permissões
+                        </CardTitle>
+                        <CardDescription>
+                            Verifique e corrija permissões de escrita nos diretórios do sistema
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            onClick={handleCheckPermissions}
+                                            disabled={isCheckingPermissions}
+                                            className="gap-2"
+                                        >
+                                            {isCheckingPermissions ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Shield className="h-4 w-4" />
+                                            )}
+                                            {isCheckingPermissions ? 'Verificando...' : 'Verificar Permissões'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Verificar permissões de escrita nos diretórios</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            onClick={handleFixPermissions}
+                                            disabled={isFixingPermissions}
+                                            variant="outline"
+                                            className="gap-2"
+                                        >
+                                            {isFixingPermissions ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <RotateCcw className="h-4 w-4" />
+                                            )}
+                                            {isFixingPermissions ? 'Corrigindo...' : 'Corrigir Permissões'}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Tentar corrigir permissões automaticamente</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+
+                        {permissionsResult && (
+                            <div className="space-y-4 border-t pt-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    {Object.entries(permissionsResult).map(([key, info]) => (
+                                        <div key={key} className="space-y-2">
+                                            <h4 className="font-medium capitalize">
+                                                {key.replace('_dir', '').replace('_', ' ')}
+                                            </h4>
+                                            <div className="text-sm space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-muted-foreground">Caminho:</span>
+                                                    <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                                                        {info.path}
+                                                    </code>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-muted-foreground">Existe:</span>
+                                                    <Badge variant={info.exists ? "default" : "destructive"}>
+                                                        {info.exists ? "Sim" : "Não"}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-muted-foreground">Gravável:</span>
+                                                    <Badge variant={info.writable ? "default" : "destructive"}>
+                                                        {info.writable ? "Sim" : "Não"}
+                                                    </Badge>
+                                                </div>
+                                                {info.permissions && typeof info.permissions === 'object' && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Permissões: {info.permissions.octal}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Summary */}
+                                <div className="flex items-center gap-4 pt-2 border-t">
+                                    {Object.values(permissionsResult).every(info => !info.exists) && (
+                                        <Badge variant="destructive" className="gap-1">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Diretórios não encontrados
+                                        </Badge>
+                                    )}
+                                    {Object.values(permissionsResult).some(info => info.exists && !info.writable) && (
+                                        <Badge variant="destructive" className="gap-1">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Permissões insuficientes
+                                        </Badge>
+                                    )}
+                                    {Object.values(permissionsResult).every(info => info.exists && info.writable) && (
+                                        <Badge variant="default" className="gap-1">
+                                            <CheckCircle className="h-3 w-3" />
+                                            Todas as permissões OK
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </CardContent>

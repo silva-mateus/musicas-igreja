@@ -5185,16 +5185,26 @@ def api_add_items_to_merge_list(list_id):
     cursor.execute('SELECT MAX(order_position) FROM merge_list_items WHERE merge_list_id = ?', (list_id,))
     max_pos = cursor.fetchone()[0] or 0
     added = 0
+    new_item_ids = []  # Lista dos IDs dos novos itens criados
+    
     for fid in file_ids:
         cursor.execute('SELECT id FROM merge_list_items WHERE merge_list_id = ? AND pdf_file_id = ?', (list_id, fid))
         if not cursor.fetchone():
             max_pos += 1
             cursor.execute('INSERT INTO merge_list_items (merge_list_id, pdf_file_id, order_position) VALUES (?, ?, ?)', (list_id, fid, max_pos))
+            new_item_id = cursor.lastrowid  # Capturar o ID do item criado
+            new_item_ids.append(new_item_id)
             added += 1
+    
     cursor.execute('UPDATE merge_lists SET updated_date = CURRENT_TIMESTAMP WHERE id = ?', (list_id,))
     conn.commit()
     conn.close()
-    return jsonify({'success': True, 'added': added})
+    
+    return jsonify({
+        'success': True, 
+        'added': added,
+        'new_item_ids': new_item_ids  # Retornar os IDs dos novos itens
+    })
 
 
 @app.route('/api/merge_list_items/<int:item_id>', methods=['DELETE'])
@@ -5647,6 +5657,92 @@ def api_admin_cleanup_entities():
             'success': False,
             'error': str(e)
         }), 500
+
+@app.route('/api/admin/check-permissions')
+def api_admin_check_permissions():
+    """Verificar permissões de escrita nos diretórios importantes."""
+    import os
+    import stat
+
+    results = {
+        'data_dir': {
+            'path': os.path.abspath(DEFAULT_DATA_DIR),
+            'exists': os.path.exists(DEFAULT_DATA_DIR),
+            'writable': False,
+            'permissions': None
+        },
+        'organized_dir': {
+            'path': os.path.abspath(ORGANIZED_FOLDER),
+            'exists': os.path.exists(ORGANIZED_FOLDER),
+            'writable': False,
+            'permissions': None
+        },
+        'uploads_dir': {
+            'path': os.path.abspath(UPLOAD_FOLDER),
+            'exists': os.path.exists(UPLOAD_FOLDER),
+            'writable': False,
+            'permissions': None
+        }
+    }
+
+    for key, info in results.items():
+        if info['exists']:
+            # Verificar permissões de escrita
+            info['writable'] = os.access(info['path'], os.W_OK)
+
+            # Obter informações detalhadas de permissões
+            try:
+                stat_info = os.stat(info['path'])
+                info['permissions'] = {
+                    'octal': oct(stat_info.st_mode)[-3:],
+                    'owner_read': bool(stat_info.st_mode & stat.S_IRUSR),
+                    'owner_write': bool(stat_info.st_mode & stat.S_IWUSR),
+                    'owner_execute': bool(stat_info.st_mode & stat.S_IXUSR),
+                    'group_read': bool(stat_info.st_mode & stat.S_IRGRP),
+                    'group_write': bool(stat_info.st_mode & stat.S_IWGRP),
+                    'group_execute': bool(stat_info.st_mode & stat.S_IXGRP),
+                    'other_read': bool(stat_info.st_mode & stat.S_IROTH),
+                    'other_write': bool(stat_info.st_mode & stat.S_IWOTH),
+                    'other_execute': bool(stat_info.st_mode & stat.S_IXOTH)
+                }
+            except Exception as e:
+                info['permissions'] = str(e)
+
+    return jsonify(results)
+
+@app.route('/api/admin/fix-permissions')
+def api_admin_fix_permissions():
+    """Tentar corrigir permissões de escrita nos diretórios."""
+    import os
+    import stat
+
+    results = {}
+
+    directories_to_check = [
+        ('data', DEFAULT_DATA_DIR),
+        ('organized', ORGANIZED_FOLDER),
+        ('uploads', UPLOAD_FOLDER)
+    ]
+
+    for name, path in directories_to_check:
+        results[name] = {
+            'path': os.path.abspath(path),
+            'original_writable': os.access(path, os.W_OK) if os.path.exists(path) else False,
+            'fixed': False,
+            'error': None
+        }
+
+        try:
+            if os.path.exists(path):
+                # Tentar definir permissões 755 (rwxr-xr-x)
+                os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                results[name]['fixed'] = os.access(path, os.W_OK)
+            else:
+                results[name]['error'] = 'Diretório não existe'
+        except Exception as e:
+            results[name]['error'] = str(e)
+
+    return jsonify(results)
 
 @app.route('/health')
 def health_check():

@@ -117,6 +117,13 @@ export default function EditMusicPage() {
         setHasChanges(true)
     }
 
+    // Detectar mudanças quando um PDF é selecionado
+    useEffect(() => {
+        if (pendingPdf) {
+            setHasChanges(true)
+        }
+    }, [pendingPdf])
+
     const handleSave = async () => {
         if (!music) return
         if (!formData.song_name.trim()) {
@@ -144,6 +151,12 @@ export default function EditMusicPage() {
                 const res = await fetch(`/api/files/${music.id}/replace_pdf`, { method: 'POST', body: form })
                 if (!res.ok) {
                     const j = await res.json().catch(() => ({}))
+
+                    // Verificar se é erro de backend indisponível
+                    if (res.status === 503) {
+                        throw new Error(j?.error || 'Servidor backend não está disponível. Execute: cd backend && python app.py')
+                    }
+
                     throw new Error(j?.error || 'Falha ao substituir PDF')
                 }
             }

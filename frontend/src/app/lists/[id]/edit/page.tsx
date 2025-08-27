@@ -179,27 +179,36 @@ export default function EditListPage() {
         if (!list) return
 
         try {
-            await listsApi.addMusicToList(list.id, music.id)
+            const response = await listsApi.addMusicToList(list.id, music.id)
 
-            // Atualizar lista localmente sem recarregar
-            const newItem = {
-                id: Date.now(), // Temporary ID
-                list_id: list.id,
-                music_id: music.id,
-                position: (list.items?.length || 0) + 1,
-                music: music
+            if (response.success && response.new_item_ids.length > 0) {
+                // Usar o ID real retornado pelo backend
+                const realItemId = response.new_item_ids[0]
+
+                const newItem = {
+                    id: realItemId, // ID real do backend
+                    list_id: list.id,
+                    music_id: music.id,
+                    position: (list.items?.length || 0) + 1,
+                    music: music
+                }
+
+                setList(prev => prev ? {
+                    ...prev,
+                    items: [...(prev.items || []), newItem]
+                } : prev)
+
+                console.log('✅ [ADD_MUSIC] Música adicionada com ID real:', realItemId)
+
+                toast({
+                    title: "Música adicionada",
+                    description: `"${music.title}" foi adicionada à lista.`,
+                })
+            } else {
+                throw new Error('Música não foi adicionada ou já existe na lista')
             }
-
-            setList(prev => prev ? {
-                ...prev,
-                items: [...(prev.items || []), newItem]
-            } : prev)
-
-            toast({
-                title: "Música adicionada",
-                description: `"${music.title}" foi adicionada à lista.`,
-            })
         } catch (error) {
+            console.error('❌ [ADD_MUSIC] Erro:', error)
             toast({
                 title: "Erro ao adicionar música",
                 description: handleApiError(error),
@@ -242,7 +251,7 @@ export default function EditListPage() {
         }
     }
 
-    const handleDragEnd = (result: DropResult) => {
+    const handleDragEnd = async (result: DropResult) => {
         const { destination, source } = result
 
         // Se não foi solto em um local válido
@@ -261,12 +270,28 @@ export default function EditListPage() {
         // Atualizar a ordem local
         setList(prev => prev ? { ...prev, items: newItems } : prev)
 
-        // TODO: Enviar para o backend a nova ordem
-        // Por enquanto, apenas mostra um toast
-        toast({
-            title: "Ordem alterada",
-            description: "A ordem das músicas foi atualizada. Lembre-se de salvar.",
-        })
+        try {
+            // Salvar a nova ordem imediatamente no backend
+            console.log('🔄 [DRAG] Salvando nova ordem...')
+            await listsApi.reorderList(list.id, newItems.map(item => ({ id: item.id })))
+            console.log('✅ [DRAG] Ordem salva automaticamente')
+
+            toast({
+                title: "Ordem atualizada",
+                description: "A nova ordem foi salva automaticamente.",
+            })
+        } catch (error) {
+            console.error('❌ [DRAG] Erro ao salvar ordem:', error)
+
+            // Em caso de erro, reverter a mudança local
+            setList(prev => prev ? { ...prev, items: list.items } : prev)
+
+            toast({
+                title: "Erro ao reordenar",
+                description: "Não foi possível salvar a nova ordem. Tente novamente.",
+                variant: "destructive"
+            })
+        }
     }
 
     const openYouTube = (url: string) => {

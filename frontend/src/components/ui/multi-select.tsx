@@ -94,32 +94,14 @@ export function MultiSelect({
                             <Badge
                                 variant="secondary"
                                 key={item}
-                                className="mr-1 mb-1"
+                                className="mr-1 mb-1 cursor-pointer hover:bg-secondary/80 pr-1"
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     handleUnselect(item)
                                 }}
                             >
                                 {item}
-                                <button
-                                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            handleUnselect(item)
-                                        }
-                                    }}
-                                    onMouseDown={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                    }}
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleUnselect(item)
-                                    }}
-                                >
-                                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                                </button>
+                                <X className="h-3 w-3 text-muted-foreground hover:text-foreground ml-1" />
                             </Badge>
                         ))}
                     </div>
