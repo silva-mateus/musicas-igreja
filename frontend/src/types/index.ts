@@ -114,6 +114,13 @@ export interface ApiResponse {
     error?: string
 }
 
+export interface AddMusicToListResponse {
+    success: boolean
+    added: number
+    new_item_ids: number[]
+    error?: string
+}
+
 export interface UploadFileResult {
     filename: string
     original_name: string

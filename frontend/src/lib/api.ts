@@ -7,6 +7,7 @@ import type {
     DashboardStats,
     ChartData,
     ApiResponse,
+    AddMusicToListResponse,
     AuthResponse,
     PaginatedResponse,
     SearchFilters,
@@ -299,8 +300,8 @@ export const listsApi = {
         return await request<ApiResponse>(`/merge_lists/${id}`, { method: 'DELETE' })
     },
 
-    async addMusicToList(listId: number, musicId: number): Promise<{ success: boolean; added: number; new_item_ids: number[] }> {
-        return await request<{ success: boolean; added: number; new_item_ids: number[] }>(`/merge_lists/${listId}/items`, {
+    async addMusicToList(listId: number, musicId: number): Promise<AddMusicToListResponse> {
+        return await request<AddMusicToListResponse>(`/merge_lists/${listId}/items`, {
             method: 'POST',
             body: JSON.stringify({ file_ids: [musicId] }),
         })

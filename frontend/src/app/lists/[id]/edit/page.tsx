@@ -44,6 +44,11 @@ interface FilterSuggestions {
     musical_keys: string[]
 }
 
+// Type guard para verificar se a resposta é do tipo AddMusicToListResponse
+function isAddMusicResponse(response: any): response is { success: boolean; new_item_ids: number[]; added: number } {
+    return response && typeof response.success === 'boolean' && Array.isArray(response.new_item_ids)
+}
+
 export default function EditListPage() {
     const router = useRouter()
     const params = useParams()
@@ -181,7 +186,7 @@ export default function EditListPage() {
         try {
             const response = await listsApi.addMusicToList(list.id, music.id)
 
-            if (response.success && response.new_item_ids.length > 0) {
+            if (isAddMusicResponse(response) && response.success && response.new_item_ids.length > 0) {
                 // Usar o ID real retornado pelo backend
                 const realItemId = response.new_item_ids[0]
 
