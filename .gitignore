@@ -126,7 +126,7 @@ dmypy.json
 
 # Python/Flask runtime (backend)
 backend/uploads/
-#backend/organized/
+backend/organized/
 backend/flask_session/
 backend/logs/
 backend/**/*.log
