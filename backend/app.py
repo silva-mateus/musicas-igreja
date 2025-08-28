@@ -4697,6 +4697,11 @@ def _sync_worker(root_folder_id: str):
         conn.close()
 
         _update_sync_state(in_progress=True, total=len(items), done=0, last_file='', message='Iniciando')
+        app.logger.info(f"🔄 [DRIVE] Iniciando sincronização de {len(items)} arquivos")
+        app.logger.info(f"📁 [DRIVE] ORGANIZED_FOLDER configurado como: {ORGANIZED_FOLDER}")
+
+        files_not_found = 0
+        files_synced = 0
 
         for _id, filename, category, rel_path in items:
             abs_path = to_absolute_organized_path(rel_path)
@@ -4704,8 +4709,12 @@ def _sync_worker(root_folder_id: str):
 
             # Ignorar se arquivo não existe localmente
             if not abs_path or not os.path.exists(abs_path):
+                app.logger.warning(f"⚠️ [DRIVE] Arquivo não encontrado: {abs_path} (rel_path: {rel_path})")
+                files_not_found += 1
                 _update_sync_state(done=SYNC_STATE['done'] + 1)
                 continue
+
+            app.logger.info(f"📄 [DRIVE] Processando: {filename} -> {abs_path}")
 
             # Pasta por categoria
             category_name = category or 'Diversos'
@@ -4714,12 +4723,17 @@ def _sync_worker(root_folder_id: str):
                 # Se já existir, pula
                 if not _file_exists_in_folder(service, cat_folder_id, filename):
                     _upload_file_to_folder(service, cat_folder_id, abs_path, filename)
+                    app.logger.info(f"✅ [DRIVE] Sincronizado: {filename}")
+                    files_synced += 1
+                else:
+                    app.logger.info(f"⏭️ [DRIVE] Já existe no Drive: {filename}")
             except Exception as e:
-                app.logger.error(f"[DRIVE] Erro ao sincronizar '{filename}': {e}")
+                app.logger.error(f"❌ [DRIVE] Erro ao sincronizar '{filename}': {e}")
 
             _update_sync_state(done=SYNC_STATE['done'] + 1)
 
-        _update_sync_state(in_progress=False, message='Concluído')
+        app.logger.info(f"🏁 [DRIVE] Sincronização concluída: {files_synced} enviados, {files_not_found} não encontrados")
+        _update_sync_state(in_progress=False, message=f'Concluído: {files_synced} enviados, {files_not_found} não encontrados')
     except Exception as e:
         app.logger.error(f"[DRIVE] Falha na sincronização: {e}")
         _update_sync_state(in_progress=False, message=f'Erro: {e}')
@@ -4957,9 +4971,37 @@ def api_google_drive_sync():
 @app.route('/api/google-drive/debug', methods=['GET'])
 def api_google_drive_debug():
     """Retorna informações de debug/progresso da sincronização."""
-    with SYNC_LOCK:
-        state = dict(SYNC_STATE)
-    return jsonify({'sync_progress': state})
+    debug_info = {
+        'sync_state': dict(SYNC_STATE),
+        'paths': {
+            'ORGANIZED_FOLDER': ORGANIZED_FOLDER,
+            'organized_folder_exists': os.path.exists(ORGANIZED_FOLDER),
+            'organized_folder_writable': os.access(ORGANIZED_FOLDER, os.W_OK) if os.path.exists(ORGANIZED_FOLDER) else False,
+        },
+        'sample_files': []
+    }
+    
+    # Pegar alguns arquivos de exemplo para verificar caminhos
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, filename, file_path FROM pdf_files LIMIT 5')
+        sample_files = cursor.fetchall()
+        conn.close()
+        
+        for file_id, filename, rel_path in sample_files:
+            abs_path = to_absolute_organized_path(rel_path)
+            debug_info['sample_files'].append({
+                'id': file_id,
+                'filename': filename,
+                'rel_path': rel_path,
+                'abs_path': abs_path,
+                'exists': os.path.exists(abs_path) if abs_path else False
+            })
+    except Exception as e:
+        debug_info['sample_files_error'] = str(e)
+    
+    return jsonify(debug_info)
 
 
 @app.route('/api/google-drive/clear-cache', methods=['POST'])

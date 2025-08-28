@@ -88,6 +88,29 @@ interface PermissionsResult {
     }
 }
 
+interface GoogleDriveDebugResult {
+    sync_state: {
+        in_progress: boolean
+        total: number
+        done: number
+        last_file: string
+        message: string
+    }
+    paths: {
+        ORGANIZED_FOLDER: string
+        organized_folder_exists: boolean
+        organized_folder_writable: boolean
+    }
+    sample_files: Array<{
+        id: number
+        filename: string
+        rel_path: string
+        abs_path: string
+        exists: boolean
+    }>
+    sample_files_error?: string
+}
+
 export default function SettingsPage() {
     const { toast } = useToast()
 
@@ -115,6 +138,10 @@ export default function SettingsPage() {
     const [permissionsResult, setPermissionsResult] = useState<PermissionsResult | null>(null)
     const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
     const [isFixingPermissions, setIsFixingPermissions] = useState(false)
+
+    // Google Drive Debug
+    const [driveDebugResult, setDriveDebugResult] = useState<GoogleDriveDebugResult | null>(null)
+    const [isDriveDebugging, setIsDriveDebugging] = useState(false)
 
     const [isLoading, setIsLoading] = useState(false)
 
@@ -346,6 +373,27 @@ export default function SettingsPage() {
             })
         } finally {
             setIsFixingPermissions(false)
+        }
+    }
+
+    // Google Drive Debug Functions
+    const handleDriveDebug = async () => {
+        setIsDriveDebugging(true)
+        try {
+            const data = await request<GoogleDriveDebugResult>('/admin/google-drive-debug')
+            setDriveDebugResult(data)
+            toast({
+                title: "Debug concluído",
+                description: "Informações de debug do Google Drive obtidas.",
+            })
+        } catch (error: any) {
+            toast({
+                title: "Erro no debug",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsDriveDebugging(false)
         }
     }
 
@@ -808,6 +856,122 @@ export default function SettingsPage() {
                                         </Badge>
                                     )}
                                 </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Google Drive Debug Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Cloud className="h-5 w-5" />
+                            Debug Google Drive
+                        </CardTitle>
+                        <CardDescription>
+                            Verificar configurações e caminhos da sincronização com Google Drive
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleDriveDebug}
+                                disabled={isDriveDebugging}
+                                className="gap-2"
+                            >
+                                {isDriveDebugging ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Search className="h-4 w-4" />
+                                )}
+                                {isDriveDebugging ? 'Verificando...' : 'Verificar Configuração'}
+                            </Button>
+                        </div>
+
+                        {driveDebugResult && (
+                            <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
+                                <h4 className="font-semibold">Configuração de Caminhos:</h4>
+                                <div className="grid gap-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">ORGANIZED_FOLDER:</span>
+                                        <span className="font-mono">{driveDebugResult.paths.ORGANIZED_FOLDER}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Diretório existe:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.paths.organized_folder_exists ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                            )}
+                                            <span>{driveDebugResult.paths.organized_folder_exists ? 'Sim' : 'Não'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Permissão de escrita:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.paths.organized_folder_writable ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                            )}
+                                            <span>{driveDebugResult.paths.organized_folder_writable ? 'Sim' : 'Não'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 className="font-semibold mt-4">Estado da Sincronização:</h4>
+                                <div className="grid gap-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Status:</span>
+                                        <span>{driveDebugResult.sync_state.in_progress ? 'Em andamento' : 'Parado'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Progresso:</span>
+                                        <span>{driveDebugResult.sync_state.done}/{driveDebugResult.sync_state.total}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Último arquivo:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.sync_state.last_file || 'Nenhum'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Mensagem:</span>
+                                        <span>{driveDebugResult.sync_state.message || 'Nenhuma'}</span>
+                                    </div>
+                                </div>
+
+                                {driveDebugResult.sample_files && driveDebugResult.sample_files.length > 0 && (
+                                    <>
+                                        <h4 className="font-semibold mt-4">Arquivos de Exemplo:</h4>
+                                        <div className="space-y-2 text-sm">
+                                            {driveDebugResult.sample_files.map((file) => (
+                                                <div key={file.id} className="border rounded p-2 bg-background">
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="font-medium">{file.filename}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            {file.exists ? (
+                                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                            ) : (
+                                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                                            )}
+                                                            <span className="text-xs">{file.exists ? 'Existe' : 'Não encontrado'}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        <div>Relativo: {file.rel_path}</div>
+                                                        <div>Absoluto: {file.abs_path}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
+                                {driveDebugResult.sample_files_error && (
+                                    <div className="text-sm text-red-600">
+                                        Erro ao verificar arquivos: {driveDebugResult.sample_files_error}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </CardContent>
