@@ -19,6 +19,18 @@ import sys
 
 app = Flask(__name__)
 
+# Configuração para proxy headers (nginx, cloudflare, etc.)
+# Permite que Flask confie nos headers X-Forwarded-* do proxy
+if os.environ.get('TRUST_PROXY_HEADERS', '').lower() in ('1', 'true', 'yes'):
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    # ProxyFix ajusta request.host_url, request.scheme, etc. baseado nos headers do proxy
+    # x_for=1: X-Forwarded-For
+    # x_proto=1: X-Forwarded-Proto (http/https)
+    # x_host=1: X-Forwarded-Host
+    # x_prefix=1: X-Forwarded-Prefix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    print("🔗 [PROXY] ProxyFix habilitado - Flask confiará em headers X-Forwarded-*")
+
 # Configuração CORS para desenvolvimento
 @app.after_request
 def after_request(response):
@@ -4812,16 +4824,29 @@ def api_google_drive_auth_url():
 
         # Permitir configurar uma porta separada para callback OAuth via variável de ambiente
         oauth_port = os.environ.get('OAUTH_CALLBACK_PORT')
-        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost')
+        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST')
         
-        if oauth_port:
-            # Usar porta customizada para callback (ex: para tunnel OAuth)
+        # Debug: Mostrar headers recebidos
+        app.logger.info(f"🔍 [OAUTH DEBUG] Headers recebidos:")
+        app.logger.info(f"  - request.host: {request.host}")
+        app.logger.info(f"  - request.host_url: {request.host_url}")
+        app.logger.info(f"  - request.scheme: {request.scheme}")
+        app.logger.info(f"  - X-Forwarded-Proto: {request.headers.get('X-Forwarded-Proto')}")
+        app.logger.info(f"  - X-Forwarded-Host: {request.headers.get('X-Forwarded-Host')}")
+        app.logger.info(f"  - X-Forwarded-For: {request.headers.get('X-Forwarded-For')}")
+        
+        if oauth_host and oauth_port:
+            # Configuração completa: host + porta
             redirect_uri = f"{oauth_host}:{oauth_port}/api/google-drive/callback"
-            app.logger.info(f"🔗 [OAUTH] Usando callback customizado: {redirect_uri}")
+            app.logger.info(f"🔗 [OAUTH] Usando callback host+porta: {redirect_uri}")
+        elif oauth_host:
+            # Apenas host configurado (sem porta - para HTTPS padrão)
+            redirect_uri = f"{oauth_host}/api/google-drive/callback"
+            app.logger.info(f"🔗 [OAUTH] Usando callback host: {redirect_uri}")
         else:
-            # Usar host padrão da requisição
+            # Usar host padrão da requisição (com ProxyFix se configurado)
             redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
-            app.logger.info(f"🔗 [OAUTH] Usando callback padrão: {redirect_uri}")
+            app.logger.info(f"🔗 [OAUTH] Usando callback da requisição: {redirect_uri}")
             
         scopes = ['https://www.googleapis.com/auth/drive']
 
@@ -4860,14 +4885,25 @@ def api_google_drive_callback():
         
         # Usar a mesma configuração de porta para callback
         oauth_port = os.environ.get('OAUTH_CALLBACK_PORT')
-        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost')
+        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST')
         
-        if oauth_port:
+        # Debug: Mostrar headers recebidos no callback
+        app.logger.info(f"🔍 [CALLBACK DEBUG] Headers recebidos:")
+        app.logger.info(f"  - request.host: {request.host}")
+        app.logger.info(f"  - request.host_url: {request.host_url}")
+        app.logger.info(f"  - request.scheme: {request.scheme}")
+        app.logger.info(f"  - X-Forwarded-Proto: {request.headers.get('X-Forwarded-Proto')}")
+        app.logger.info(f"  - X-Forwarded-Host: {request.headers.get('X-Forwarded-Host')}")
+        
+        if oauth_host and oauth_port:
             redirect_uri = f"{oauth_host}:{oauth_port}/api/google-drive/callback"
-            app.logger.info(f"🔗 [CALLBACK] Usando callback customizado: {redirect_uri}")
+            app.logger.info(f"🔗 [CALLBACK] Usando callback host+porta: {redirect_uri}")
+        elif oauth_host:
+            redirect_uri = f"{oauth_host}/api/google-drive/callback"
+            app.logger.info(f"🔗 [CALLBACK] Usando callback host: {redirect_uri}")
         else:
             redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
-            app.logger.info(f"🔗 [CALLBACK] Usando callback padrão: {redirect_uri}")
+            app.logger.info(f"🔗 [CALLBACK] Usando callback da requisição: {redirect_uri}")
             
         scopes = ['https://www.googleapis.com/auth/drive']
         flow = Flow.from_client_secrets_file(
@@ -5006,8 +5042,10 @@ def api_google_drive_debug():
         },
         'oauth_config': {
             'callback_port': os.environ.get('OAUTH_CALLBACK_PORT'),
-            'callback_host': os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost'),
-            'using_custom_callback': bool(os.environ.get('OAUTH_CALLBACK_PORT')),
+            'callback_host': os.environ.get('OAUTH_CALLBACK_HOST'),
+            'using_custom_callback': bool(os.environ.get('OAUTH_CALLBACK_HOST')),
+            'allow_http': os.environ.get('OAUTH_ALLOW_HTTP', '').lower() in ('1', 'true', 'yes'),
+            'trust_proxy': os.environ.get('TRUST_PROXY_HEADERS', '').lower() in ('1', 'true', 'yes'),
             'token_exists': any(os.path.exists(p) for p in [
                 os.path.join(os.path.dirname(__file__), 'token.json'),
                 os.path.join(os.getcwd(), 'token.json'),
@@ -5018,6 +5056,14 @@ def api_google_drive_debug():
                 os.path.join(os.getcwd(), 'credentials.json'),
                 '/app/credentials.json',
             ])
+        },
+        'proxy_headers': {
+            'x_forwarded_proto': request.headers.get('X-Forwarded-Proto'),
+            'x_forwarded_host': request.headers.get('X-Forwarded-Host'),
+            'x_forwarded_for': request.headers.get('X-Forwarded-For'),
+            'host': request.host,
+            'scheme': request.scheme,
+            'host_url': request.host_url
         },
         'sample_files': []
     }
