@@ -103,10 +103,20 @@ interface GoogleDriveDebugResult {
     }
     oauth_config: {
         callback_port: string | null
-        callback_host: string
+        callback_host: string | null
         using_custom_callback: boolean
+        allow_http: boolean
+        trust_proxy: boolean
         token_exists: boolean
         credentials_exists: boolean
+    }
+    proxy_headers: {
+        x_forwarded_proto: string | null
+        x_forwarded_host: string | null
+        x_forwarded_for: string | null
+        host: string
+        scheme: string
+        host_url: string
     }
     sample_files: Array<{
         id: number
@@ -973,6 +983,56 @@ export default function SettingsPage() {
                                             )}
                                             <span>{driveDebugResult.oauth_config.token_exists ? 'Presente' : 'Ausente'}</span>
                                         </div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Permitir HTTP:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.oauth_config.allow_http ? (
+                                                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                            ) : (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            )}
+                                            <span>{driveDebugResult.oauth_config.allow_http ? 'Sim (teste)' : 'Não (HTTPS)'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Confiar proxy:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.oauth_config.trust_proxy ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-gray-500" />
+                                            )}
+                                            <span>{driveDebugResult.oauth_config.trust_proxy ? 'Sim' : 'Não'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 className="font-semibold mt-4">Headers de Proxy:</h4>
+                                <div className="grid gap-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Scheme detectado:</span>
+                                        <span className="font-mono">{driveDebugResult.proxy_headers.scheme}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">Host detectado:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.host}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">URL completa:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.host_url}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">X-Forwarded-Proto:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_proto || 'Não enviado'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">X-Forwarded-Host:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_host || 'Não enviado'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-medium">X-Forwarded-For:</span>
+                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_for || 'Não enviado'}</span>
                                     </div>
                                 </div>
 
