@@ -94,10 +94,13 @@ def to_absolute_organized_path(path: str) -> str:
         pass
     return path
 
-# OAuth (Google) - permitir HTTP em desenvolvimento local
-if os.environ.get('FLASK_ENV', 'development') != 'production':
+# OAuth (Google) - configuração de transporte
+# Permitir HTTP em desenvolvimento OU quando explicitamente configurado
+if (os.environ.get('FLASK_ENV', 'development') != 'production' or 
+    os.environ.get('OAUTH_ALLOW_HTTP', '').lower() in ('1', 'true', 'yes')):
     os.environ.setdefault('OAUTHLIB_INSECURE_TRANSPORT', '1')
     os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
+    print("🔓 [OAUTH] Transporte HTTP habilitado para OAuth (desenvolvimento/teste)")
 
 # Setup logging to daily log file
 def setup_logging():

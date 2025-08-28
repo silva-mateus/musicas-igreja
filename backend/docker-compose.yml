@@ -18,6 +18,7 @@ services:
       # Configuração OAuth Google Drive (opcional)
       - OAUTH_CALLBACK_PORT=${OAUTH_CALLBACK_PORT:-} # Porta separada para callback OAuth (ex: 5002)
       - OAUTH_CALLBACK_HOST=${OAUTH_CALLBACK_HOST:-http://localhost} # Host para callback OAuth
+      - OAUTH_ALLOW_HTTP=${OAUTH_ALLOW_HTTP:-} # Permitir HTTP para OAuth (apenas teste/desenvolvimento)
     volumes:
       # Volume para persistir os dados da aplicação (banco de dados, uploads, logs)
       - musicas_data:/data:rw
@@ -51,6 +52,7 @@ services:
       # Configuração OAuth exclusiva para este serviço
       - OAUTH_CALLBACK_PORT=${OAUTH_CALLBACK_PORT:-5002}
       - OAUTH_CALLBACK_HOST=${OAUTH_CALLBACK_HOST:-http://localhost}
+      - OAUTH_ALLOW_HTTP=${OAUTH_ALLOW_HTTP:-} # Permitir HTTP para OAuth (apenas teste/desenvolvimento)
       # Modo callback-only (apenas para OAuth)
       - OAUTH_ONLY_MODE=true
     volumes:

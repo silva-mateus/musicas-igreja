@@ -21,9 +21,14 @@ Crie um arquivo `.env` com as configurações OAuth:
 OAUTH_CALLBACK_PORT=5002
 
 # Host para callback OAuth (ajuste conforme seu tunnel)
-OAUTH_CALLBACK_HOST=http://localhost
+OAUTH_CALLBACK_HOST=https://oauth.networkmat.uk
+# Para desenvolvimento local: http://localhost
 # Para produção: https://seu-dominio.com
 # Para ngrok: https://abc123.ngrok.io
+
+# Permitir HTTP para OAuth (APENAS para teste/desenvolvimento)
+# ATENÇÃO: Google exige HTTPS em produção!
+OAUTH_ALLOW_HTTP=true
 
 # Chave secreta (mesma do serviço principal)
 SECRET_KEY=musicas-igreja-secret-key-2024
@@ -85,14 +90,72 @@ Configure no Google Cloud Console:
 3. **Edite** seu OAuth 2.0 Client ID
 4. **Adicione Redirect URI:**
 
-**Para serviço separado:**
+**Para domínio com HTTPS (RECOMENDADO):**
+```
+https://oauth.networkmat.uk/api/google-drive/callback
+```
+
+**Para tunnel ngrok:**
 ```
 https://abc123.ngrok.io/api/google-drive/callback
 ```
 
-**Para sistema principal:**
+**Para desenvolvimento local (apenas teste):**
 ```
-https://def456.ngrok.io/api/google-drive/callback
+http://localhost:5002/api/google-drive/callback
+```
+
+## ⚠️ HTTPS vs HTTP
+
+### 🔒 HTTPS (Produção - OBRIGATÓRIO)
+O Google **exige HTTPS** para OAuth2 em produção por segurança.
+
+**Configuração para HTTPS:**
+```bash
+# .env
+OAUTH_CALLBACK_HOST=https://oauth.networkmat.uk
+OAUTH_CALLBACK_PORT=  # Vazio para usar porta padrão HTTPS (443)
+OAUTH_ALLOW_HTTP=     # Vazio (HTTPS é padrão)
+```
+
+### 🔓 HTTP (Desenvolvimento/Teste - TEMPORÁRIO)
+Para teste local ou desenvolvimento, você pode forçar HTTP:
+
+**Configuração para HTTP:**
+```bash
+# .env
+OAUTH_CALLBACK_HOST=http://localhost
+OAUTH_CALLBACK_PORT=5002
+OAUTH_ALLOW_HTTP=true  # ⚠️ FORÇA HTTP (apenas teste!)
+```
+
+**No Google Console, adicione:**
+```
+http://localhost:5002/api/google-drive/callback
+```
+
+### 🛡️ Tunnel com HTTPS (Recomendado para Teste)
+Use um tunnel que forneça HTTPS automático:
+
+#### Ngrok (HTTPS automático):
+```bash
+ngrok http 5002
+# Resultado: https://abc123.ngrok.io
+
+# .env
+OAUTH_CALLBACK_HOST=https://abc123.ngrok.io
+OAUTH_CALLBACK_PORT=  # Vazio
+OAUTH_ALLOW_HTTP=     # Vazio (HTTPS)
+```
+
+#### Cloudflare Tunnel:
+```bash
+cloudflared tunnel --hostname oauth.meusite.com --url http://localhost:5002
+
+# .env
+OAUTH_CALLBACK_HOST=https://oauth.meusite.com
+OAUTH_CALLBACK_PORT=  # Vazio
+OAUTH_ALLOW_HTTP=     # Vazio (HTTPS)
 ```
 
 ## 🔧 Como Funciona
@@ -120,6 +183,40 @@ Quando configurado corretamente, você verá nos logs:
 ```
 
 ## 🚨 Troubleshooting
+
+### Erro: "OAuth 2 MUST utilize https"
+```json
+{
+  "error": "Erro no callback: (insecure_transport) OAuth 2 MUST utilize https.",
+  "success": false
+}
+```
+
+**Soluções:**
+
+#### ✅ Solução 1: Usar HTTPS (Recomendado)
+```bash
+# Configure seu tunnel/domínio com HTTPS
+OAUTH_CALLBACK_HOST=https://oauth.networkmat.uk
+OAUTH_CALLBACK_PORT=  # Vazio
+OAUTH_ALLOW_HTTP=     # Vazio
+```
+
+#### ✅ Solução 2: Forçar HTTP (Apenas Teste)
+```bash
+# Adicione ao .env
+OAUTH_ALLOW_HTTP=true
+
+# Reinicie o container
+docker-compose down && docker-compose up -d
+```
+
+#### ✅ Solução 3: Usar Ngrok (HTTPS automático)
+```bash
+# Ngrok fornece HTTPS automático
+ngrok http 5002
+# Use a URL https://abc123.ngrok.io no .env
+```
 
 ### Erro: redirect_uri_mismatch
 - ✅ Verifique se a URI no Google Cloud Console está correta
