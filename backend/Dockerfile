@@ -45,6 +45,7 @@ RUN chmod +x /entrypoint.sh
 COPY --chown=appuser:appuser . .
 
 # Criar diretórios padrão em /data (compatível com volume montado)
+# se não existir, cria os diretórios e define as permissões
 RUN mkdir -p /data/logs /data/uploads /data/organized && \
     chown -R appuser:appuser /data /app && \
     chmod 755 /data /data/logs /data/uploads /data/organized /app
