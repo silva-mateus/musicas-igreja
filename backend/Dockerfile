@@ -46,8 +46,8 @@ COPY --chown=appuser:appuser . .
 
 # Criar diretórios padrão em /data (compatível com volume montado)
 RUN mkdir -p /data/logs /data/uploads /data/organized && \
-    chown -R appuser:appuser /data && \
-    chmod 755 /data /data/logs /data/uploads /data/organized
+    chown -R appuser:appuser /data /app && \
+    chmod 755 /data /data/logs /data/uploads /data/organized /app
 
 # Permitir ao appuser usar sudo para ajustar permissões se necessário
 RUN echo "appuser ALL=(ALL) NOPASSWD: /bin/chown, /bin/chmod" >> /etc/sudoers

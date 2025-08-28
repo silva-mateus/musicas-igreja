@@ -62,7 +62,3 @@ networks:
 volumes:
   musicas_data:
     driver: local # Define um volume local para persistir os dados da aplicação
-    driver_opts:
-      type: none
-      o: bind
-      device: ${PWD}/data  # Monta diretório local ./data para persistência
