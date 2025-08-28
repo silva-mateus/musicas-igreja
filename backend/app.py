@@ -2828,17 +2828,29 @@ def replace_pdf(file_id):
             UPDATE pdf_files 
             SET filename = ?, file_path = ?, file_size = ?, file_hash = ?, page_count = ?
             WHERE id = ?
-        ''', (new_filename, new_file_path, new_file_size, new_file_hash, pdf_info['page_count'], file_id))
+        ''', (new_filename, to_relative_organized_path(new_file_path), new_file_size, new_file_hash, pdf_info['page_count'], file_id))
         
         cursor.execute('COMMIT')
         
         # ETAPA 5: Remover arquivo antigo (após sucesso no DB)
-        if old_file_path and os.path.exists(old_file_path) and old_file_path != new_file_path:
-            try:
-                os.remove(old_file_path)
-                app.logger.info(f"Arquivo antigo removido: {old_file_path}")
-            except Exception as e:
-                app.logger.warning(f"Erro ao remover arquivo antigo: {str(e)}")
+        if old_file_path:
+            # Converter para caminho absoluto caso seja relativo
+            old_file_path_abs = to_absolute_organized_path(old_file_path)
+            app.logger.info(f"🗑️ [REPLACE] Tentando remover arquivo antigo: {old_file_path_abs}")
+            
+            # Só tentar remover se for arquivo diferente do novo
+            if old_file_path_abs != new_file_path:
+                if os.path.exists(old_file_path_abs):
+                    try:
+                        os.remove(old_file_path_abs)
+                        app.logger.info(f"✅ [REPLACE] Arquivo antigo removido: {old_file_path_abs}")
+                    except Exception as e:
+                        app.logger.warning(f"⚠️ [REPLACE] Falha ao remover arquivo antigo (ignorado): {str(e)}")
+                        # IMPORTANTE: Não falhar a operação se não conseguir remover o arquivo antigo
+                else:
+                    app.logger.warning(f"⚠️ [REPLACE] Arquivo antigo não encontrado (já foi removido?): {old_file_path_abs}")
+            else:
+                app.logger.info(f"⏭️ [REPLACE] Arquivo novo é o mesmo que o antigo, não removendo")
         
         app.logger.info(f"PDF substituído com sucesso para música ID {file_id}: {old_filename} -> {new_filename}")
         
@@ -5743,6 +5755,116 @@ def api_admin_fix_permissions():
             results[name]['error'] = str(e)
 
     return jsonify(results)
+
+
+@app.route('/api/admin/check-orphaned-files', methods=['GET'])
+def api_admin_check_orphaned_files():
+    """Verificar arquivos no banco que não existem fisicamente."""
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, filename, file_path, song_name, artist
+            FROM pdf_files
+            ORDER BY id
+        ''')
+        
+        all_files = cursor.fetchall()
+        orphaned_files = []
+        
+        for file_id, filename, file_path, song_name, artist in all_files:
+            abs_path = to_absolute_organized_path(file_path)
+            
+            if not os.path.exists(abs_path):
+                orphaned_files.append({
+                    'id': file_id,
+                    'filename': filename,
+                    'file_path': file_path,
+                    'abs_path': abs_path,
+                    'song_name': song_name,
+                    'artist': artist
+                })
+        
+        conn.close()
+        
+        app.logger.info(f"🔍 [ORPHAN_CHECK] Verificados {len(all_files)} arquivos, {len(orphaned_files)} órfãos encontrados")
+        
+        return jsonify({
+            'success': True,
+            'total_files': len(all_files),
+            'orphaned_count': len(orphaned_files),
+            'orphaned_files': orphaned_files
+        })
+        
+    except Exception as e:
+        app.logger.error(f"❌ [ORPHAN_CHECK] Erro: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/admin/fix-orphaned-files', methods=['POST'])
+def api_admin_fix_orphaned_files():
+    """Corrigir arquivos órfãos (remover do banco ou marcar como órfãos)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        action = data.get('action', 'remove')  # 'remove' ou 'mark'
+        file_ids = data.get('file_ids', [])
+        
+        if not file_ids:
+            return jsonify({'success': False, 'error': 'Nenhum arquivo especificado'}), 400
+        
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        processed_files = []
+        
+        if action == 'remove':
+            # Remover arquivos órfãos do banco de dados
+            for file_id in file_ids:
+                try:
+                    cursor.execute('DELETE FROM pdf_files WHERE id = ?', (file_id,))
+                    processed_files.append({'id': file_id, 'action': 'removed', 'success': True})
+                except Exception as e:
+                    processed_files.append({'id': file_id, 'action': 'remove_failed', 'success': False, 'error': str(e)})
+        
+        elif action == 'mark':
+            # Marcar arquivos como órfãos (adicionar observação)
+            for file_id in file_ids:
+                try:
+                    cursor.execute('''
+                        UPDATE pdf_files 
+                        SET description = COALESCE(description, '') || ' [ARQUIVO ÓRFÃO - ARQUIVO FÍSICO NÃO ENCONTRADO]'
+                        WHERE id = ?
+                    ''', (file_id,))
+                    processed_files.append({'id': file_id, 'action': 'marked', 'success': True})
+                except Exception as e:
+                    processed_files.append({'id': file_id, 'action': 'mark_failed', 'success': False, 'error': str(e)})
+        
+        conn.commit()
+        conn.close()
+        
+        successful = len([f for f in processed_files if f['success']])
+        
+        app.logger.info(f"✅ [ORPHAN_FIX] Processados {len(file_ids)} arquivos, {successful} com sucesso (ação: {action})")
+        
+        return jsonify({
+            'success': True,
+            'action': action,
+            'processed_count': len(file_ids),
+            'successful_count': successful,
+            'processed_files': processed_files
+        })
+        
+    except Exception as e:
+        app.logger.error(f"❌ [ORPHAN_FIX] Erro: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 
 @app.route('/health')
 def health_check():
