@@ -4807,7 +4807,19 @@ def api_google_drive_auth_url():
         if not cred_path:
             return jsonify({'success': False, 'error': 'credentials.json não encontrado no servidor'}), 200
 
-        redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+        # Permitir configurar uma porta separada para callback OAuth via variável de ambiente
+        oauth_port = os.environ.get('OAUTH_CALLBACK_PORT')
+        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost')
+        
+        if oauth_port:
+            # Usar porta customizada para callback (ex: para tunnel OAuth)
+            redirect_uri = f"{oauth_host}:{oauth_port}/api/google-drive/callback"
+            app.logger.info(f"🔗 [OAUTH] Usando callback customizado: {redirect_uri}")
+        else:
+            # Usar host padrão da requisição
+            redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+            app.logger.info(f"🔗 [OAUTH] Usando callback padrão: {redirect_uri}")
+            
         scopes = ['https://www.googleapis.com/auth/drive']
 
         flow = Flow.from_client_secrets_file(
@@ -4842,7 +4854,18 @@ def api_google_drive_callback():
             return jsonify({'success': False, 'error': 'credentials.json não encontrado'}), 400
 
         state = session.get('google_oauth_state')
-        redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+        
+        # Usar a mesma configuração de porta para callback
+        oauth_port = os.environ.get('OAUTH_CALLBACK_PORT')
+        oauth_host = os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost')
+        
+        if oauth_port:
+            redirect_uri = f"{oauth_host}:{oauth_port}/api/google-drive/callback"
+            app.logger.info(f"🔗 [CALLBACK] Usando callback customizado: {redirect_uri}")
+        else:
+            redirect_uri = request.host_url.rstrip('/') + '/api/google-drive/callback'
+            app.logger.info(f"🔗 [CALLBACK] Usando callback padrão: {redirect_uri}")
+            
         scopes = ['https://www.googleapis.com/auth/drive']
         flow = Flow.from_client_secrets_file(
             cred_path,
@@ -4977,6 +5000,21 @@ def api_google_drive_debug():
             'ORGANIZED_FOLDER': ORGANIZED_FOLDER,
             'organized_folder_exists': os.path.exists(ORGANIZED_FOLDER),
             'organized_folder_writable': os.access(ORGANIZED_FOLDER, os.W_OK) if os.path.exists(ORGANIZED_FOLDER) else False,
+        },
+        'oauth_config': {
+            'callback_port': os.environ.get('OAUTH_CALLBACK_PORT'),
+            'callback_host': os.environ.get('OAUTH_CALLBACK_HOST', 'http://localhost'),
+            'using_custom_callback': bool(os.environ.get('OAUTH_CALLBACK_PORT')),
+            'token_exists': any(os.path.exists(p) for p in [
+                os.path.join(os.path.dirname(__file__), 'token.json'),
+                os.path.join(os.getcwd(), 'token.json'),
+                '/app/token.json',
+            ]),
+            'credentials_exists': any(os.path.exists(p) for p in [
+                os.path.join(os.path.dirname(__file__), 'credentials.json'),
+                os.path.join(os.getcwd(), 'credentials.json'),
+                '/app/credentials.json',
+            ])
         },
         'sample_files': []
     }

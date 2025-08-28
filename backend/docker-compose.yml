@@ -15,6 +15,9 @@ services:
       - UPLOAD_FOLDER=/data/uploads
       - ORGANIZED_FOLDER=/app/organized
       - LOG_FOLDER=/data/logs
+      # Configuração OAuth Google Drive (opcional)
+      - OAUTH_CALLBACK_PORT=${OAUTH_CALLBACK_PORT:-} # Porta separada para callback OAuth (ex: 5002)
+      - OAUTH_CALLBACK_HOST=${OAUTH_CALLBACK_HOST:-http://localhost} # Host para callback OAuth
     volumes:
       # Volume para persistir os dados da aplicação (banco de dados, uploads, logs)
       - musicas_data:/data:rw
@@ -30,6 +33,40 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s # Tempo para a aplicação iniciar antes de começar a verificar
+
+  # Serviço OAuth separado para callback do Google (opcional)
+  musicas-oauth:
+    image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja:latest
+    container_name: musicas-igreja-oauth
+    restart: unless-stopped
+    ports:
+      - "${OAUTH_CALLBACK_PORT:-5002}:5000" # Porta OAuth separada (padrão 5002)
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_PATH=/data/pdf_organizer.db
+      - UPLOAD_FOLDER=/data/uploads
+      - ORGANIZED_FOLDER=/app/organized
+      - LOG_FOLDER=/data/logs
+      # Configuração OAuth exclusiva para este serviço
+      - OAUTH_CALLBACK_PORT=${OAUTH_CALLBACK_PORT:-5002}
+      - OAUTH_CALLBACK_HOST=${OAUTH_CALLBACK_HOST:-http://localhost}
+      # Modo callback-only (apenas para OAuth)
+      - OAUTH_ONLY_MODE=true
+    volumes:
+      - musicas_data:/data:rw
+      - ./organized:/app/organized:rw
+      - ./config:/app/config:ro
+    networks:
+      - musicas-network
+    profiles:
+      - oauth # Perfil opcional, ative com: docker-compose --profile oauth up
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
     image: ghcr.io/${GHCR_NAMESPACE}/musicas-igreja-frontend:latest

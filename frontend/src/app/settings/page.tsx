@@ -101,6 +101,13 @@ interface GoogleDriveDebugResult {
         organized_folder_exists: boolean
         organized_folder_writable: boolean
     }
+    oauth_config: {
+        callback_port: string | null
+        callback_host: string
+        using_custom_callback: boolean
+        token_exists: boolean
+        credentials_exists: boolean
+    }
     sample_files: Array<{
         id: number
         filename: string
@@ -916,6 +923,55 @@ export default function SettingsPage() {
                                                 <AlertCircle className="h-4 w-4 text-red-500" />
                                             )}
                                             <span>{driveDebugResult.paths.organized_folder_writable ? 'Sim' : 'Não'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h4 className="font-semibold mt-4">Configuração OAuth:</h4>
+                                <div className="grid gap-2 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Callback customizado:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.oauth_config.using_custom_callback ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-gray-500" />
+                                            )}
+                                            <span>{driveDebugResult.oauth_config.using_custom_callback ? 'Sim' : 'Não (padrão)'}</span>
+                                        </div>
+                                    </div>
+                                    {driveDebugResult.oauth_config.using_custom_callback && (
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">Porta OAuth:</span>
+                                                <span className="font-mono">{driveDebugResult.oauth_config.callback_port}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">Host OAuth:</span>
+                                                <span className="font-mono text-xs">{driveDebugResult.oauth_config.callback_host}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Credenciais OAuth:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.oauth_config.credentials_exists ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                            )}
+                                            <span>{driveDebugResult.oauth_config.credentials_exists ? 'Presente' : 'Ausente'}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-medium">Token OAuth:</span>
+                                        <div className="flex items-center gap-1">
+                                            {driveDebugResult.oauth_config.token_exists ? (
+                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                            ) : (
+                                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                            )}
+                                            <span>{driveDebugResult.oauth_config.token_exists ? 'Presente' : 'Ausente'}</span>
                                         </div>
                                     </div>
                                 </div>
