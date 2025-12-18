@@ -214,10 +214,10 @@ export function MusicTable({
                                         </div>
                                     </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="max-w-[150px] sm:max-w-[200px]">
                                     {music.artist ? (
-                                        <div className="flex items-center gap-2">
-                                            <User className="h-4 w-4 text-muted-foreground" />
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
                                             <span className="truncate">{music.artist}</span>
                                         </div>
                                     ) : (

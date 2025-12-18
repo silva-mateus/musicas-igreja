@@ -151,131 +151,137 @@ export default function MusicDetailsPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header + ações */}
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-4">
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/music">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Voltar
-                                </Link>
-                            </Button>
-                            <div className="text-sm text-muted-foreground">
-                                <Link href="/music" className="hover:text-primary">Músicas</Link>
-                                <span className="mx-2">/</span>
-                                <span className="underline">{music.title}</span>
-                            </div>
-                        </div>
-                        <h1 className="text-3xl font-bold mt-4">{music.title}</h1>
-                        {music.artist && (
-                            <p className="text-xl text-muted-foreground flex items-center gap-2 mt-2">
-                                <User className="h-5 w-5" />
-                                {music.artist}
-                            </p>
-                        )}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {music.categories && music.categories.length > 0 ? (
-                                music.categories.map((cat, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-sm">
-                                        <Tag className="h-3 w-3 mr-1" />{cat}
-                                    </Badge>
-                                ))
-                            ) : music.category ? (
-                                <Badge variant="secondary" className="text-sm">
-                                    <Tag className="h-3 w-3 mr-1" />{music.category}
-                                </Badge>
-                            ) : null}
-
-                            {music.liturgical_times && music.liturgical_times.length > 0 ? (
-                                music.liturgical_times.map((time, idx) => (
-                                    <Badge key={idx} variant="outline" className="text-sm">
-                                        <Calendar className="h-3 w-3 mr-1" />{time}
-                                    </Badge>
-                                ))
-                            ) : music.liturgical_time ? (
-                                <Badge variant="outline" className="text-sm">
-                                    <Calendar className="h-3 w-3 mr-1" />{music.liturgical_time}
-                                </Badge>
-                            ) : null}
-
-                            {music.musical_key && (
-                                <Badge variant="outline" className="text-sm">
-                                    <Music className="h-3 w-3 mr-1" />Tom: {music.musical_key}
-                                </Badge>
-                            )}
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <Button variant="outline" size="sm" asChild className="self-start">
+                            <Link href="/music">
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Voltar
+                            </Link>
+                        </Button>
+                        <div className="text-sm text-muted-foreground truncate">
+                            <Link href="/music" className="hover:text-primary">Músicas</Link>
+                            <span className="mx-2">/</span>
+                            <span className="underline truncate">{music.title}</span>
                         </div>
                     </div>
-                    <TooltipProvider>
-                        <div className="flex flex-wrap gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" onClick={() => window.open(`/api/files/${music.id}/stream`, '_blank')}>
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        Visualizar PDF
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Abrir PDF em nova aba</p>
-                                </TooltipContent>
-                            </Tooltip>
+                    
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl sm:text-3xl font-bold break-words">{music.title}</h1>
+                            {music.artist && (
+                                <p className="text-lg sm:text-xl text-muted-foreground flex items-center gap-2 mt-2">
+                                    <User className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                                    <span className="truncate">{music.artist}</span>
+                                </p>
+                            )}
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {music.categories && music.categories.length > 0 ? (
+                                    music.categories.map((cat, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs sm:text-sm">
+                                            <Tag className="h-3 w-3 mr-1 shrink-0" />{cat}
+                                        </Badge>
+                                    ))
+                                ) : music.category ? (
+                                    <Badge variant="secondary" className="text-xs sm:text-sm">
+                                        <Tag className="h-3 w-3 mr-1 shrink-0" />{music.category}
+                                    </Badge>
+                                ) : null}
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" onClick={handleDownload}>
-                                        <Download className="h-4 w-4 mr-2" />
-                                        Download
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Baixar arquivo PDF</p>
-                                </TooltipContent>
-                            </Tooltip>
+                                {music.liturgical_times && music.liturgical_times.length > 0 ? (
+                                    music.liturgical_times.map((time, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs sm:text-sm">
+                                            <Calendar className="h-3 w-3 mr-1 shrink-0" />{time}
+                                        </Badge>
+                                    ))
+                                ) : music.liturgical_time ? (
+                                    <Badge variant="outline" className="text-xs sm:text-sm">
+                                        <Calendar className="h-3 w-3 mr-1 shrink-0" />{music.liturgical_time}
+                                    </Badge>
+                                ) : null}
 
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" asChild>
-                                        <Link href={`/music/${music.id}/edit`}>
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Editar
-                                        </Link>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Editar informações da música</p>
-                                </TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={handleDelete}>
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Excluir
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Excluir esta música</p>
-                                </TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <AddToListModal
-                                        musicId={music.id}
-                                        musicTitle={music.title || music.original_name}
-                                        trigger={
-                                            <Button variant="default" className="gap-2">
-                                                <Plus className="h-4 w-4" />
-                                                Adicionar à lista
-                                            </Button>
-                                        }
-                                    />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Adicionar música a uma lista</p>
-                                </TooltipContent>
-                            </Tooltip>
+                                {music.musical_key && (
+                                    <Badge variant="outline" className="text-xs sm:text-sm">
+                                        <Music className="h-3 w-3 mr-1 shrink-0" />Tom: {music.musical_key}
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
-                    </TooltipProvider>
+                        
+                        {/* Actions - Desktop: inline, Mobile: grid */}
+                        <TooltipProvider>
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 shrink-0">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="sm" onClick={() => window.open(`/api/files/${music.id}/stream`, '_blank')} className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                            <Eye className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Visualizar PDF</span>
+                                            <span className="sm:hidden">Ver PDF</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Abrir PDF em nova aba</p>
+                                    </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="sm" onClick={handleDownload} className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                            <Download className="h-4 w-4" />
+                                            <span>Download</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Baixar arquivo PDF</p>
+                                    </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                            <Link href={`/music/${music.id}/edit`}>
+                                                <Edit className="h-4 w-4" />
+                                                <span>Editar</span>
+                                            </Link>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Editar informações da música</p>
+                                    </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 gap-1 sm:gap-2 text-xs sm:text-sm" onClick={handleDelete}>
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Excluir</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Excluir esta música</p>
+                                    </TooltipContent>
+                                </Tooltip>
+
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <AddToListModal
+                                            musicId={music.id}
+                                            musicTitle={music.title || music.original_name}
+                                            trigger={
+                                                <Button variant="default" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
+                                                    <Plus className="h-4 w-4" />
+                                                    <span>Adicionar à lista</span>
+                                                </Button>
+                                            }
+                                        />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Adicionar música a uma lista</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </TooltipProvider>
+                    </div>
                 </div>
 
                 {/* Conteúdo em 2 colunas: PDF + info à direita */}
@@ -348,14 +354,28 @@ export default function MusicDetailsPage() {
                         <Card>
                             <CardHeader><CardTitle>Informações do Arquivo</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="flex items-center justify-between"><span className="text-sm font-medium">Nome do arquivo:</span><span className="text-sm text-muted-foreground truncate ml-2">{music.original_name}</span></div>
-                                <div className="flex items-center justify-between"><span className="text-sm font-medium">Tamanho:</span><span className="text-sm text-muted-foreground">{(music.file_size / 1024).toFixed(2)} KB</span></div>
-                                <div className="flex items-center justify-between"><span className="text-sm font-medium">Páginas:</span><span className="text-sm text-muted-foreground">{music.pages}</span></div>
-                                <div className="flex items-center justify-between"><span className="text-sm font-medium">Upload:</span><span className="text-sm text-muted-foreground">{new Date(music.upload_date).toLocaleDateString('pt-BR')}</span></div>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                                    <span className="text-sm font-medium shrink-0">Nome do arquivo:</span>
+                                    <span className="text-sm text-muted-foreground break-all sm:text-right">{music.original_name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">Tamanho:</span>
+                                    <span className="text-sm text-muted-foreground">{(music.file_size / 1024).toFixed(2)} KB</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">Páginas:</span>
+                                    <span className="text-sm text-muted-foreground">{music.pages}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">Upload:</span>
+                                    <span className="text-sm text-muted-foreground">{new Date(music.upload_date).toLocaleDateString('pt-BR')}</span>
+                                </div>
                                 {music.youtube_link && (
                                     <div>
                                         <span className="text-sm font-medium block mb-1">YouTube:</span>
-                                        <a href={music.youtube_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"><ExternalLink className="h-3 w-3" /> Abrir no YouTube</a>
+                                        <a href={music.youtube_link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 break-all">
+                                            <ExternalLink className="h-3 w-3 shrink-0" /> Abrir no YouTube
+                                        </a>
                                     </div>
                                 )}
                             </CardContent>

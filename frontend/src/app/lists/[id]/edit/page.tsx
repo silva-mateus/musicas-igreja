@@ -362,53 +362,56 @@ export default function EditListPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link href={`/lists/${list.id}`}>
-                                            <ArrowLeft className="h-4 w-4 mr-2" />
-                                            Voltar
-                                        </Link>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Voltar para visualização da lista</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        <div>
-                            <h1 className="text-3xl font-bold flex items-center gap-2">
-                                <List className="h-8 w-8 text-primary" />
-                                Editar Lista
-                            </h1>
-                            <p className="text-muted-foreground mt-1">
-                                Modifique as informações e músicas da lista
-                            </p>
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="outline" size="sm" asChild className="self-start shrink-0">
+                                            <Link href={`/lists/${list.id}`}>
+                                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                                Voltar
+                                            </Link>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Voltar para visualização da lista</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                            <div className="min-w-0">
+                                <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                                    <List className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+                                    <span className="truncate">Editar Lista</span>
+                                </h1>
+                                <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                                    Modifique as informações e músicas da lista
+                                </p>
+                            </div>
                         </div>
-                    </div>
 
-                    <TooltipProvider>
-                        <div className="flex gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        onClick={handleSave}
-                                        disabled={isSaving || !name.trim()}
-                                        className="gap-2"
-                                    >
-                                        <Save className="h-4 w-4" />
-                                        {isSaving ? 'Salvando...' : 'Salvar'}
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Salvar alterações da lista</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </TooltipProvider>
+                        <TooltipProvider>
+                            <div className="flex gap-2 shrink-0">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            onClick={handleSave}
+                                            disabled={isSaving || !name.trim()}
+                                            size="sm"
+                                            className="gap-2"
+                                        >
+                                            <Save className="h-4 w-4" />
+                                            <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Salvar alterações da lista</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </TooltipProvider>
+                    </div>
                 </div>
 
                 {/* Informações da Lista - Collapsible */}
@@ -499,22 +502,24 @@ export default function EditListPage() {
                                                                 <div
                                                                     ref={provided.innerRef}
                                                                     {...provided.draggableProps}
-                                                                    className={`flex items-center gap-4 p-4 border rounded-lg transition-colors ${snapshot.isDragging
+                                                                    className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg transition-colors ${snapshot.isDragging
                                                                         ? 'bg-muted shadow-lg'
                                                                         : 'hover:bg-muted/50'
                                                                         }`}
                                                                 >
-                                                                    <div {...provided.dragHandleProps}>
-                                                                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                                                    </div>
-                                                                    <Badge variant="outline" className="w-8 h-8 rounded-full flex items-center justify-center">
-                                                                        {index + 1}
-                                                                    </Badge>
-                                                                    <div className="flex-1">
-                                                                        <h4 className="font-medium">{item.music?.title || 'Título não disponível'}</h4>
-                                                                        {item.music?.artist && (
-                                                                            <p className="text-sm text-muted-foreground">{item.music.artist}</p>
-                                                                        )}
+                                                                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                                                                        <div {...provided.dragHandleProps} className="shrink-0">
+                                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                                        </div>
+                                                                        <Badge variant="outline" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 text-xs sm:text-sm">
+                                                                            {index + 1}
+                                                                        </Badge>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <h4 className="font-medium text-sm sm:text-base truncate">{item.music?.title || 'Título não disponível'}</h4>
+                                                                            {item.music?.artist && (
+                                                                                <p className="text-xs sm:text-sm text-muted-foreground truncate">{item.music.artist}</p>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                     <TooltipProvider>
                                                                         <div className="flex gap-1">
@@ -593,7 +598,7 @@ export default function EditListPage() {
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                             <CardContent>
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                                     {/* Filtros */}
                                     <div className="space-y-4">
                                         <h4 className="font-medium">Filtros</h4>
@@ -684,14 +689,14 @@ export default function EditListPage() {
                                                 {searchResults.map((music) => (
                                                     <div
                                                         key={music.id}
-                                                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-muted/50 gap-3"
                                                     >
-                                                        <div className="flex-1">
-                                                            <h5 className="font-medium">{music.title}</h5>
-                                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                                {music.artist && <span>{music.artist}</span>}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h5 className="font-medium text-sm sm:text-base truncate">{music.title}</h5>
+                                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                                                                {music.artist && <span className="truncate max-w-[150px]">{music.artist}</span>}
                                                                 {music.musical_key && (
-                                                                    <Badge variant="outline" className="text-xs">
+                                                                    <Badge variant="outline" className="text-xs shrink-0">
                                                                         {music.musical_key}
                                                                     </Badge>
                                                                 )}

@@ -172,12 +172,13 @@ export default function ListDetailsPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-4">
+                    {/* Navigation and Title */}
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="outline" size="sm" asChild>
+                                    <Button variant="outline" size="sm" asChild className="self-start shrink-0">
                                         <Link href="/lists">
                                             <ArrowLeft className="h-4 w-4 mr-2" />
                                             Voltar
@@ -189,36 +190,39 @@ export default function ListDetailsPage() {
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                        <div>
-                            <h1 className="text-3xl font-bold flex items-center gap-2">
-                                <List className="h-8 w-8 text-primary" />
-                                {list.name}
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                                <List className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+                                <span className="truncate">{list.name}</span>
                             </h1>
-                            <p className="text-muted-foreground mt-1">
+                            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                                 {list.items?.length || 0} música{(list.items?.length || 0) !== 1 ? 's' : ''}
                             </p>
                         </div>
                     </div>
 
+                    {/* Actions - Responsive Grid */}
                     <TooltipProvider>
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant="outline"
+                                        size="sm"
                                         onClick={handleGenerateReport}
                                         disabled={isGeneratingReport || !list.items?.length}
-                                        className="gap-2"
+                                        className="gap-1 sm:gap-2 text-xs sm:text-sm"
                                     >
                                         {reportCopied ? (
                                             <>
                                                 <Check className="h-4 w-4 text-green-600" />
-                                                Copiado!
+                                                <span className="hidden sm:inline">Copiado!</span>
+                                                <span className="sm:hidden">OK</span>
                                             </>
                                         ) : (
                                             <>
                                                 <ClipboardList className="h-4 w-4" />
-                                                {isGeneratingReport ? 'Gerando...' : 'Relatório'}
+                                                <span>{isGeneratingReport ? 'Gerando...' : 'Relatório'}</span>
                                             </>
                                         )}
                                     </Button>
@@ -229,9 +233,10 @@ export default function ListDetailsPage() {
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="outline" onClick={handleExport} className="gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleExport} className="gap-1 sm:gap-2 text-xs sm:text-sm">
                                         <Download className="h-4 w-4" />
-                                        Exportar PDF
+                                        <span className="hidden sm:inline">Exportar PDF</span>
+                                        <span className="sm:hidden">PDF</span>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -245,9 +250,9 @@ export default function ListDetailsPage() {
                                         listName={list.name}
                                         onSuccess={loadList}
                                         trigger={
-                                            <Button variant="outline" className="gap-2">
+                                            <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm">
                                                 <Copy className="h-4 w-4" />
-                                                Duplicar
+                                                <span>Duplicar</span>
                                             </Button>
                                         }
                                     />
@@ -258,10 +263,10 @@ export default function ListDetailsPage() {
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button asChild className="gap-2">
+                                    <Button size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
                                         <Link href={`/lists/${list.id}/edit`}>
                                             <Edit className="h-4 w-4" />
-                                            Editar Lista
+                                            <span>Editar</span>
                                         </Link>
                                     </Button>
                                 </TooltipTrigger>
@@ -271,9 +276,9 @@ export default function ListDetailsPage() {
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="destructive" onClick={handleDelete} className="gap-2">
+                                    <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
                                         <Trash2 className="h-4 w-4" />
-                                        Excluir
+                                        <span>Excluir</span>
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -285,7 +290,7 @@ export default function ListDetailsPage() {
                 </div>
 
                 {/* Info Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
@@ -316,7 +321,7 @@ export default function ListDetailsPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="md:col-span-2">
+                    <Card className="sm:col-span-2 lg:col-span-2">
                         <CardHeader>
                             <CardTitle>Observações</CardTitle>
                         </CardHeader>
@@ -351,16 +356,16 @@ export default function ListDetailsPage() {
                                 {list.items.map((item, index) => (
                                     <div
                                         key={item.id}
-                                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-muted/50 gap-2 sm:gap-4"
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <Badge variant="outline" className="w-8 h-8 rounded-full flex items-center justify-center">
+                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                                            <Badge variant="outline" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 text-xs sm:text-sm">
                                                 {index + 1}
                                             </Badge>
-                                            <div>
-                                                <h4 className="font-medium">{item.music?.title || 'Título não disponível'}</h4>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className="font-medium text-sm sm:text-base truncate">{item.music?.title || 'Título não disponível'}</h4>
                                                 {item.music?.artist && (
-                                                    <p className="text-sm text-muted-foreground">{item.music.artist}</p>
+                                                    <p className="text-xs sm:text-sm text-muted-foreground truncate">{item.music.artist}</p>
                                                 )}
                                             </div>
                                         </div>

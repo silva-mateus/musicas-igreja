@@ -213,14 +213,16 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Editar Informações dos Arquivos</h3>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={expandAll}>
-                        Expandir Todos
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 className="text-base sm:text-lg font-semibold">Editar Informações dos Arquivos</h3>
+                <div className="flex gap-2 shrink-0">
+                    <Button variant="outline" size="sm" onClick={expandAll} className="text-xs sm:text-sm">
+                        <span className="hidden sm:inline">Expandir Todos</span>
+                        <span className="sm:hidden">Expandir</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={collapseAll}>
-                        Recolher Todos
+                    <Button variant="outline" size="sm" onClick={collapseAll} className="text-xs sm:text-sm">
+                        <span className="hidden sm:inline">Recolher Todos</span>
+                        <span className="sm:hidden">Recolher</span>
                     </Button>
                 </div>
             </div>
@@ -231,7 +233,7 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                     <CardTitle className="text-sm">Aplicar a Todos os Arquivos</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label>Categoria</Label>
                             <Select onValueChange={(value) => applyToAll('category', value)}>
@@ -282,35 +284,38 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                 {metadata.map((item, index) => (
                     <Card key={index} className="transition-all duration-200">
                         <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <FileText className="h-5 w-5 text-blue-500" />
-                                    <div>
-                                        <div className="font-medium">{item.file.name}</div>
-                                        <div className="text-sm text-muted-foreground">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                    <FileText className="h-5 w-5 text-blue-500 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-sm sm:text-base truncate">{item.file.name}</div>
+                                        <div className="text-xs sm:text-sm text-muted-foreground">
                                             {formatFileSize(item.file.size)}
                                         </div>
                                     </div>
                                     {isFormValid(item) ? (
-                                        <Badge variant="default" className="bg-green-500">
+                                        <Badge variant="default" className="bg-green-500 shrink-0 text-xs">
                                             <Check className="h-3 w-3 mr-1" />
-                                            Válido
+                                            <span className="hidden sm:inline">Válido</span>
+                                            <span className="sm:hidden">OK</span>
                                         </Badge>
                                     ) : (
-                                        <Badge variant="destructive">
+                                        <Badge variant="destructive" className="shrink-0 text-xs">
                                             <X className="h-3 w-3 mr-1" />
-                                            Incompleto
+                                            <span className="hidden sm:inline">Incompleto</span>
+                                            <span className="sm:hidden">!</span>
                                         </Badge>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => toggleExpanded(index)}
+                                        className="text-xs sm:text-sm gap-1"
                                     >
                                         <Edit3 className="h-4 w-4" />
-                                        {expandedItems.has(index) ? 'Recolher' : 'Editar'}
+                                        <span>{expandedItems.has(index) ? 'Recolher' : 'Editar'}</span>
                                     </Button>
                                     <Button
                                         variant="ghost"

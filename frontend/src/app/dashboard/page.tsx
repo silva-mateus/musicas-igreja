@@ -62,19 +62,19 @@ export default function DashboardPage() {
         <MainLayout>
             <div className="space-y-8">
                 {/* Header */}
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-bold flex items-center gap-2">
-                            <BarChart3 className="h-8 w-8 text-primary" />
-                            Dashboard
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                            <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+                            <span className="truncate">Dashboard</span>
                         </h1>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
                             Visão geral do sistema de músicas da igreja
                         </p>
                     </div>
-                    <Button onClick={loadStats} variant="outline" size="sm" className="gap-2">
+                    <Button onClick={loadStats} variant="outline" size="sm" className="gap-2 shrink-0 self-start sm:self-auto">
                         <RefreshCw className="h-4 w-4" />
-                        Atualizar
+                        <span className="hidden sm:inline">Atualizar</span>
                     </Button>
                 </div>
 

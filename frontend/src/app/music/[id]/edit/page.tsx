@@ -195,29 +195,36 @@ export default function EditMusicPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button variant="outline" size="sm" onClick={handleCancel}>
+                <div className="flex flex-col gap-4">
+                    {/* Navigation */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                        <Button variant="outline" size="sm" onClick={handleCancel} className="self-start shrink-0">
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Voltar
                         </Button>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground truncate">
                             <Link href="/music" className="hover:text-primary">Músicas</Link>
                             <span className="mx-2">/</span>
-                            <Link href={`/music/${musicId}`} className="hover:text-primary">{music.title}</Link>
+                            <Link href={`/music/${musicId}`} className="hover:text-primary truncate">{music.title}</Link>
                             <span className="mx-2">/</span>
                             <span>Editar</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => window.open(`/api/files/${music.id}/stream`, '_blank')}>
-                            <Eye className="h-4 w-4 mr-2" /> Visualizar PDF
+                    
+                    {/* Actions */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:justify-end">
+                        <Button variant="outline" size="sm" onClick={() => window.open(`/api/files/${music.id}/stream`, '_blank')} className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                            <Eye className="h-4 w-4" />
+                            <span className="hidden sm:inline">Visualizar PDF</span>
+                            <span className="sm:hidden">Ver PDF</span>
                         </Button>
-                        <Button variant="outline" onClick={handleCancel} disabled={saving}>
-                            <X className="h-4 w-4 mr-2" /> Cancelar
+                        <Button variant="outline" size="sm" onClick={handleCancel} disabled={saving} className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                            <X className="h-4 w-4" />
+                            <span>Cancelar</span>
                         </Button>
-                        <Button onClick={handleSave} disabled={saving || !hasChanges}>
-                            <Save className="h-4 w-4 mr-2" /> {saving ? 'Salvando...' : 'Salvar'}
+                        <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges} className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
+                            <Save className="h-4 w-4" />
+                            <span>{saving ? 'Salvando...' : 'Salvar'}</span>
                         </Button>
                     </div>
                 </div>
@@ -359,7 +366,7 @@ export default function EditMusicPage() {
                             <CardContent className="space-y-4">
                                 <div>
                                     <span className="text-sm font-medium block mb-1">Nome original:</span>
-                                    <span className="text-sm text-muted-foreground">{music.original_name}</span>
+                                    <span className="text-sm text-muted-foreground break-all">{music.original_name}</span>
                                 </div>
                                 <div>
                                     <span className="text-sm font-medium block mb-1">Tamanho:</span>

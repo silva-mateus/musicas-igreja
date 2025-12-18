@@ -173,13 +173,13 @@ export default function UploadPage() {
         <MainLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-bold flex items-center gap-2">
-                            <Upload className="h-8 w-8 text-primary" />
-                            Upload de Músicas
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                            <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+                            <span className="truncate">Upload de Músicas</span>
                         </h1>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
                             Envie arquivos PDF de partituras para o sistema
                         </p>
                     </div>
@@ -187,11 +187,13 @@ export default function UploadPage() {
                         <Button
                             onClick={resetUpload}
                             variant="outline"
-                            className="gap-2"
+                            size="sm"
+                            className="gap-2 shrink-0 self-start sm:self-auto"
                             disabled={uploadState.isUploading}
                         >
                             <RefreshCw className="h-4 w-4" />
-                            Novo Upload
+                            <span className="hidden sm:inline">Novo Upload</span>
+                            <span className="sm:hidden">Novo</span>
                         </Button>
                     )}
                 </div>
@@ -208,7 +210,7 @@ export default function UploadPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <h4 className="font-medium text-green-600">✅ Formatos Aceitos</h4>
                                 <ul className="text-sm text-muted-foreground space-y-1">
