@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-// Configuração do backend com múltiplas opções
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.BACKEND_URL ||
+// Configuração do backend - BACKEND_URL tem prioridade em runtime
+const BACKEND_URL = process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
     'http://127.0.0.1:5000'
 
 console.log('🔧 [REPLACE_PDF_API] Backend URL:', BACKEND_URL)
