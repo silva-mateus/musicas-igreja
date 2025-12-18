@@ -98,12 +98,15 @@ jobs:
           echo "=== Fixing workspace permissions ==="
           sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
 
-      - name: Stop and remove old containers
+      - name: Stop and remove old containers (preserving volumes)
         working-directory: ./backend
         run: |
           set -e
-          echo "=== Stopping existing services ==="
+          echo "=== Stopping existing services (keeping volumes) ==="
+          # IMPORTANTE: NÃO usar --volumes ou -v para preservar os dados!
           docker compose down --remove-orphans || true
+          echo "=== Listing existing data volumes ==="
+          docker volume ls | grep musicas || echo "No musicas volumes found yet"
           echo "=== Pruning unused containers ==="
           docker container prune -f || true
 

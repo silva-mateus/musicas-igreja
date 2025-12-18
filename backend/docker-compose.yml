@@ -67,6 +67,9 @@ networks:
 
 volumes:
   musicas_data:
-    driver: local # Define um volume local para persistir os dados da aplicação
+    # O Docker Compose prefixa automaticamente com o nome do diretório (backend_)
+    # Volume: backend_musicas_data - persiste banco de dados, uploads e logs
+    driver: local
   musicas_organized:
-    driver: local # Define um volume local para persistir as músicas organizadas
+    # Volume: backend_musicas_organized - persiste as músicas organizadas em PDF
+    driver: local
