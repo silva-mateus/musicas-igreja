@@ -422,6 +422,10 @@ export const dashboardApi = {
 
     async getUploadsTimeline(): Promise<any> {
         return await request<any>('/dashboard/uploads-timeline', { method: 'GET' })
+    },
+
+    async getArtists(): Promise<string[]> {
+        return await request<string[]>('/dashboard/get_artists', { method: 'GET' })
     }
 }
 
