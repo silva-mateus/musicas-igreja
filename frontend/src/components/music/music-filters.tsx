@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError, request } from '@/lib/api'
+import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError } from '@/lib/api'
 import type { SearchFilters } from '@/types'
 import { Filter, RotateCcw, X } from 'lucide-react'
 
@@ -45,16 +45,33 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
         try {
             setIsLoading(true)
             // Buscar artistas, categorias e tempos reais
-            const [artists, cats, times] = await Promise.all([
-                request<any[]>('/dashboard/get_artists').catch(() => []),
-                categoriesApi.getCategories().catch(() => ({ data: [] })),
-                liturgicalTimesApi.getLiturgicalTimes().catch(() => ({ data: [] })),
+            const [artistsResult, catsResult, timesResult] = await Promise.all([
+                dashboardApi.getArtists().catch((err) => {
+                    console.error('Erro ao carregar artistas:', err)
+                    return []
+                }),
+                categoriesApi.getCategories().catch((err) => {
+                    console.error('Erro ao carregar categorias:', err)
+                    return { data: [] }
+                }),
+                liturgicalTimesApi.getLiturgicalTimes().catch((err) => {
+                    console.error('Erro ao carregar tempos litúrgicos:', err)
+                    return { data: [] }
+                }),
             ])
+            
+            // Extrair arrays de forma segura
+            const artists = Array.isArray(artistsResult) ? artistsResult : []
+            const categories = Array.isArray(catsResult?.data) ? catsResult.data : (Array.isArray(catsResult) ? catsResult : [])
+            const liturgicalTimes = Array.isArray(timesResult?.data) ? timesResult.data : (Array.isArray(timesResult) ? timesResult : [])
+            
+            console.log('📋 Sugestões carregadas:', { artists: artists.length, categories: categories.length, liturgicalTimes: liturgicalTimes.length })
+            
             setSuggestions(prev => ({
                 ...prev,
-                artists: Array.isArray(artists) ? artists : [],
-                categories: Array.isArray(cats.data) ? cats.data : [],
-                liturgical_times: Array.isArray(times.data) ? times.data : [],
+                artists,
+                categories,
+                liturgical_times: liturgicalTimes,
             }))
         } catch (error) {
             console.error('Erro ao carregar sugestões:', handleApiError(error))
@@ -109,7 +126,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                 {/* Artist Filter */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between min-h-[24px]">
-                        <Label htmlFor="artist">Artista</Label>
+                        <Label htmlFor="artist">Artista {isLoading && <span className="text-xs text-muted-foreground">(carregando...)</span>}</Label>
                         {localFilters.artist && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('artist')} className="h-6 w-6 p-0">
                                 <X className="h-3 w-3" />
@@ -118,14 +135,20 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                     </div>
                     <Select value={localFilters.artist || ''} onValueChange={(value) => handleFilterChange('artist', value)}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Selecionar artista" />
+                            <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar artista"} />
                         </SelectTrigger>
-                        <SelectContent>
-                            {(suggestions.artists || []).map((artist) => (
-                                <SelectItem key={artist} value={artist}>
-                                    {artist}
-                                </SelectItem>
-                            ))}
+                        <SelectContent position="popper" className="max-h-[300px]">
+                            {isLoading ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Carregando artistas...</div>
+                            ) : suggestions.artists.length === 0 ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Nenhum artista encontrado</div>
+                            ) : (
+                                suggestions.artists.map((artist) => (
+                                    <SelectItem key={artist} value={artist}>
+                                        {artist}
+                                    </SelectItem>
+                                ))
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -133,7 +156,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                 {/* Category Filter */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between min-h-[24px]">
-                        <Label htmlFor="category">Categoria</Label>
+                        <Label htmlFor="category">Categoria {isLoading && <span className="text-xs text-muted-foreground">(carregando...)</span>}</Label>
                         {localFilters.category && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('category')} className="h-6 w-6 p-0">
                                 <X className="h-3 w-3" />
@@ -142,14 +165,20 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                     </div>
                     <Select value={localFilters.category || ''} onValueChange={(value) => handleFilterChange('category', value)}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Selecionar categoria" />
+                            <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar categoria"} />
                         </SelectTrigger>
-                        <SelectContent>
-                            {(suggestions.categories || []).map((category) => (
-                                <SelectItem key={category} value={category}>
-                                    {category}
-                                </SelectItem>
-                            ))}
+                        <SelectContent position="popper" className="max-h-[300px]">
+                            {isLoading ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Carregando categorias...</div>
+                            ) : suggestions.categories.length === 0 ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Nenhuma categoria encontrada</div>
+                            ) : (
+                                suggestions.categories.map((category) => (
+                                    <SelectItem key={category} value={category}>
+                                        {category}
+                                    </SelectItem>
+                                ))
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -157,7 +186,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                 {/* Liturgical Time Filter */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between min-h-[24px]">
-                        <Label htmlFor="liturgical_time">Tempo Litúrgico</Label>
+                        <Label htmlFor="liturgical_time">Tempo Litúrgico {isLoading && <span className="text-xs text-muted-foreground">(carregando...)</span>}</Label>
                         {localFilters.liturgical_time && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('liturgical_time')} className="h-6 w-6 p-0">
                                 <X className="h-3 w-3" />
@@ -166,14 +195,20 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                     </div>
                     <Select value={localFilters.liturgical_time || ''} onValueChange={(value) => handleFilterChange('liturgical_time', value)}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Selecionar tempo" />
+                            <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar tempo"} />
                         </SelectTrigger>
-                        <SelectContent>
-                            {(suggestions.liturgical_times || []).map((time) => (
-                                <SelectItem key={time} value={time}>
-                                    {time}
-                                </SelectItem>
-                            ))}
+                        <SelectContent position="popper" className="max-h-[300px]">
+                            {isLoading ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Carregando tempos litúrgicos...</div>
+                            ) : suggestions.liturgical_times.length === 0 ? (
+                                <div className="py-2 px-3 text-sm text-muted-foreground">Nenhum tempo litúrgico encontrado</div>
+                            ) : (
+                                suggestions.liturgical_times.map((time) => (
+                                    <SelectItem key={time} value={time}>
+                                        {time}
+                                    </SelectItem>
+                                ))
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
@@ -192,8 +227,8 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                         <SelectTrigger>
                             <SelectValue placeholder="Selecionar tonalidade" />
                         </SelectTrigger>
-                        <SelectContent>
-                            {(suggestions.musical_keys || []).map((key) => (
+                        <SelectContent position="popper" className="max-h-[300px]">
+                            {suggestions.musical_keys.map((key) => (
                                 <SelectItem key={key} value={key}>
                                     {key}
                                 </SelectItem>
@@ -225,7 +260,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                         <SelectTrigger>
                             <SelectValue placeholder="Filtrar por YouTube" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="popper" className="max-h-[300px]">
                             <SelectItem value="true">Com link do YouTube</SelectItem>
                             <SelectItem value="false">Sem link do YouTube</SelectItem>
                         </SelectContent>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5000'
+const BACKEND_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5000'
 
 // API route for discovering entities
 export async function POST(request: NextRequest) {
