@@ -92,6 +92,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Fix permissions for runner
+        run: |
+          set -e
+          echo "=== Fixing workspace permissions ==="
+          sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+
       - name: Stop and remove old containers
         working-directory: ./backend
         run: |

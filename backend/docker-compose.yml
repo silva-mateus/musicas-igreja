@@ -24,8 +24,8 @@ services:
     volumes:
       # Volume para persistir os dados da aplicação (banco de dados, uploads, logs)
       - musicas_data:/data:rw
-      # Pasta organizada compartilhada com o host (usar mesmo caminho em dev/prod)
-      - ./organized:/app/organized:rw
+      # Pasta organizada - volume nomeado para persistir entre deploys
+      - musicas_organized:/app/organized:rw
       # Montagem opcional de um diretório 'config' do host para dentro do contêiner (somente leitura)
       - ./config:/app/config:ro
     networks:
@@ -68,3 +68,5 @@ networks:
 volumes:
   musicas_data:
     driver: local # Define um volume local para persistir os dados da aplicação
+  musicas_organized:
+    driver: local # Define um volume local para persistir as músicas organizadas
