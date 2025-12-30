@@ -95,19 +95,22 @@ export function ListsTable({
     const handleGenerateReport = async (list: MusicList) => {
         setGeneratingReport(list.id)
         try {
-            // Buscar detalhes completos da lista
-            const fullList = await listsApi.getList(list.id)
+            // Usar a API do backend para gerar o relatório (garante youtube_link correto)
+            const result = await listsApi.generateReport(list.id)
 
-            if (!fullList.items?.length) {
+            if (!result.success || !result.report) {
                 toast({
-                    title: "Lista vazia",
-                    description: "Esta lista não possui músicas para gerar relatório.",
+                    title: "Erro",
+                    description: result.message || "Não foi possível gerar o relatório.",
                     variant: "destructive"
                 })
                 return
             }
 
-            // Gerar relatório
+            // Buscar informações da lista para o cabeçalho
+            const fullList = await listsApi.getList(list.id)
+
+            // Montar relatório com cabeçalho personalizado
             let report = `${fullList.name}\n`
             report += '='.repeat(fullList.name.length) + '\n'
 
@@ -117,28 +120,12 @@ export function ListsTable({
             }
             report += '\n'
 
-            fullList.items.forEach((item, index) => {
-                const title = item.music?.title || 'Título não disponível'
-                const key = item.music?.musical_key
-                const artist = item.music?.artist
-                const youtubeLink = item.music?.youtube_link
-
-                // Construir linha omitindo informações faltantes
-                let line = `${index + 1}. ${title}`
-
-                if (key?.trim()) {
-                    line += ` - ${key}`
-                }
-
-                if (artist?.trim()) {
-                    line += ` - ${artist}`
-                }
-
-                if (youtubeLink?.trim()) {
-                    line += ` - ${youtubeLink}`
-                }
-
-                report += line + '\n'
+            // Adicionar as músicas do backend (com youtube_link correto)
+            // O backend retorna no formato: "Música - Artista - Link"
+            // Vamos numerar as linhas
+            const lines = result.report.split('\n').filter((line: string) => line.trim())
+            lines.forEach((line: string, index: number) => {
+                report += `${index + 1}. ${line}\n`
             })
 
             // Copiar para clipboard

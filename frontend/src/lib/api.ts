@@ -332,6 +332,10 @@ export const listsApi = {
         if (!res.ok) throw new Error('Falha ao exportar')
         return await res.blob()
     },
+
+    async generateReport(listId: number): Promise<{ success: boolean; report?: string; message?: string }> {
+        return await request<{ success: boolean; report?: string; message?: string }>(`/generate_report/${listId}`)
+    },
 }
 
 

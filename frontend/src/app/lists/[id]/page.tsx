@@ -106,7 +106,19 @@ export default function ListDetailsPage() {
 
         setIsGeneratingReport(true)
         try {
-            // Gerar relatório de texto
+            // Usar a API do backend para gerar o relatório (garante youtube_link correto)
+            const result = await listsApi.generateReport(list.id)
+
+            if (!result.success || !result.report) {
+                toast({
+                    title: "Erro ao gerar relatório",
+                    description: result.message || "Não foi possível gerar o relatório.",
+                    variant: "destructive",
+                })
+                return
+            }
+
+            // Montar relatório com cabeçalho personalizado
             let report = `${list.name}\n`
             report += '='.repeat(list.name.length) + '\n'
 
@@ -116,28 +128,12 @@ export default function ListDetailsPage() {
             }
             report += '\n'
 
-            list.items.forEach((item, index) => {
-                const title = item.music?.title || 'Título não disponível'
-                const key = item.music?.musical_key
-                const artist = item.music?.artist
-                const youtubeLink = item.music?.youtube_link
-
-                // Construir linha omitindo informações faltantes
-                let line = `${index + 1}. ${title}`
-
-                if (key?.trim()) {
-                    line += ` - ${key}`
-                }
-
-                if (artist?.trim()) {
-                    line += ` - ${artist}`
-                }
-
-                if (youtubeLink?.trim()) {
-                    line += ` - ${youtubeLink}`
-                }
-
-                report += line + '\n'
+            // Adicionar as músicas do backend (com youtube_link correto)
+            // O backend retorna no formato: "Música - Artista - Link"
+            // Vamos numerar as linhas
+            const lines = result.report.split('\n').filter((line: string) => line.trim())
+            lines.forEach((line: string, index: number) => {
+                report += `${index + 1}. ${line}\n`
             })
 
             // Copiar para clipboard

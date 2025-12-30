@@ -3129,7 +3129,7 @@ def api_generate_report(list_id=None):
             
             # Buscar músicas da lista ordenadas por posição
             cursor.execute('''
-                SELECT pf.song_name, pf.artist, pf.youtube_link, pf.filename
+                SELECT pf.song_name, pf.artist, pf.youtube_link, pf.filename, pf.musical_key
                 FROM merge_list_items mli
                 JOIN pdf_files pf ON mli.pdf_file_id = pf.id
                 WHERE mli.merge_list_id = ?
@@ -3141,7 +3141,7 @@ def api_generate_report(list_id=None):
         else:
             # Gerar relatório de todas as músicas
             cursor.execute('''
-                SELECT song_name, artist, youtube_link, filename
+                SELECT song_name, artist, youtube_link, filename, musical_key
                 FROM pdf_files 
                 ORDER BY song_name, artist
             ''')
@@ -3159,19 +3159,23 @@ def api_generate_report(list_id=None):
         # Gerar lista simples de músicas
         report_lines = []
         
-        for song_name, artist, youtube_link, filename in files:
+        for song_name, artist, youtube_link, filename, musical_key in files:
             # Usar song_name se disponível, senão usar filename
             music_title = song_name if song_name and song_name.strip() else filename.replace('.pdf', '')
-            artist_name = artist if artist and artist.strip() else 'Não informado'
             
-            # Formato básico: "Música - Artista"
+            # Construir linha: "Título - Tonalidade - Artista - YouTube"
+            parts = [music_title]
+            
+            if musical_key and musical_key.strip():
+                parts.append(musical_key.strip())
+            
+            if artist and artist.strip():
+                parts.append(artist.strip())
+            
             if youtube_link and youtube_link.strip():
-                # Formato com YouTube: "Música - Artista - Link do YouTube"
-                line = f"{music_title} - {artist_name} - {youtube_link}"
-            else:
-                # Formato sem YouTube: "Música - Artista"
-                line = f"{music_title} - {artist_name}"
+                parts.append(youtube_link.strip())
             
+            line = " - ".join(parts)
             report_lines.append(line)
         
         # Juntar todas as linhas
