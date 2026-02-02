@@ -16,7 +16,7 @@ import type {
 
 const BASE = '/api'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
         ...init,
         headers: {
@@ -426,41 +426,6 @@ export const dashboardApi = {
 
     async getArtists(): Promise<string[]> {
         return await request<string[]>('/dashboard/get_artists', { method: 'GET' })
-    }
-}
-
-// Google Drive API
-export const googleDriveApi = {
-    async getAuthUrl(): Promise<any> {
-        return await request<any>('/google-drive/auth-url', { method: 'GET', cache: 'no-store' as any })
-    },
-
-    async getStatus(): Promise<any> {
-        const result = await request<any>('/google-drive/status', { method: 'GET', cache: 'no-store' as any })
-        return result
-    },
-
-    async sync(): Promise<any> {
-        return await request<any>('/google-drive/sync', { method: 'POST', cache: 'no-store' as any })
-    },
-
-    async getSettings(): Promise<any> {
-        return await request<any>('/google-drive/settings', { method: 'GET', cache: 'no-store' as any })
-    },
-
-    async saveSettings(settings: any): Promise<any> {
-        return await request<any>('/google-drive/settings', {
-            method: 'POST',
-            body: JSON.stringify(settings),
-        })
-    },
-
-    async getDebugInfo(): Promise<any> {
-        return await request<any>('/google-drive/debug', { method: 'GET', cache: 'no-store' as any })
-    },
-
-    async clearCache(): Promise<any> {
-        return await request<any>('/google-drive/clear-cache', { method: 'POST', cache: 'no-store' as any })
     }
 }
 

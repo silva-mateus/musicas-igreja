@@ -4,11 +4,7 @@ import { useState } from 'react'
 import { MainLayout } from '@/components/layout/main-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -17,7 +13,6 @@ import {
     RefreshCw,
     FileCheck,
     RotateCcw,
-    Cloud,
     Shield,
     CheckCircle,
     AlertCircle,
@@ -29,8 +24,7 @@ import {
     Database
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { GoogleDriveSettings } from '@/components/settings/google-drive-settings'
-import { adminApi, request } from '@/lib/api'
+import { adminApi } from '@/lib/api'
 
 interface MismatchedFile {
     id: number
@@ -67,67 +61,6 @@ interface DiscoveryResult {
     }
 }
 
-interface PermissionsResult {
-    data_dir: {
-        path: string
-        exists: boolean
-        writable: boolean
-        permissions: any
-    }
-    organized_dir: {
-        path: string
-        exists: boolean
-        writable: boolean
-        permissions: any
-    }
-    uploads_dir: {
-        path: string
-        exists: boolean
-        writable: boolean
-        permissions: any
-    }
-}
-
-interface GoogleDriveDebugResult {
-    sync_state: {
-        in_progress: boolean
-        total: number
-        done: number
-        last_file: string
-        message: string
-    }
-    paths: {
-        ORGANIZED_FOLDER: string
-        organized_folder_exists: boolean
-        organized_folder_writable: boolean
-    }
-    oauth_config: {
-        callback_port: string | null
-        callback_host: string | null
-        using_custom_callback: boolean
-        allow_http: boolean
-        trust_proxy: boolean
-        token_exists: boolean
-        credentials_exists: boolean
-    }
-    proxy_headers: {
-        x_forwarded_proto: string | null
-        x_forwarded_host: string | null
-        x_forwarded_for: string | null
-        host: string
-        scheme: string
-        host_url: string
-    }
-    sample_files: Array<{
-        id: number
-        filename: string
-        rel_path: string
-        abs_path: string
-        exists: boolean
-    }>
-    sample_files_error?: string
-}
-
 export default function SettingsPage() {
     const { toast } = useToast()
 
@@ -151,17 +84,6 @@ export default function SettingsPage() {
         liturgical_times: []
     })
 
-    // Permissions Check
-    const [permissionsResult, setPermissionsResult] = useState<PermissionsResult | null>(null)
-    const [isCheckingPermissions, setIsCheckingPermissions] = useState(false)
-    const [isFixingPermissions, setIsFixingPermissions] = useState(false)
-
-    // Google Drive Debug
-    const [driveDebugResult, setDriveDebugResult] = useState<GoogleDriveDebugResult | null>(null)
-    const [isDriveDebugging, setIsDriveDebugging] = useState(false)
-
-    const [isLoading, setIsLoading] = useState(false)
-
     const handleVerifyPdfs = async () => {
         setIsVerifying(true)
         try {
@@ -170,7 +92,7 @@ export default function SettingsPage() {
 
             if (response.ok) {
                 setVerificationResult(data)
-                setSelectedFiles([]) // Clear selection
+                setSelectedFiles([])
                 toast({
                     title: "Verificação concluída",
                     description: `${data.mismatched_count} de ${data.total_files} arquivos precisam ser corrigidos.`,
@@ -207,7 +129,6 @@ export default function SettingsPage() {
                     title: "Correção concluída",
                     description: `${data.fixed_count} arquivos foram corrigidos.`,
                 })
-                // Refresh verification after fixing
                 handleVerifyPdfs()
             } else {
                 throw new Error(data.error || 'Erro na correção')
@@ -291,7 +212,6 @@ export default function SettingsPage() {
                     title: "Registro concluído",
                     description: data.message,
                 })
-                // Refresh discovery after registering
                 handleDiscoverEntities()
             } else {
                 throw new Error(data.error || 'Erro no registro')
@@ -316,7 +236,6 @@ export default function SettingsPage() {
                     title: "Limpeza concluída",
                     description: data.message,
                 })
-                // Refresh discovery after cleanup
                 if (discoveryResult) {
                     handleDiscoverEntities()
                 }
@@ -350,71 +269,6 @@ export default function SettingsPage() {
             [type]: prev[type].length === allEntities.length ? [] : allEntities
         }))
     }
-
-    // Permissions Functions
-    const handleCheckPermissions = async () => {
-        setIsCheckingPermissions(true)
-        try {
-            const data = await request<any>('/admin/check-permissions')
-            setPermissionsResult(data)
-            toast({
-                title: "Verificação concluída",
-                description: "Permissões dos diretórios foram verificadas.",
-            })
-        } catch (error: any) {
-            toast({
-                title: "Erro na verificação",
-                description: error.message,
-                variant: "destructive",
-            })
-        } finally {
-            setIsCheckingPermissions(false)
-        }
-    }
-
-    const handleFixPermissions = async () => {
-        setIsFixingPermissions(true)
-        try {
-            const data = await request<any>('/admin/fix-permissions')
-            toast({
-                title: "Correção concluída",
-                description: "Tentativa de correção de permissões realizada.",
-            })
-            // Refresh permissions check
-            handleCheckPermissions()
-        } catch (error: any) {
-            toast({
-                title: "Erro na correção",
-                description: error.message,
-                variant: "destructive",
-            })
-        } finally {
-            setIsFixingPermissions(false)
-        }
-    }
-
-    // Google Drive Debug Functions
-    const handleDriveDebug = async () => {
-        setIsDriveDebugging(true)
-        try {
-            const data = await request<GoogleDriveDebugResult>('/admin/google-drive-debug')
-            setDriveDebugResult(data)
-            toast({
-                title: "Debug concluído",
-                description: "Informações de debug do Google Drive obtidas.",
-            })
-        } catch (error: any) {
-            toast({
-                title: "Erro no debug",
-                description: error.message,
-                variant: "destructive",
-            })
-        } finally {
-            setIsDriveDebugging(false)
-        }
-    }
-
-
 
     return (
         <MainLayout>
@@ -549,7 +403,7 @@ export default function SettingsPage() {
                             Descoberta de Entidades
                         </CardTitle>
                         <CardDescription>
-                            Descubra e cadastre automaticamente artistas, categorias, tempos litúrgicos e tons musicais presentes nos arquivos
+                            Descubra e cadastre automaticamente artistas, categorias e tempos litúrgicos presentes nos arquivos
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -755,346 +609,6 @@ export default function SettingsPage() {
                         )}
                     </CardContent>
                 </Card>
-
-                {/* Permissions Diagnostic Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5" />
-                            Diagnóstico de Permissões
-                        </CardTitle>
-                        <CardDescription>
-                            Verifique e corrija permissões de escrita nos diretórios do sistema
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex gap-2">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            onClick={handleCheckPermissions}
-                                            disabled={isCheckingPermissions}
-                                            className="gap-2"
-                                        >
-                                            {isCheckingPermissions ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <Shield className="h-4 w-4" />
-                                            )}
-                                            {isCheckingPermissions ? 'Verificando...' : 'Verificar Permissões'}
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Verificar permissões de escrita nos diretórios</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            onClick={handleFixPermissions}
-                                            disabled={isFixingPermissions}
-                                            variant="outline"
-                                            className="gap-2"
-                                        >
-                                            {isFixingPermissions ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                                <RotateCcw className="h-4 w-4" />
-                                            )}
-                                            {isFixingPermissions ? 'Corrigindo...' : 'Corrigir Permissões'}
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Tentar corrigir permissões automaticamente</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-
-                        {permissionsResult && (
-                            <div className="space-y-4 border-t pt-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {Object.entries(permissionsResult).map(([key, info]) => (
-                                        <div key={key} className="space-y-2">
-                                            <h4 className="font-medium capitalize">
-                                                {key.replace('_dir', '').replace('_', ' ')}
-                                            </h4>
-                                            <div className="text-sm space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-muted-foreground">Caminho:</span>
-                                                    <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                                                        {info.path}
-                                                    </code>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-muted-foreground">Existe:</span>
-                                                    <Badge variant={info.exists ? "default" : "destructive"}>
-                                                        {info.exists ? "Sim" : "Não"}
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-muted-foreground">Gravável:</span>
-                                                    <Badge variant={info.writable ? "default" : "destructive"}>
-                                                        {info.writable ? "Sim" : "Não"}
-                                                    </Badge>
-                                                </div>
-                                                {info.permissions && typeof info.permissions === 'object' && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Permissões: {info.permissions.octal}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Summary */}
-                                <div className="flex items-center gap-4 pt-2 border-t">
-                                    {Object.values(permissionsResult).every(info => !info.exists) && (
-                                        <Badge variant="destructive" className="gap-1">
-                                            <AlertCircle className="h-3 w-3" />
-                                            Diretórios não encontrados
-                                        </Badge>
-                                    )}
-                                    {Object.values(permissionsResult).some(info => info.exists && !info.writable) && (
-                                        <Badge variant="destructive" className="gap-1">
-                                            <AlertCircle className="h-3 w-3" />
-                                            Permissões insuficientes
-                                        </Badge>
-                                    )}
-                                    {Object.values(permissionsResult).every(info => info.exists && info.writable) && (
-                                        <Badge variant="default" className="gap-1">
-                                            <CheckCircle className="h-3 w-3" />
-                                            Todas as permissões OK
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Google Drive Debug Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Cloud className="h-5 w-5" />
-                            Debug Google Drive
-                        </CardTitle>
-                        <CardDescription>
-                            Verificar configurações e caminhos da sincronização com Google Drive
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={handleDriveDebug}
-                                disabled={isDriveDebugging}
-                                className="gap-2"
-                            >
-                                {isDriveDebugging ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Search className="h-4 w-4" />
-                                )}
-                                {isDriveDebugging ? 'Verificando...' : 'Verificar Configuração'}
-                            </Button>
-                        </div>
-
-                        {driveDebugResult && (
-                            <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
-                                <h4 className="font-semibold">Configuração de Caminhos:</h4>
-                                <div className="grid gap-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">ORGANIZED_FOLDER:</span>
-                                        <span className="font-mono">{driveDebugResult.paths.ORGANIZED_FOLDER}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Diretório existe:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.paths.organized_folder_exists ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-red-500" />
-                                            )}
-                                            <span>{driveDebugResult.paths.organized_folder_exists ? 'Sim' : 'Não'}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Permissão de escrita:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.paths.organized_folder_writable ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-red-500" />
-                                            )}
-                                            <span>{driveDebugResult.paths.organized_folder_writable ? 'Sim' : 'Não'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <h4 className="font-semibold mt-4">Configuração OAuth:</h4>
-                                <div className="grid gap-2 text-sm">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Callback customizado:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.oauth_config.using_custom_callback ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-gray-500" />
-                                            )}
-                                            <span>{driveDebugResult.oauth_config.using_custom_callback ? 'Sim' : 'Não (padrão)'}</span>
-                                        </div>
-                                    </div>
-                                    {driveDebugResult.oauth_config.using_custom_callback && (
-                                        <>
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Porta OAuth:</span>
-                                                <span className="font-mono">{driveDebugResult.oauth_config.callback_port}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Host OAuth:</span>
-                                                <span className="font-mono text-xs">{driveDebugResult.oauth_config.callback_host}</span>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Credenciais OAuth:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.oauth_config.credentials_exists ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-red-500" />
-                                            )}
-                                            <span>{driveDebugResult.oauth_config.credentials_exists ? 'Presente' : 'Ausente'}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Token OAuth:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.oauth_config.token_exists ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-red-500" />
-                                            )}
-                                            <span>{driveDebugResult.oauth_config.token_exists ? 'Presente' : 'Ausente'}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Permitir HTTP:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.oauth_config.allow_http ? (
-                                                <AlertCircle className="h-4 w-4 text-yellow-500" />
-                                            ) : (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            )}
-                                            <span>{driveDebugResult.oauth_config.allow_http ? 'Sim (teste)' : 'Não (HTTPS)'}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium">Confiar proxy:</span>
-                                        <div className="flex items-center gap-1">
-                                            {driveDebugResult.oauth_config.trust_proxy ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                            ) : (
-                                                <AlertCircle className="h-4 w-4 text-gray-500" />
-                                            )}
-                                            <span>{driveDebugResult.oauth_config.trust_proxy ? 'Sim' : 'Não'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <h4 className="font-semibold mt-4">Headers de Proxy:</h4>
-                                <div className="grid gap-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Scheme detectado:</span>
-                                        <span className="font-mono">{driveDebugResult.proxy_headers.scheme}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Host detectado:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.host}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">URL completa:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.host_url}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">X-Forwarded-Proto:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_proto || 'Não enviado'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">X-Forwarded-Host:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_host || 'Não enviado'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">X-Forwarded-For:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.proxy_headers.x_forwarded_for || 'Não enviado'}</span>
-                                    </div>
-                                </div>
-
-                                <h4 className="font-semibold mt-4">Estado da Sincronização:</h4>
-                                <div className="grid gap-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Status:</span>
-                                        <span>{driveDebugResult.sync_state.in_progress ? 'Em andamento' : 'Parado'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Progresso:</span>
-                                        <span>{driveDebugResult.sync_state.done}/{driveDebugResult.sync_state.total}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Último arquivo:</span>
-                                        <span className="font-mono text-xs">{driveDebugResult.sync_state.last_file || 'Nenhum'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="font-medium">Mensagem:</span>
-                                        <span>{driveDebugResult.sync_state.message || 'Nenhuma'}</span>
-                                    </div>
-                                </div>
-
-                                {driveDebugResult.sample_files && driveDebugResult.sample_files.length > 0 && (
-                                    <>
-                                        <h4 className="font-semibold mt-4">Arquivos de Exemplo:</h4>
-                                        <div className="space-y-2 text-sm">
-                                            {driveDebugResult.sample_files.map((file) => (
-                                                <div key={file.id} className="border rounded p-2 bg-background">
-                                                    <div className="flex justify-between items-start">
-                                                        <span className="font-medium">{file.filename}</span>
-                                                        <div className="flex items-center gap-1">
-                                                            {file.exists ? (
-                                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                                            ) : (
-                                                                <AlertCircle className="h-4 w-4 text-red-500" />
-                                                            )}
-                                                            <span className="text-xs">{file.exists ? 'Existe' : 'Não encontrado'}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        <div>Relativo: {file.rel_path}</div>
-                                                        <div>Absoluto: {file.abs_path}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-
-                                {driveDebugResult.sample_files_error && (
-                                    <div className="text-sm text-red-600">
-                                        Erro ao verificar arquivos: {driveDebugResult.sample_files_error}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Google Drive Sync Section */}
-                <GoogleDriveSettings />
 
                 {/* System Info */}
                 <Card>

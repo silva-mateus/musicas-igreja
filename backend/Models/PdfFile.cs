@@ -21,6 +21,7 @@ public class PdfFile
     // Navigation properties
     public ICollection<FileCategory> FileCategories { get; set; } = new List<FileCategory>();
     public ICollection<FileLiturgicalTime> FileLiturgicalTimes { get; set; } = new List<FileLiturgicalTime>();
+    public ICollection<FileArtist> FileArtists { get; set; } = new List<FileArtist>();
     public ICollection<MergeListItem> MergeListItems { get; set; } = new List<MergeListItem>();
 }
 

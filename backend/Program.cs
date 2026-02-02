@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Services
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IMigrationService, MigrationService>();
 
 // Controllers
 builder.Services.AddControllers()
@@ -52,18 +53,23 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Apply migrations on startup only if database doesn't exist
+// Apply migrations and normalizations on startup
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var fileService = scope.ServiceProvider.GetRequiredService<IFileService>();
+    var migrationService = scope.ServiceProvider.GetRequiredService<IMigrationService>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     
-    // Only create if database file doesn't exist
+    // Create database if it doesn't exist
     if (!File.Exists(dbPath))
     {
+        logger.LogInformation("Creating database at {DbPath}...", dbPath);
         context.Database.EnsureCreated();
     }
+    
+    // Run SQL migration scripts
+    await migrationService.RunMigrationsAsync();
     
     // Normalize all file paths to the standard relative format (organized/Category/file.pdf)
     // This ensures compatibility between Windows (dev) and Linux (production) environments

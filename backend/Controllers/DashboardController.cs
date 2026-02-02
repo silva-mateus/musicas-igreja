@@ -19,16 +19,88 @@ public class DashboardController : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult<DashboardStatsDto>> GetStats()
     {
-        var stats = new DashboardStatsDto(
-            await _context.PdfFiles.CountAsync(),
-            await _context.Categories.CountAsync(),
-            await _context.LiturgicalTimes.CountAsync(),
-            await _context.Artists.CountAsync(),
-            await _context.MergeLists.CountAsync()
-        );
+        var totalMusics = await _context.PdfFiles.CountAsync();
+        var totalLists = await _context.MergeLists.CountAsync();
+        var totalCategories = await _context.Categories.CountAsync();
+        var totalLiturgicalTimes = await _context.LiturgicalTimes.CountAsync();
+        var totalArtists = await _context.Artists.CountAsync();
+        
+        // Calculate total file size in MB
+        var totalFileSizeBytes = await _context.PdfFiles
+            .SumAsync(f => f.FileSize ?? 0);
+        var totalFileSizeMb = totalFileSizeBytes / (1024.0 * 1024.0);
+        
+        // Calculate total pages
+        var totalPages = await _context.PdfFiles
+            .SumAsync(f => f.PageCount ?? 0);
+        
+        // Count musics with YouTube links
+        var musicsWithYoutube = await _context.PdfFiles
+            .CountAsync(f => !string.IsNullOrEmpty(f.YoutubeLink));
+        
+        // Calculate average musics per list
+        double avgMusicsPerList = 0;
+        if (totalLists > 0)
+        {
+            var totalItems = await _context.MergeListItems.CountAsync();
+            avgMusicsPerList = (double)totalItems / totalLists;
+        }
+        
+        // Get largest list
+        LargestListDto? largestList = null;
+        var largestListData = await _context.MergeLists
+            .Include(l => l.Items)
+            .OrderByDescending(l => l.Items.Count)
+            .Select(l => new { l.Name, Count = l.Items.Count })
+            .FirstOrDefaultAsync();
+        
+        if (largestListData != null && largestListData.Count > 0)
+        {
+            largestList = new LargestListDto
+            {
+                Name = largestListData.Name,
+                Count = largestListData.Count
+            };
+        }
+        
+        // Get most popular category
+        MostPopularCategoryDto? mostPopularCategory = null;
+        var categoryData = await _context.PdfFiles
+            .Where(f => !string.IsNullOrEmpty(f.Category))
+            .GroupBy(f => f.Category)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .FirstOrDefaultAsync();
+        
+        if (categoryData != null)
+        {
+            mostPopularCategory = new MostPopularCategoryDto
+            {
+                Name = categoryData.Name ?? "Desconhecido",
+                Count = categoryData.Count
+            };
+        }
+
+        var stats = new DashboardStatsDto
+        {
+            TotalMusics = totalMusics,
+            TotalLists = totalLists,
+            TotalCategories = totalCategories,
+            TotalLiturgicalTimes = totalLiturgicalTimes,
+            TotalArtists = totalArtists,
+            TotalFileSizeMb = Math.Round(totalFileSizeMb, 2),
+            TotalPages = totalPages,
+            MusicsWithYoutube = musicsWithYoutube,
+            AvgMusicsPerList = Math.Round(avgMusicsPerList, 2),
+            LargestList = largestList,
+            MostPopularCategory = mostPopularCategory
+        };
 
         return Ok(stats);
     }
+
+    // These endpoints are kept for backward compatibility.
+    // Prefer using /api/categories, /api/liturgical_times, and /api/filters/suggestions
 
     [HttpGet("get_categories")]
     public async Task<ActionResult<List<string>>> GetCategories()
@@ -55,19 +127,20 @@ public class DashboardController : ControllerBase
     [HttpGet("get_artists")]
     public async Task<ActionResult<List<string>>> GetArtists()
     {
-        var artists = await _context.Artists
+        // Get artists from the artists table
+        var registeredArtists = await _context.Artists
             .OrderBy(a => a.Name)
             .Select(a => a.Name)
             .ToListAsync();
 
-        // Also include unique artists from pdf_files
+        // Also include unique artists from pdf_files for backward compatibility
         var fileArtists = await _context.PdfFiles
             .Where(f => f.Artist != null && f.Artist != "")
             .Select(f => f.Artist!)
             .Distinct()
             .ToListAsync();
 
-        var allArtists = artists.Union(fileArtists).OrderBy(a => a).ToList();
+        var allArtists = registeredArtists.Union(fileArtists).OrderBy(a => a).ToList();
         return Ok(allArtists);
     }
 
@@ -122,4 +195,3 @@ public class DashboardController : ControllerBase
         return Ok(timeline);
     }
 }
-

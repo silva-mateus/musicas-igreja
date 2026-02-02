@@ -288,5 +288,69 @@ public class FilesController : ControllerBase
         var stream = new FileStream(absolutePath, FileMode.Open, FileAccess.Read);
         return File(stream, "application/pdf");
     }
+
+    [HttpPost("{id}/replace_pdf")]
+    [RequestSizeLimit(52_428_800)] // 50MB
+    public async Task<ActionResult<object>> ReplacePdf(int id, IFormFile replacement_pdf)
+    {
+        if (replacement_pdf == null || replacement_pdf.Length == 0)
+            return BadRequest(new { success = false, error = "Nenhum arquivo enviado" });
+
+        if (!replacement_pdf.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { success = false, error = "Apenas arquivos PDF são permitidos" });
+
+        var file = await _context.PdfFiles.FindAsync(id);
+        if (file == null)
+            return NotFound(new { success = false, error = "Arquivo não encontrado" });
+
+        try
+        {
+            // Get the current file path
+            var currentPath = _fileService.GetAbsolutePath(file.FilePath);
+
+            // Delete the old file if it exists
+            if (System.IO.File.Exists(currentPath))
+            {
+                System.IO.File.Delete(currentPath);
+            }
+
+            // Save the new file in the same location
+            using (var stream = new FileStream(currentPath, FileMode.Create))
+            {
+                await replacement_pdf.CopyToAsync(stream);
+            }
+
+            // Update file metadata
+            file.FileSize = replacement_pdf.Length;
+            file.OriginalName = replacement_pdf.FileName;
+
+            // Compute new hash
+            using (var hashStream = new FileStream(currentPath, FileMode.Open, FileAccess.Read))
+            {
+                file.FileHash = _fileService.ComputeFileHash(hashStream);
+            }
+
+            // Get new page count
+            file.PageCount = _fileService.GetPdfPageCount(currentPath);
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("PDF substituído com sucesso: {FileId}, novo tamanho: {Size} bytes", id, file.FileSize);
+
+            return Ok(new
+            {
+                success = true,
+                message = "PDF substituído com sucesso",
+                file_id = file.Id,
+                new_size = file.FileSize,
+                new_pages = file.PageCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao substituir PDF para o arquivo {FileId}", id);
+            return StatusCode(500, new { success = false, error = "Erro ao substituir PDF: " + ex.Message });
+        }
+    }
 }
 

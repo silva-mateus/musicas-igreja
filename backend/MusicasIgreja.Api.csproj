@@ -16,4 +16,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.1" />
   </ItemGroup>
 
+  <!-- Include migration scripts in output -->
+  <ItemGroup>
+    <None Include="Migrations\Scripts\**\*.sql" CopyToOutputDirectory="PreserveNewest" LinkBase="Migrations\Scripts" />
+  </ItemGroup>
+
 </Project>
