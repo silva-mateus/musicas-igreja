@@ -13,19 +13,32 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
         if (!response.ok) {
             console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
-            return NextResponse.json({ error: 'Backend error' }, { status: response.status })
+            return NextResponse.json({ success: false, message: 'Backend error' }, { status: response.status })
         }
 
-        // Return the blob directly for PDF download
+        // Get the PDF blob from backend
         const blob = await response.blob()
+        
+        // Get filename from Content-Disposition header if available
+        const contentDisposition = response.headers.get('Content-Disposition')
+        let filename = `lista_${listId}.pdf`
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+            if (match && match[1]) {
+                filename = match[1].replace(/['"]/g, '')
+            }
+        }
+
+        // Return the PDF as a response
         return new NextResponse(blob, {
+            status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="lista-${listId}.pdf"`,
+                'Content-Disposition': `attachment; filename="${filename}"`,
             },
         })
     } catch (error: any) {
         console.error('❌ [PROXY] Network error:', error)
-        return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
+        return NextResponse.json({ success: false, message: 'Network error', details: error.message }, { status: 500 })
     }
 }

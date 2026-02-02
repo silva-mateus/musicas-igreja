@@ -1,0 +1,12 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/data
+**/organized
+*.md
+*.http
+Dockerfile*
+.dockerignore
+appsettings.Development.json
+
