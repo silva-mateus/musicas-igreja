@@ -1,74 +1,27 @@
-# Multi-stage build para otimização
-FROM python:3.11-slim as builder
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
 
-# Instalar dependências do sistema necessárias para build
-RUN apt-get update && apt-get install -y \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY ["MusicasIgreja.Api.csproj", "./"]
+RUN dotnet restore
 
-# Configurar diretório de trabalho
+COPY . .
+RUN dotnet build -c Release -o /app/build
+RUN dotnet publish -c Release -o /app/publish
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-# Copiar requirements e instalar dependências Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+COPY --from=build /app/publish .
 
-# Stage final - imagem de produção
-FROM python:3.11-slim
+# Create directories for data and files
+RUN mkdir -p /app/data /app/organized
 
-# Definir UID/GID para o usuário não-root para consistência com permissões de volume no host
-ARG APP_USER_UID=1000
-ARG APP_USER_GID=1000
-RUN groupadd -r -g ${APP_USER_GID} appuser && useradd -r -g appuser -u ${APP_USER_UID} appuser
-
-# Instalar apenas dependências runtime necessárias
-RUN apt-get update && apt-get install -y \
-    curl \
-    sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-# Configurar diretório de trabalho
-WORKDIR /app
-
-# Copiar dependências Python do builder
-COPY --from=builder /root/.local /home/appuser/.local
-
-# Configurar PATH para incluir pacotes Python locais
-ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Copiar e configurar entrypoint primeiro (como root)
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Copiar aplicação
-COPY --chown=appuser:appuser . .
-
-# Criar diretórios padrão em /data (compatível com volume montado)
-# se não existir, cria os diretórios e define as permissões
-RUN mkdir -p /data/logs /data/uploads /data/organized && \
-    chown -R appuser:appuser /data /app && \
-    chmod 755 /data /data/logs /data/uploads /data/organized /app
-
-# Permitir ao appuser usar sudo para ajustar permissões se necessário
-RUN echo "appuser ALL=(ALL) NOPASSWD: /bin/chown, /bin/chmod" >> /etc/sudoers
-
-# Configurar variáveis de ambiente
-ENV FLASK_APP=app.py
-ENV FLASK_ENV=production
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-
-# Expor porta
 EXPOSE 5000
 
-# Trocar para usuário não-root
-USER appuser
+ENV ASPNETCORE_URLS=http://+:5000
+ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+ENTRYPOINT ["dotnet", "MusicasIgreja.Api.dll"]
 
-# Comando de inicialização
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "-u", "app.py"]

@@ -1,179 +1,103 @@
-# Python
+# ========================================
+# Python (Legacy backend - backend-py)
+# ========================================
+backend-py/
+
+# Python files (if any remain)
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-# Python lib directories (but allow frontend/lib/)
-/lib/
-backend/lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
+# ========================================
+# .NET / C# Backend
+# ========================================
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Build results
+backend/bin/
+backend/obj/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-*db.sqlite3
-*db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-**/venv/
-**/.venv/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# Project specific
-
-# Python/Flask runtime (backend)
-backend/uploads/
+# Data and uploads
+backend/data/
 backend/organized/
-backend/flask_session/
-backend/logs/
-backend/**/*.log
-backend/templates/
-
-# Databases (SQLite)
-# Atenção: vamos COMMITAR o db atual no primeiro deploy. Depois reativar ignores.
 *.db
-# backend/*.db
-# backend/data/*.db
 *.db-journal
-*.db.bkp
 
-# IDE
+# NuGet packages
+*.nupkg
+.nuget/
+packages/
+
+# ========================================
+# Frontend (Next.js)
+# ========================================
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+.next/
+frontend/.next/
+out/
+frontend/out/
+
+# Testing
+frontend/coverage/
+frontend/.eslintcache
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+frontend/.env.local
+
+# ========================================
+# IDE and OS
+# ========================================
+
+# Visual Studio / VSCode
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Frontend build artifacts
-node_modules/
-frontend/node_modules/
-.next/
-frontend/.next/
-out/
-frontend/out/
-frontend/.eslintcache
-frontend/coverage/
-
-# Local env files
-.env.local
-.env.*.local
-*.env.example
-frontend/.env.local
+.vs/
 
 # OS
 .DS_Store
 .DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+ehthumbs.db
+
+# ========================================
+# General
+# ========================================
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.bak
 
 # Docker
 docker-compose.override.yml
 
+# Development scripts
 start-all.sh
 start-all.ps1

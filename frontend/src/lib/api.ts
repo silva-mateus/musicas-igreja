@@ -273,7 +273,6 @@ export const listsApi = {
                     title: it.file.song_name || it.file.filename?.replace('.pdf', ''),
                     artist: it.file.artist,
                     musical_key: it.file.musical_key,
-                    youtube_link: it.file.youtube_link,
                     file_size: 0,
                     upload_date: '',
                     uploaded_by: 0,
@@ -331,10 +330,6 @@ export const listsApi = {
         const res = await fetch(`${BASE}/merge_lists/${listId}/export`, { cache: 'no-store' })
         if (!res.ok) throw new Error('Falha ao exportar')
         return await res.blob()
-    },
-
-    async generateReport(listId: number): Promise<{ success: boolean; report?: string; message?: string }> {
-        return await request<{ success: boolean; report?: string; message?: string }>(`/generate_report/${listId}`)
     },
 }
 
