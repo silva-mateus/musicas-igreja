@@ -28,13 +28,19 @@ import {
     Eye,
     ChevronDown,
     ChevronRight,
+    ChevronUp,
     Download,
     ExternalLink,
     Youtube,
     Plus,
-    FileText
+    FileText,
+    ArrowUp,
+    ArrowDown,
+    Lock,
+    Loader2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 
 interface FilterSuggestions {
@@ -53,6 +59,7 @@ export default function EditListPage() {
     const router = useRouter()
     const params = useParams()
     const { toast } = useToast()
+    const { canEdit, isAuthenticated } = useAuth()
     const listId = parseInt(params.id as string)
 
     const [list, setList] = useState<MusicList | null>(null)
@@ -158,9 +165,7 @@ export default function EditListPage() {
 
             // Salvar ordem das músicas se houver itens
             if (list.items && list.items.length > 0) {
-                console.log('💾 [SAVE] Salvando ordem das músicas...')
                 await listsApi.reorderList(list.id, list.items.map(item => ({ id: item.id })))
-                console.log('✅ [SAVE] Ordem salva com sucesso')
             }
 
             toast({
@@ -169,7 +174,6 @@ export default function EditListPage() {
             })
             router.push(`/lists/${list.id}`)
         } catch (error) {
-            console.error('❌ [SAVE] Erro ao salvar:', error)
             toast({
                 title: "Erro ao salvar",
                 description: handleApiError(error),
@@ -203,8 +207,6 @@ export default function EditListPage() {
                     items: [...(prev.items || []), newItem]
                 } : prev)
 
-                console.log('✅ [ADD_MUSIC] Música adicionada com ID real:', realItemId)
-
                 toast({
                     title: "Música adicionada",
                     description: `"${music.title}" foi adicionada à lista.`,
@@ -213,7 +215,6 @@ export default function EditListPage() {
                 throw new Error('Música não foi adicionada ou já existe na lista')
             }
         } catch (error) {
-            console.error('❌ [ADD_MUSIC] Erro:', error)
             toast({
                 title: "Erro ao adicionar música",
                 description: handleApiError(error),
@@ -276,24 +277,61 @@ export default function EditListPage() {
         setList(prev => prev ? { ...prev, items: newItems } : prev)
 
         try {
-            // Salvar a nova ordem imediatamente no backend
-            console.log('🔄 [DRAG] Salvando nova ordem...')
             await listsApi.reorderList(list.id, newItems.map(item => ({ id: item.id })))
-            console.log('✅ [DRAG] Ordem salva automaticamente')
 
             toast({
                 title: "Ordem atualizada",
                 description: "A nova ordem foi salva automaticamente.",
             })
         } catch (error) {
-            console.error('❌ [DRAG] Erro ao salvar ordem:', error)
-
             // Em caso de erro, reverter a mudança local
             setList(prev => prev ? { ...prev, items: list.items } : prev)
 
             toast({
                 title: "Erro ao reordenar",
                 description: "Não foi possível salvar a nova ordem. Tente novamente.",
+                variant: "destructive"
+            })
+        }
+    }
+
+    const handleMoveUp = async (index: number) => {
+        if (index === 0 || !list?.items) return
+        
+        const newItems = Array.from(list.items)
+        const [removed] = newItems.splice(index, 1)
+        newItems.splice(index - 1, 0, removed)
+        
+        setList(prev => prev ? { ...prev, items: newItems } : prev)
+        
+        try {
+            await listsApi.reorderList(list.id, newItems.map(item => ({ id: item.id })))
+        } catch (error) {
+            setList(prev => prev ? { ...prev, items: list.items } : prev)
+            toast({
+                title: "Erro ao reordenar",
+                description: "Não foi possível salvar a nova ordem.",
+                variant: "destructive"
+            })
+        }
+    }
+
+    const handleMoveDown = async (index: number) => {
+        if (!list?.items || index === list.items.length - 1) return
+        
+        const newItems = Array.from(list.items)
+        const [removed] = newItems.splice(index, 1)
+        newItems.splice(index + 1, 0, removed)
+        
+        setList(prev => prev ? { ...prev, items: newItems } : prev)
+        
+        try {
+            await listsApi.reorderList(list.id, newItems.map(item => ({ id: item.id })))
+        } catch (error) {
+            setList(prev => prev ? { ...prev, items: list.items } : prev)
+            toast({
+                title: "Erro ao reordenar",
+                description: "Não foi possível salvar a nova ordem.",
                 variant: "destructive"
             })
         }
@@ -328,12 +366,29 @@ export default function EditListPage() {
         window.open(`/api/files/${music.id}/stream`, '_blank')
     }
 
+    // Permission check
+    if (!isAuthenticated || !canEdit) {
+        return (
+            <MainLayout>
+                <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                    <Lock className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h2 className="text-xl font-semibold mb-2">Acesso Restrito</h2>
+                    <p className="text-muted-foreground">
+                        {!isAuthenticated 
+                            ? 'Você precisa estar logado para editar listas.'
+                            : 'Você não tem permissão para editar listas.'}
+                    </p>
+                </div>
+            </MainLayout>
+        )
+    }
+
     if (isLoading) {
         return (
             <MainLayout>
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
                         <p className="mt-4 text-muted-foreground">Carregando lista...</p>
                     </div>
                 </div>
@@ -490,72 +545,122 @@ export default function EditListPage() {
                                                 <div
                                                     {...provided.droppableProps}
                                                     ref={provided.innerRef}
-                                                    className="space-y-3"
+                                                    className="overflow-x-auto"
                                                 >
-                                                    {(list.items ?? []).map((item, index) => (
-                                                        <Draggable
-                                                            key={`item-${item.id}`}
-                                                            draggableId={`item-${item.id}`}
-                                                            index={index}
-                                                        >
-                                                            {(provided, snapshot) => (
-                                                                <div
-                                                                    ref={provided.innerRef}
-                                                                    {...provided.draggableProps}
-                                                                    className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg transition-colors ${snapshot.isDragging
-                                                                        ? 'bg-muted shadow-lg'
-                                                                        : 'hover:bg-muted/50'
-                                                                        }`}
+                                                    <table className="w-full">
+                                                        <thead>
+                                                            <tr className="border-b text-xs text-muted-foreground">
+                                                                <th className="text-left py-2 px-1 w-8"></th>
+                                                                <th className="text-left py-2 px-1 w-10">#</th>
+                                                                <th className="text-left py-2 px-2">Música</th>
+                                                                <th className="text-left py-2 px-2 hidden md:table-cell">Artista</th>
+                                                                <th className="text-left py-2 px-2 hidden lg:table-cell">Categoria</th>
+                                                                <th className="text-left py-2 px-2 hidden lg:table-cell">T. Litúrgico</th>
+                                                                <th className="text-center py-2 px-1 w-14">Tom</th>
+                                                                <th className="text-center py-2 px-1 w-20">Ordem</th>
+                                                                <th className="text-right py-2 px-1 w-24">Ações</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {(list.items ?? []).map((item, index) => (
+                                                                <Draggable
+                                                                    key={`item-${item.id}`}
+                                                                    draggableId={`item-${item.id}`}
+                                                                    index={index}
                                                                 >
-                                                                    <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                                                                        <div {...provided.dragHandleProps} className="shrink-0">
-                                                                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                                                        </div>
-                                                                        <Badge variant="outline" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 text-xs sm:text-sm">
-                                                                            {index + 1}
-                                                                        </Badge>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <h4 className="font-medium text-sm sm:text-base truncate">{item.music?.title || 'Título não disponível'}</h4>
-                                                                            {item.music?.artist && (
-                                                                                <p className="text-xs sm:text-sm text-muted-foreground truncate">{item.music.artist}</p>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <TooltipProvider>
-                                                                        <div className="flex gap-1">
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                    <Button variant="ghost" size="sm" asChild>
-                                                                                        <Link href={`/music/${item.music_id}`} target="_blank">
-                                                                                            <FileText className="h-4 w-4" />
-                                                                                        </Link>
-                                                                                    </Button>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent>
-                                                                                    <p>Ver detalhes da música</p>
-                                                                                </TooltipContent>
-                                                                            </Tooltip>
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
+                                                                    {(provided, snapshot) => (
+                                                                        <tr
+                                                                            ref={provided.innerRef}
+                                                                            {...provided.draggableProps}
+                                                                            className={`border-b transition-colors ${snapshot.isDragging ? 'bg-muted shadow-lg' : 'hover:bg-muted/50'}`}
+                                                                        >
+                                                                            <td className="py-2 px-1" {...provided.dragHandleProps}>
+                                                                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                                                            </td>
+                                                                            <td className="py-2 px-1">
+                                                                                <Badge variant="outline" className="w-7 h-7 rounded-full flex items-center justify-center text-xs">
+                                                                                    {index + 1}
+                                                                                </Badge>
+                                                                            </td>
+                                                                            <td className="py-2 px-2">
+                                                                                <div className="font-medium text-sm">{item.music?.title || 'Sem título'}</div>
+                                                                                <div className="text-xs text-muted-foreground md:hidden">{item.music?.artist || ''}</div>
+                                                                            </td>
+                                                                            <td className="py-2 px-2 hidden md:table-cell text-sm text-muted-foreground">
+                                                                                {item.music?.artist || '-'}
+                                                                            </td>
+                                                                            <td className="py-2 px-2 hidden lg:table-cell">
+                                                                                {item.music?.category ? (
+                                                                                    <Badge variant="secondary" className="text-xs">{item.music.category}</Badge>
+                                                                                ) : '-'}
+                                                                            </td>
+                                                                            <td className="py-2 px-2 hidden lg:table-cell">
+                                                                                {item.music?.liturgical_time ? (
+                                                                                    <Badge variant="outline" className="text-xs">{item.music.liturgical_time}</Badge>
+                                                                                ) : '-'}
+                                                                            </td>
+                                                                            <td className="py-2 px-1 text-center">
+                                                                                {item.music?.musical_key ? (
+                                                                                    <Badge className="text-xs">{item.music.musical_key}</Badge>
+                                                                                ) : '-'}
+                                                                            </td>
+                                                                            <td className="py-2 px-1 text-center">
+                                                                                <div className="flex gap-0.5 justify-center">
                                                                                     <Button
                                                                                         variant="ghost"
-                                                                                        size="sm"
-                                                                                        onClick={() => handleRemoveMusic(item.id)}
-                                                                                        className="text-destructive hover:text-destructive"
+                                                                                        size="icon"
+                                                                                        className="h-7 w-7"
+                                                                                        onClick={() => handleMoveUp(index)}
+                                                                                        disabled={index === 0}
                                                                                     >
-                                                                                        <Trash2 className="h-4 w-4" />
+                                                                                        <ArrowUp className="h-3.5 w-3.5" />
                                                                                     </Button>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent>
-                                                                                    <p>Remover da lista</p>
-                                                                                </TooltipContent>
-                                                                            </Tooltip>
-                                                                        </div>
-                                                                    </TooltipProvider>
-                                                                </div>
-                                                            )}
-                                                        </Draggable>
-                                                    ))}
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-7 w-7"
+                                                                                        onClick={() => handleMoveDown(index)}
+                                                                                        disabled={index === (list.items?.length || 0) - 1}
+                                                                                    >
+                                                                                        <ArrowDown className="h-3.5 w-3.5" />
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="py-2 px-1">
+                                                                                <div className="flex gap-0.5 justify-end">
+                                                                                    <TooltipProvider>
+                                                                                        <Tooltip>
+                                                                                            <TooltipTrigger asChild>
+                                                                                                <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                                                                                                    <Link href={`/music/${item.music_id}`} target="_blank">
+                                                                                                        <FileText className="h-3.5 w-3.5" />
+                                                                                                    </Link>
+                                                                                                </Button>
+                                                                                            </TooltipTrigger>
+                                                                                            <TooltipContent><p>Ver detalhes</p></TooltipContent>
+                                                                                        </Tooltip>
+                                                                                        <Tooltip>
+                                                                                            <TooltipTrigger asChild>
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                                                                                    onClick={() => handleRemoveMusic(item.id)}
+                                                                                                >
+                                                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                                                </Button>
+                                                                                            </TooltipTrigger>
+                                                                                            <TooltipContent><p>Remover</p></TooltipContent>
+                                                                                        </Tooltip>
+                                                                                    </TooltipProvider>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </Draggable>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
                                                     {provided.placeholder}
                                                 </div>
                                             )}
@@ -680,105 +785,95 @@ export default function EditListPage() {
                                         <div className="flex items-center justify-between mb-4">
                                             <h4 className="font-medium">Resultados</h4>
                                             {isSearching && (
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                             )}
                                         </div>
 
                                         {searchResults.length > 0 ? (
-                                            <div className="space-y-3 max-h-96 overflow-y-auto">
-                                                {searchResults.map((music) => (
-                                                    <div
-                                                        key={music.id}
-                                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-muted/50 gap-3"
-                                                    >
-                                                        <div className="flex-1 min-w-0">
-                                                            <h5 className="font-medium text-sm sm:text-base truncate">{music.title}</h5>
-                                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                                                                {music.artist && <span className="truncate max-w-[150px]">{music.artist}</span>}
-                                                                {music.musical_key && (
-                                                                    <Badge variant="outline" className="text-xs shrink-0">
-                                                                        {music.musical_key}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <TooltipProvider>
-                                                            <div className="flex gap-1">
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button variant="ghost" size="sm" asChild>
-                                                                            <Link href={`/music/${music.id}`} target="_blank">
-                                                                                <FileText className="h-4 w-4" />
-                                                                            </Link>
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p>Ver detalhes da música</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => handleViewPdf(music)}
-                                                                        >
-                                                                            <Eye className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p>Visualizar PDF</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                                {music.youtube_link && (
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => openYouTube(music.youtube_link!)}
-                                                                            >
-                                                                                <Youtube className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            <p>Abrir vídeo no YouTube</p>
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                )}
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => handleDownload(music)}
-                                                                        >
-                                                                            <Download className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p>Baixar PDF</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            onClick={() => handleAddMusic(music)}
-                                                                            className="gap-1"
-                                                                        >
-                                                                            <Plus className="h-4 w-4" />
-                                                                            Adicionar
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p>Adicionar à lista</p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </div>
-                                                        </TooltipProvider>
-                                                    </div>
-                                                ))}
+                                            <div className="max-h-96 overflow-y-auto">
+                                                <table className="w-full">
+                                                    <thead className="sticky top-0 bg-background">
+                                                        <tr className="border-b text-xs text-muted-foreground">
+                                                            <th className="text-left py-2 px-2">Música</th>
+                                                            <th className="text-left py-2 px-2 hidden md:table-cell">Artista</th>
+                                                            <th className="text-left py-2 px-2 hidden lg:table-cell">Categoria</th>
+                                                            <th className="text-left py-2 px-2 hidden lg:table-cell">T. Litúrgico</th>
+                                                            <th className="text-center py-2 px-1 w-14">Tom</th>
+                                                            <th className="text-right py-2 px-1 w-32">Ações</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {searchResults.map((music) => (
+                                                            <tr key={music.id} className="border-b hover:bg-muted/50">
+                                                                <td className="py-2 px-2">
+                                                                    <div className="font-medium text-sm truncate max-w-[200px]">{music.title}</div>
+                                                                    <div className="text-xs text-muted-foreground md:hidden truncate">{music.artist || ''}</div>
+                                                                </td>
+                                                                <td className="py-2 px-2 hidden md:table-cell text-sm text-muted-foreground">
+                                                                    <span className="truncate block max-w-[120px]">{music.artist || '-'}</span>
+                                                                </td>
+                                                                <td className="py-2 px-2 hidden lg:table-cell">
+                                                                    {music.category ? (
+                                                                        <Badge variant="secondary" className="text-xs">{music.category}</Badge>
+                                                                    ) : '-'}
+                                                                </td>
+                                                                <td className="py-2 px-2 hidden lg:table-cell">
+                                                                    {music.liturgical_time ? (
+                                                                        <Badge variant="outline" className="text-xs">{music.liturgical_time}</Badge>
+                                                                    ) : '-'}
+                                                                </td>
+                                                                <td className="py-2 px-1 text-center">
+                                                                    {music.musical_key ? (
+                                                                        <Badge className="text-xs">{music.musical_key}</Badge>
+                                                                    ) : '-'}
+                                                                </td>
+                                                                <td className="py-2 px-1">
+                                                                    <div className="flex gap-0.5 justify-end">
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                                                                                        <Link href={`/music/${music.id}`} target="_blank">
+                                                                                            <FileText className="h-3.5 w-3.5" />
+                                                                                        </Link>
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent><p>Detalhes</p></TooltipContent>
+                                                                            </Tooltip>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewPdf(music)}>
+                                                                                        <Eye className="h-3.5 w-3.5" />
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent><p>Ver PDF</p></TooltipContent>
+                                                                            </Tooltip>
+                                                                            {music.youtube_link && (
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openYouTube(music.youtube_link!)}>
+                                                                                            <Youtube className="h-3.5 w-3.5 text-red-500" />
+                                                                                        </Button>
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent><p>YouTube</p></TooltipContent>
+                                                                                </Tooltip>
+                                                                            )}
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button size="sm" className="h-7 gap-1" onClick={() => handleAddMusic(music)}>
+                                                                                        <Plus className="h-3.5 w-3.5" />
+                                                                                        <span className="hidden sm:inline">Add</span>
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent><p>Adicionar</p></TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         ) : (
                                             <div className="text-center py-8 text-muted-foreground">

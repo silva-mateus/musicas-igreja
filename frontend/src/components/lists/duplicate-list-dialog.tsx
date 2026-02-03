@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Copy } from 'lucide-react'
+import { Copy, Loader2 } from 'lucide-react'
 import { listsApi, handleApiError } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 
@@ -30,14 +30,10 @@ export function DuplicateListDialog({ listId, listName, trigger, onSuccess }: Du
 
         setIsDuplicating(true)
         try {
-            console.log('📋 [DUPLICATE] Duplicando lista:', listId, 'com nome:', newName.trim())
-
             const response = await listsApi.duplicateList(listId, newName.trim())
 
-            console.log('✅ [DUPLICATE] Lista duplicada:', response)
-
             setOpen(false)
-            setNewName(`${listName} - Cópia`) // Reset for next time
+            setNewName(`${listName} - Cópia`)
 
             toast({
                 title: "Lista duplicada!",
@@ -46,13 +42,11 @@ export function DuplicateListDialog({ listId, listName, trigger, onSuccess }: Du
 
             onSuccess?.()
 
-            // Redirecionar para a edição da nova lista após um pequeno delay
             setTimeout(() => {
                 router.push(`/lists/${response.new_list_id}/edit`)
             }, 1000)
 
         } catch (error) {
-            console.error('❌ [DUPLICATE] Erro ao duplicar lista:', error)
             toast({
                 title: "Erro ao duplicar lista",
                 description: handleApiError(error),
@@ -65,14 +59,14 @@ export function DuplicateListDialog({ listId, listName, trigger, onSuccess }: Du
 
     const handleClose = () => {
         setOpen(false)
-        setNewName(`${listName} - Cópia`) // Reset when closing
+        setNewName(`${listName} - Cópia`)
     }
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant="ghost" size="sm" title="Duplicar lista">
+                    <Button variant="ghost" size="icon" title="Duplicar lista">
                         <Copy className="h-4 w-4" />
                     </Button>
                 )}
@@ -119,7 +113,7 @@ export function DuplicateListDialog({ listId, listName, trigger, onSuccess }: Du
                         >
                             {isDuplicating ? (
                                 <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                     Duplicando...
                                 </>
                             ) : (

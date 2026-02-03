@@ -13,6 +13,7 @@ import Link from 'next/link'
 import type { MusicFile as MusicType } from '@/types'
 import { musicApi, handleApiError } from '@/lib/api'
 import { AddToListModal } from '@/components/music/add-to-list-modal'
+import { useAuth } from '@/contexts/AuthContext'
 
 function isValidYouTube(url?: string) {
     if (!url) return false
@@ -28,6 +29,7 @@ export default function MusicDetailsPage() {
     const params = useParams()
     const router = useRouter()
     const { toast } = useToast()
+    const { canEdit, canDelete } = useAuth()
 
     const [music, setMusic] = useState<MusicType | null>(null)
     const [loading, setLoading] = useState(true)
@@ -62,7 +64,6 @@ export default function MusicDetailsPage() {
             setLoadingPdf(true)
             setPdfError(false)
 
-            console.log('🔄 Carregando PDF para fileId:', fileId)
             const response = await fetch(`/api/files/${fileId}/stream`, {
                 method: 'GET',
                 headers: {
@@ -71,9 +72,6 @@ export default function MusicDetailsPage() {
                 cache: 'no-store'
             })
 
-            console.log('📡 Response status:', response.status, response.statusText)
-            console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()))
-
             if (!response.ok) {
                 const errorText = await response.text()
                 console.error('❌ Error response:', errorText)
@@ -81,10 +79,7 @@ export default function MusicDetailsPage() {
             }
 
             const blob = await response.blob()
-            console.log('📦 Blob created:', blob.size, 'bytes, type:', blob.type)
-
             const url = URL.createObjectURL(blob)
-            console.log('🔗 Blob URL created:', url)
             setPdfUrl(url)
         } catch (error) {
             console.error('❌ Erro ao carregar PDF:', error)
@@ -236,31 +231,35 @@ export default function MusicDetailsPage() {
                                     </TooltipContent>
                                 </Tooltip>
 
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="outline" size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
-                                            <Link href={`/music/${music.id}/edit`}>
-                                                <Edit className="h-4 w-4" />
-                                                <span>Editar</span>
-                                            </Link>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Editar informações da música</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {canEdit && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="outline" size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                                <Link href={`/music/${music.id}/edit`}>
+                                                    <Edit className="h-4 w-4" />
+                                                    <span>Editar</span>
+                                                </Link>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Editar informações da música</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
 
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 gap-1 sm:gap-2 text-xs sm:text-sm" onClick={handleDelete}>
-                                            <Trash2 className="h-4 w-4" />
-                                            <span>Excluir</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Excluir esta música</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {canDelete && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 gap-1 sm:gap-2 text-xs sm:text-sm" onClick={handleDelete}>
+                                                <Trash2 className="h-4 w-4" />
+                                                <span>Excluir</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Excluir esta música</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
 
                                 <Tooltip>
                                     <TooltipTrigger asChild>

@@ -23,9 +23,11 @@ import {
     Check,
     FileText,
     Copy,
-    Youtube
+    Youtube,
+    Lock
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { DuplicateListDialog } from '@/components/lists/duplicate-list-dialog'
 
@@ -33,6 +35,7 @@ export default function ListDetailsPage() {
     const router = useRouter()
     const params = useParams()
     const { toast } = useToast()
+    const { canEdit, canDelete } = useAuth()
     const listId = parseInt(params.id as string)
 
     const [list, setList] = useState<MusicList | null>(null)
@@ -292,48 +295,54 @@ export default function ListDetailsPage() {
                                     <p>Baixar todas as músicas mescladas em um PDF</p>
                                 </TooltipContent>
                             </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <DuplicateListDialog
-                                        listId={list.id}
-                                        listName={list.name}
-                                        onSuccess={loadList}
-                                        trigger={
-                                            <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm">
-                                                <Copy className="h-4 w-4" />
-                                                <span>Duplicar</span>
-                                            </Button>
-                                        }
-                                    />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Criar uma cópia desta lista</p>
-                                </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
-                                        <Link href={`/lists/${list.id}/edit`}>
-                                            <Edit className="h-4 w-4" />
-                                            <span>Editar</span>
-                                        </Link>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Editar informações e músicas da lista</p>
-                                </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
-                                        <Trash2 className="h-4 w-4" />
-                                        <span>Excluir</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Excluir esta lista permanentemente</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            {canEdit && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <DuplicateListDialog
+                                            listId={list.id}
+                                            listName={list.name}
+                                            onSuccess={loadList}
+                                            trigger={
+                                                <Button variant="outline" size="sm" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                                    <Copy className="h-4 w-4" />
+                                                    <span>Duplicar</span>
+                                                </Button>
+                                            }
+                                        />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Criar uma cópia desta lista</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                            {canEdit && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                            <Link href={`/lists/${list.id}/edit`}>
+                                                <Edit className="h-4 w-4" />
+                                                <span>Editar</span>
+                                            </Link>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Editar informações e músicas da lista</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                            {canDelete && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Excluir</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Excluir esta lista permanentemente</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
                         </div>
                     </TooltipProvider>
                 </div>
@@ -401,85 +410,111 @@ export default function ListDetailsPage() {
                     </CardHeader>
                     <CardContent>
                         {list.items && list.items.length > 0 ? (
-                            <div className="space-y-3">
-                                {list.items.map((item, index) => (
-                                    <div
-                                        key={item.id}
-                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-muted/50 gap-2 sm:gap-4"
-                                    >
-                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                                            <Badge variant="outline" className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 text-xs sm:text-sm">
-                                                {index + 1}
-                                            </Badge>
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-medium text-sm sm:text-base truncate">{item.music?.title || 'Título não disponível'}</h4>
-                                                {item.music?.artist && (
-                                                    <p className="text-xs sm:text-sm text-muted-foreground truncate">{item.music.artist}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <TooltipProvider>
-                                            <div className="flex gap-1 flex-wrap justify-end">
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/music/${item.music_id}`} target="_blank">
-                                                                <FileText className="h-4 w-4" />
-                                                            </Link>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Ver detalhes da música</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleViewPdf(item.music_id)}
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Visualizar PDF</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDownloadPdf(item.music_id, item.music?.title || '')}
-                                                        >
-                                                            <Download className="h-4 w-4" />
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Baixar arquivo PDF</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                                {item.music?.youtube_link && (
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => openYouTube(item.music!.youtube_link!)}
-                                                            >
-                                                                <Youtube className="h-4 w-4 text-red-500" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>Abrir vídeo no YouTube</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                )}
-                                            </div>
-                                        </TooltipProvider>
-                                    </div>
-                                ))}
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b text-sm text-muted-foreground">
+                                            <th className="text-left py-2 px-2 w-10">#</th>
+                                            <th className="text-left py-2 px-2">Música</th>
+                                            <th className="text-left py-2 px-2 hidden md:table-cell">Artista</th>
+                                            <th className="text-left py-2 px-2 hidden lg:table-cell">Categoria</th>
+                                            <th className="text-left py-2 px-2 hidden lg:table-cell">Tempo Litúrgico</th>
+                                            <th className="text-center py-2 px-2 w-16">Tom</th>
+                                            <th className="text-right py-2 px-2 w-32">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {list.items.map((item, index) => (
+                                            <tr key={item.id} className="border-b hover:bg-muted/50">
+                                                <td className="py-3 px-2">
+                                                    <Badge variant="outline" className="w-7 h-7 rounded-full flex items-center justify-center text-xs">
+                                                        {index + 1}
+                                                    </Badge>
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <div className="font-medium text-sm">{item.music?.title || 'Sem título'}</div>
+                                                    <div className="text-xs text-muted-foreground md:hidden">{item.music?.artist || ''}</div>
+                                                </td>
+                                                <td className="py-3 px-2 hidden md:table-cell text-sm text-muted-foreground">
+                                                    {item.music?.artist || '-'}
+                                                </td>
+                                                <td className="py-3 px-2 hidden lg:table-cell">
+                                                    {item.music?.category ? (
+                                                        <Badge variant="secondary" className="text-xs">{item.music.category}</Badge>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="py-3 px-2 hidden lg:table-cell">
+                                                    {item.music?.liturgical_time ? (
+                                                        <Badge variant="outline" className="text-xs">{item.music.liturgical_time}</Badge>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="py-3 px-2 text-center">
+                                                    {item.music?.musical_key ? (
+                                                        <Badge className="text-xs">{item.music.musical_key}</Badge>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="py-3 px-2">
+                                                    <div className="flex gap-1 justify-end">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                                        <Link href={`/music/${item.music_id}`} target="_blank">
+                                                                            <FileText className="h-4 w-4" />
+                                                                        </Link>
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent><p>Ver detalhes</p></TooltipContent>
+                                                            </Tooltip>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewPdf(item.music_id)}>
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent><p>Visualizar PDF</p></TooltipContent>
+                                                            </Tooltip>
+<Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(item.music_id, item.music?.title || '')}>
+                                                                                        <Download className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent><p>Baixar PDF</p></TooltipContent>
+                                                                            </Tooltip>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    {item.music?.youtube_link ? (
+                                                                                        <Button 
+                                                                                            variant="ghost" 
+                                                                                            size="icon" 
+                                                                                            className="h-8 w-8 text-destructive hover:text-destructive" 
+                                                                                            onClick={() => openYouTube(item.music!.youtube_link!)}
+                                                                                        >
+                                                                                            <Youtube className="h-4 w-4" />
+                                                                                        </Button>
+                                                                                    ) : (
+                                                                                        <Button 
+                                                                                            variant="ghost" 
+                                                                                            size="icon" 
+                                                                                            className="h-8 w-8" 
+                                                                                            disabled
+                                                                                        >
+                                                                                            <Youtube className="h-4 w-4" />
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent>
+                                                                                    <p>{item.music?.youtube_link ? 'Abrir YouTube' : 'Sem link do YouTube'}</p>
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         ) : (
                             <div className="text-center py-12">

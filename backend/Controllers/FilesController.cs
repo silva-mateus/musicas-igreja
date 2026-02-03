@@ -289,6 +289,113 @@ public class FilesController : ControllerBase
         return File(stream, "application/pdf");
     }
 
+    [HttpGet("grouped/by-artist")]
+    public async Task<ActionResult<object>> GetFilesGroupedByArtist()
+    {
+        var files = await _context.PdfFiles
+            .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+            .Include(f => f.FileLiturgicalTimes).ThenInclude(flt => flt.LiturgicalTime)
+            .Where(f => f.Artist != null && f.Artist != "")
+            .OrderBy(f => f.Artist)
+            .ThenBy(f => f.SongName)
+            .ToListAsync();
+
+        var grouped = files
+            .GroupBy(f => f.Artist ?? "Sem Artista")
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                artist = g.Key,
+                count = g.Count(),
+                files = g.Select(f => new
+                {
+                    id = f.Id,
+                    filename = f.Filename,
+                    song_name = f.SongName,
+                    musical_key = f.MusicalKey,
+                    category = f.Category,
+                    categories = f.FileCategories.Select(fc => fc.Category.Name).ToList(),
+                    liturgical_time = f.LiturgicalTime,
+                    liturgical_times = f.FileLiturgicalTimes.Select(flt => flt.LiturgicalTime.Name).ToList(),
+                    youtube_link = f.YoutubeLink
+                })
+            })
+            .ToList();
+
+        return Ok(new { success = true, groups = grouped, total_artists = grouped.Count });
+    }
+
+    [HttpGet("grouped/by-category")]
+    public async Task<ActionResult<object>> GetFilesGroupedByCategory()
+    {
+        var files = await _context.PdfFiles
+            .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+            .Include(f => f.FileLiturgicalTimes).ThenInclude(flt => flt.LiturgicalTime)
+            .OrderBy(f => f.Category)
+            .ThenBy(f => f.SongName)
+            .ToListAsync();
+
+        var grouped = files
+            .GroupBy(f => f.Category ?? "Diversos")
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                category = g.Key,
+                count = g.Count(),
+                files = g.Select(f => new
+                {
+                    id = f.Id,
+                    filename = f.Filename,
+                    song_name = f.SongName,
+                    artist = f.Artist,
+                    musical_key = f.MusicalKey,
+                    categories = f.FileCategories.Select(fc => fc.Category.Name).ToList(),
+                    liturgical_time = f.LiturgicalTime,
+                    liturgical_times = f.FileLiturgicalTimes.Select(flt => flt.LiturgicalTime.Name).ToList(),
+                    youtube_link = f.YoutubeLink
+                })
+            })
+            .ToList();
+
+        return Ok(new { success = true, groups = grouped, total_categories = grouped.Count });
+    }
+
+    [HttpGet("grouped/by-liturgical-time")]
+    public async Task<ActionResult<object>> GetFilesGroupedByLiturgicalTime()
+    {
+        var files = await _context.PdfFiles
+            .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+            .Include(f => f.FileLiturgicalTimes).ThenInclude(flt => flt.LiturgicalTime)
+            .Where(f => f.LiturgicalTime != null && f.LiturgicalTime != "")
+            .OrderBy(f => f.LiturgicalTime)
+            .ThenBy(f => f.SongName)
+            .ToListAsync();
+
+        var grouped = files
+            .GroupBy(f => f.LiturgicalTime ?? "Sem Tempo Litúrgico")
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                liturgical_time = g.Key,
+                count = g.Count(),
+                files = g.Select(f => new
+                {
+                    id = f.Id,
+                    filename = f.Filename,
+                    song_name = f.SongName,
+                    artist = f.Artist,
+                    musical_key = f.MusicalKey,
+                    category = f.Category,
+                    categories = f.FileCategories.Select(fc => fc.Category.Name).ToList(),
+                    liturgical_times = f.FileLiturgicalTimes.Select(flt => flt.LiturgicalTime.Name).ToList(),
+                    youtube_link = f.YoutubeLink
+                })
+            })
+            .ToList();
+
+        return Ok(new { success = true, groups = grouped, total_liturgical_times = grouped.Count });
+    }
+
     [HttpPost("{id}/replace_pdf")]
     [RequestSizeLimit(52_428_800)] // 50MB
     public async Task<ActionResult<object>> ReplacePdf(int id, IFormFile replacement_pdf)

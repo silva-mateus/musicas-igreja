@@ -432,6 +432,136 @@ export const dashboardApi = {
     }
 }
 
+// ============ AUTH ============
+export const authApi = {
+    async login(username: string, password: string): Promise<any> {
+        return await request<any>('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+            credentials: 'include',
+        })
+    },
+
+    async logout(): Promise<any> {
+        return await request<any>('/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+        })
+    },
+
+    async getCurrentUser(): Promise<any> {
+        return await request<any>('/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+        })
+    },
+
+    async changePassword(currentPassword: string, newPassword: string): Promise<any> {
+        return await request<any>('/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+            credentials: 'include',
+        })
+    }
+}
+
+// ============ USERS (Admin only) ============
+export const usersApi = {
+    async getAll(): Promise<any> {
+        return await request<any>('/users', { method: 'GET', credentials: 'include' })
+    },
+
+    async create(username: string, fullName: string, password: string, role: string): Promise<any> {
+        return await request<any>('/users', {
+            method: 'POST',
+            body: JSON.stringify({ username, full_name: fullName, password, role }),
+            credentials: 'include',
+        })
+    },
+
+    async updateRole(userId: number, role: string): Promise<any> {
+        return await request<any>(`/users/${userId}/role`, {
+            method: 'PUT',
+            body: JSON.stringify({ role }),
+            credentials: 'include',
+        })
+    },
+
+    async resetPassword(userId: number, newPassword: string): Promise<any> {
+        return await request<any>(`/users/${userId}/reset-password`, {
+            method: 'POST',
+            body: JSON.stringify({ new_password: newPassword }),
+            credentials: 'include',
+        })
+    },
+
+    async deactivate(userId: number): Promise<any> {
+        return await request<any>(`/users/${userId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    },
+
+    async activate(userId: number): Promise<any> {
+        return await request<any>(`/users/${userId}/activate`, {
+            method: 'PUT',
+            credentials: 'include',
+        })
+    },
+
+    async deletePermanently(userId: number): Promise<any> {
+        return await request<any>(`/users/${userId}/permanent`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    }
+}
+
+// Roles API
+export const rolesApi = {
+    async getAll(): Promise<any> {
+        return await request<any>('/roles', { method: 'GET', credentials: 'include' })
+    },
+
+    async getById(roleId: number): Promise<any> {
+        return await request<any>(`/roles/${roleId}`, { method: 'GET', credentials: 'include' })
+    },
+
+    async create(role: {
+        name: string,
+        display_name: string,
+        description?: string,
+        priority?: number,
+        permissions?: Record<string, boolean>
+    }): Promise<any> {
+        return await request<any>('/roles', {
+            method: 'POST',
+            body: JSON.stringify(role),
+            credentials: 'include',
+        })
+    },
+
+    async update(roleId: number, updates: {
+        display_name?: string,
+        description?: string,
+        priority?: number,
+        permissions?: Record<string, boolean>
+    }): Promise<any> {
+        return await request<any>(`/roles/${roleId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+            credentials: 'include',
+        })
+    },
+
+    async delete(roleId: number): Promise<any> {
+        return await request<any>(`/roles/${roleId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    }
+}
+
 // Google Drive API
 export const googleDriveApi = {
     async getAuthUrl(): Promise<any> {

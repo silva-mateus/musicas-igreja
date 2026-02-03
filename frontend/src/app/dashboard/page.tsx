@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 
 import { MainLayout } from '@/components/layout/main-layout'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
+import { LoadingOverlay } from '@/components/ui/loading-spinner'
+import { ErrorState } from '@/components/ui/error-state'
 import { dashboardApi, handleApiError } from '@/lib/api'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { DashboardCharts } from '@/components/dashboard/charts'
@@ -23,6 +26,7 @@ export default function DashboardPage() {
     const loadStats = async () => {
         try {
             setIsLoading(true)
+            setError('')
             const data = await dashboardApi.getStats()
             setStats(data)
         } catch (error) {
@@ -35,12 +39,7 @@ export default function DashboardPage() {
     if (isLoading) {
         return (
             <MainLayout>
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                        <p className="mt-4 text-muted-foreground">Carregando dashboard...</p>
-                    </div>
-                </div>
+                <LoadingOverlay message="Carregando dashboard..." />
             </MainLayout>
         )
     }
@@ -48,43 +47,27 @@ export default function DashboardPage() {
     if (error) {
         return (
             <MainLayout>
-                <div className="text-center">
-                    <p className="text-destructive">{error}</p>
-                    <Button onClick={loadStats} className="mt-4">
-                        Tentar novamente
-                    </Button>
-                </div>
+                <ErrorState message={error} onRetry={loadStats} />
             </MainLayout>
         )
     }
 
     return (
         <MainLayout>
-            <div className="space-y-8">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                            <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
-                            <span className="truncate">Dashboard</span>
-                        </h1>
-                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-                            Visão geral do sistema de músicas da igreja
-                        </p>
-                    </div>
-                    <Button onClick={loadStats} variant="outline" size="sm" className="gap-2 shrink-0 self-start sm:self-auto">
+            <div className="space-y-6">
+                <PageHeader
+                    icon={BarChart3}
+                    title="Dashboard"
+                    description="Visão geral do sistema de músicas da igreja"
+                >
+                    <Button onClick={loadStats} variant="outline" size="sm" className="gap-2">
                         <RefreshCw className="h-4 w-4" />
                         <span className="hidden sm:inline">Atualizar</span>
                     </Button>
-                </div>
+                </PageHeader>
 
-                {/* Stats Cards */}
                 <StatsCards stats={stats} />
-
-                {/* Charts */}
                 <DashboardCharts />
-
-                {/* Quick Actions */}
                 <QuickActions />
             </div>
         </MainLayout>

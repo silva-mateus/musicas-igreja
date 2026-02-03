@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -14,9 +13,9 @@ import {
     Calendar,
     Music,
     Plus,
-    Check,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Loader2
 } from 'lucide-react'
 import { listsApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
@@ -59,19 +58,14 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
     const loadLists = async () => {
         setIsLoading(true)
         try {
-            console.log('🔍 [MODAL] Carregando listas...')
-            const response = await listsApi.getLists({ page: 1, limit: 1000 }) // Aumentar limite
-            console.log('📋 [MODAL] Resposta da API:', response)
+            const response = await listsApi.getLists({ page: 1, limit: 1000 })
 
-            // Ordenar por data (mais recentes primeiro)
             const sortedLists = (response.data || []).sort((a, b) =>
                 new Date(b.created_date || '').getTime() - new Date(a.created_date || '').getTime()
             )
-            console.log('📋 [MODAL] Listas ordenadas:', sortedLists.length)
             setLists(sortedLists)
             setFilteredLists(sortedLists)
         } catch (error) {
-            console.error('❌ [MODAL] Erro ao carregar listas:', error)
             toast({
                 title: "Erro",
                 description: "Não foi possível carregar as listas.",
@@ -85,9 +79,7 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
     const handleAddToList = async (listId: number, listName: string) => {
         setAddingToList(listId)
         try {
-            console.log('➕ [MODAL] Adicionando música', musicId, 'à lista', listId)
             await listsApi.addMusicToList(listId, musicId)
-            console.log('✅ [MODAL] Música adicionada com sucesso')
             toast({
                 title: "Música adicionada!",
                 description: `"${musicTitle}" foi adicionada à lista "${listName}".`
@@ -95,7 +87,6 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
             setOpen(false)
             onSuccess?.()
         } catch (error) {
-            console.error('❌ [MODAL] Erro ao adicionar música à lista:', error)
             toast({
                 title: "Erro",
                 description: "Não foi possível adicionar a música à lista.",
@@ -125,7 +116,7 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 {trigger || (
-                    <Button variant="ghost" size="sm" title="Adicionar à lista">
+                    <Button variant="ghost" size="icon" title="Adicionar à lista">
                         <ListPlus className="h-4 w-4" />
                     </Button>
                 )}
@@ -202,7 +193,7 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                                                 className="gap-2"
                                             >
                                                 {addingToList === list.id ? (
-                                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white" />
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
                                                 ) : (
                                                     <Plus className="h-3 w-3" />
                                                 )}

@@ -1,31 +1,30 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Pagination } from '@/components/ui/pagination'
+import { EmptyState } from '@/components/ui/empty-state'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import type { MusicList } from '@/types'
 import {
     Eye,
     Edit,
     Trash2,
-    Calendar,
-    Music2,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
     Copy,
     ClipboardList,
     Download,
     Check,
-    MoreHorizontal
+    MoreHorizontal,
+    Loader2
 } from 'lucide-react'
 import { listsApi, handleApiError } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import { DuplicateListDialog } from './duplicate-list-dialog'
 
@@ -50,6 +49,7 @@ export function ListsTable({
     onListDeleted
 }: ListsTableProps) {
     const { toast } = useToast()
+    const { canEdit, canDelete } = useAuth()
     const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; list: MusicList | null }>({
         open: false,
         list: null
@@ -57,17 +57,6 @@ export function ListsTable({
     const [isDeleting, setIsDeleting] = useState(false)
     const [generatingReport, setGeneratingReport] = useState<number | null>(null)
     const [reportCopied, setReportCopied] = useState<number | null>(null)
-    const [isMobile, setIsMobile] = useState(false)
-
-    useEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 640)
-        checkMobile()
-        window.addEventListener('resize', checkMobile)
-        return () => window.removeEventListener('resize', checkMobile)
-    }, [])
-
-    // Debug logs (reduzido)
-    console.log('📋 [TABLE] ListsTable rendered with', lists?.length, 'lists, loading:', isLoading)
 
     const handleDeleteClick = (list: MusicList) => {
         setDeleteDialog({ open: true, list })
@@ -95,7 +84,6 @@ export function ListsTable({
     const handleGenerateReport = async (list: MusicList) => {
         setGeneratingReport(list.id)
         try {
-            // Usar a API do backend para gerar o relatório (garante youtube_link correto)
             const result = await listsApi.generateReport(list.id)
 
             if (!result.success || !result.report) {
@@ -107,28 +95,21 @@ export function ListsTable({
                 return
             }
 
-            // Buscar informações da lista para o cabeçalho
             const fullList = await listsApi.getList(list.id)
 
-            // Montar relatório com cabeçalho personalizado
             let report = `${fullList.name}\n`
             report += '='.repeat(fullList.name.length) + '\n'
 
-            // Adicionar observações se existirem
             if (fullList.observations?.trim()) {
                 report += `${fullList.observations.trim()}\n`
             }
             report += '\n'
 
-            // Adicionar as músicas do backend (com youtube_link correto)
-            // O backend retorna no formato: "Música - Artista - Link"
-            // Vamos numerar as linhas
             const lines = result.report.split('\n').filter((line: string) => line.trim())
             lines.forEach((line: string, index: number) => {
                 report += `${index + 1}. ${line}\n`
             })
 
-            // Copiar para clipboard
             await navigator.clipboard.writeText(report)
             setReportCopied(list.id)
 
@@ -137,11 +118,9 @@ export function ListsTable({
                 description: "O relatório da lista foi copiado para a área de transferência."
             })
 
-            // Reset animation after 2 seconds
             setTimeout(() => setReportCopied(null), 2000)
 
         } catch (error) {
-            console.error('Erro ao gerar relatório:', error)
             toast({
                 title: "Erro",
                 description: "Não foi possível gerar o relatório.",
@@ -169,7 +148,6 @@ export function ListsTable({
                 description: `PDF da lista "${list.name}" está sendo baixado.`
             })
         } catch (error) {
-            console.error('Erro ao baixar PDF:', error)
             toast({
                 title: "Erro no download",
                 description: "Não foi possível baixar o PDF da lista.",
@@ -209,113 +187,90 @@ export function ListsTable({
 
     if (lists.length === 0) {
         return (
-            <div className="text-center py-12">
-                <Music2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Nenhuma lista encontrada</h3>
-                <p className="text-muted-foreground">
-                    Tente ajustar os filtros ou criar uma nova lista.
-                </p>
-            </div>
+            <EmptyState
+                title="Nenhuma lista encontrada"
+                description="Tente ajustar os filtros ou criar uma nova lista."
+            />
         )
     }
 
     return (
         <>
             <div className="space-y-4">
-                {/* Table */}
-                <div>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Nome da Lista</TableHead>
-                                <TableHead className="hidden md:table-cell">Descrição</TableHead>
-                                <TableHead className="hidden sm:table-cell">Músicas</TableHead>
-                                <TableHead className="hidden lg:table-cell">Criada em</TableHead>
-                                <TableHead className="hidden xl:table-cell">Última Atualização</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {lists.map((list) => (
-                                <TableRow key={list.id} className="hover:bg-muted/50">
-                                    <TableCell className="font-medium w-full max-w-0">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <Music2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                <span className="line-clamp-2">{list.name}</span>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome da Lista</TableHead>
+                            <TableHead className="hidden md:table-cell">Descrição</TableHead>
+                            <TableHead className="hidden sm:table-cell">Músicas</TableHead>
+                            <TableHead className="hidden lg:table-cell">Criada em</TableHead>
+                            <TableHead className="hidden xl:table-cell">Última Atualização</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {lists.map((list) => (
+                            <TableRow key={list.id} className="hover:bg-muted/50">
+                                <TableCell className="font-medium w-full max-w-0">
+                                    <div>
+                                        <span className="line-clamp-2">{list.name}</span>
+                                        {/* Mobile info */}
+                                        <div className="mt-2 space-y-1">
+                                            <div className="sm:hidden">
+                                                <Badge variant="secondary" className="text-xs">
+                                                    {list.file_count ?? 0} música{(list.file_count ?? 0) !== 1 ? 's' : ''}
+                                                </Badge>
                                             </div>
-                                            {/* Show mobile info */}
-                                            <div className="mt-2 space-y-1">
-                                                {/* Show music count on mobile */}
-                                                <div className="sm:hidden">
-                                                    <Badge variant="secondary" className="gap-1 text-xs">
-                                                        <Music2 className="h-3 w-3" />
-                                                        {list.file_count ?? 0} música{(list.file_count ?? 0) !== 1 ? 's' : ''}
-                                                    </Badge>
+                                            {list.created_date && (
+                                                <div className="lg:hidden text-xs text-muted-foreground">
+                                                    {new Date(list.created_date).toLocaleDateString('pt-BR')}
                                                 </div>
-                                                {/* Show created date on mobile */}
-                                                {list.created_date && (
-                                                    <div className="lg:hidden text-xs text-muted-foreground">
-                                                        <Calendar className="h-3 w-3 inline mr-1" />
-                                                        {new Date(list.created_date).toLocaleDateString('pt-BR')}
-                                                    </div>
-                                                )}
-                                                {/* Show description on mobile */}
-                                                {list.observations && (
-                                                    <div className="md:hidden text-xs text-muted-foreground line-clamp-2">
-                                                        {list.observations}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            )}
+                                            {list.observations && (
+                                                <div className="md:hidden text-xs text-muted-foreground line-clamp-2">
+                                                    {list.observations}
+                                                </div>
+                                            )}
                                         </div>
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                        {list.observations ? (
-                                            <div className="max-w-xs line-clamp-2 text-sm text-muted-foreground">
-                                                {list.observations}
-                                            </div>
-                                        ) : (
-                                            <span className="text-muted-foreground text-sm">-</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="hidden sm:table-cell">
-                                        <Badge variant="secondary" className="gap-1">
-                                            <Music2 className="h-3 w-3" />
-                                            {list.file_count ?? 0}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" />
-                                            {list.created_date ? new Date(list.created_date).toLocaleDateString('pt-BR') : '-'}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                    {list.observations ? (
+                                        <div className="max-w-xs line-clamp-2 text-sm text-muted-foreground">
+                                            {list.observations}
                                         </div>
-                                    </TableCell>
-                                    <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
-                                        {list.updated_date ? (
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="h-3 w-3" />
-                                                {new Date(list.updated_date).toLocaleDateString('pt-BR')}
-                                            </div>
-                                        ) : (
-                                            <span>-</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right w-auto">
-                                        {/* Desktop Actions - Inline Buttons */}
-                                        <div className="hidden sm:flex justify-end gap-1">
+                                    ) : (
+                                        <span className="text-muted-foreground text-sm">-</span>
+                                    )}
+                                </TableCell>
+                                <TableCell className="hidden sm:table-cell">
+                                    <Badge variant="secondary">
+                                        {list.file_count ?? 0}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                                    {list.created_date ? new Date(list.created_date).toLocaleDateString('pt-BR') : '-'}
+                                </TableCell>
+                                <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
+                                    {list.updated_date ? new Date(list.updated_date).toLocaleDateString('pt-BR') : '-'}
+                                </TableCell>
+                                <TableCell className="text-right w-auto">
+                                    {/* Desktop Actions */}
+                                    <div className="hidden sm:flex justify-end gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            asChild
+                                            title="Visualizar lista"
+                                        >
+                                            <Link href={`/lists/${list.id}`}>
+                                                <Eye className="h-4 w-4" />
+                                            </Link>
+                                        </Button>
+                                        {canEdit && (
                                             <Button
                                                 variant="ghost"
-                                                size="sm"
-                                                asChild
-                                                title="Visualizar lista"
-                                            >
-                                                <Link href={`/lists/${list.id}`}>
-                                                    <Eye className="h-4 w-4" />
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
+                                                size="icon"
                                                 asChild
                                                 title="Editar lista"
                                             >
@@ -323,28 +278,29 @@ export function ListsTable({
                                                     <Edit className="h-4 w-4" />
                                                 </Link>
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleGenerateReport(list)}
-                                                title="Gerar relatório"
-                                                disabled={generatingReport === list.id}
-                                                className="gap-1"
-                                            >
-                                                {reportCopied === list.id ? (
-                                                    <Check className="h-4 w-4 text-green-600" />
-                                                ) : (
-                                                    <ClipboardList className="h-4 w-4" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleDownloadPDF(list)}
-                                                title="Baixar PDF"
-                                            >
-                                                <Download className="h-4 w-4" />
-                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleGenerateReport(list)}
+                                            title="Gerar relatório"
+                                            disabled={generatingReport === list.id}
+                                        >
+                                            {reportCopied === list.id ? (
+                                                <Check className="h-4 w-4 text-primary" />
+                                            ) : (
+                                                <ClipboardList className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDownloadPDF(list)}
+                                            title="Baixar PDF"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                        {canEdit && (
                                             <DuplicateListDialog
                                                 listId={list.id}
                                                 listName={list.name}
@@ -352,175 +308,112 @@ export function ListsTable({
                                                 trigger={
                                                     <Button
                                                         variant="ghost"
-                                                        size="sm"
+                                                        size="icon"
                                                         title="Duplicar lista"
                                                     >
                                                         <Copy className="h-4 w-4" />
                                                     </Button>
                                                 }
                                             />
+                                        )}
+                                        {canDelete && (
                                             <Button
                                                 variant="ghost"
-                                                size="sm"
+                                                size="icon"
                                                 onClick={() => handleDeleteClick(list)}
                                                 title="Excluir lista"
                                                 className="text-destructive hover:text-destructive"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
-                                        </div>
+                                        )}
+                                    </div>
 
-                                        {/* Mobile Actions - Dropdown Menu */}
-                                        <div className="sm:hidden">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Abrir menu de ações</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-56">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/lists/${list.id}`} className="flex items-center">
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            Visualizar Lista
-                                                        </Link>
-                                                    </DropdownMenuItem>
+                                    {/* Mobile Actions - Dropdown */}
+                                    <div className="sm:hidden">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                    <span className="sr-only">Abrir menu</span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-56">
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/lists/${list.id}`} className="flex items-center">
+                                                        <Eye className="mr-2 h-4 w-4" />
+                                                        Visualizar Lista
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                {canEdit && (
                                                     <DropdownMenuItem asChild>
                                                         <Link href={`/lists/${list.id}/edit`} className="flex items-center">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             Editar Lista
                                                         </Link>
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleGenerateReport(list)}
-                                                        disabled={generatingReport === list.id}
-                                                    >
-                                                        {reportCopied === list.id ? (
-                                                            <Check className="mr-2 h-4 w-4 text-green-600" />
-                                                        ) : (
-                                                            <ClipboardList className="mr-2 h-4 w-4" />
-                                                        )}
-                                                        Gerar Relatório
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleDownloadPDF(list)}>
-                                                        <Download className="mr-2 h-4 w-4" />
-                                                        Baixar PDF
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DuplicateListDialog
-                                                        listId={list.id}
-                                                        listName={list.name}
-                                                        onSuccess={() => window.location.reload()}
-                                                        trigger={
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                                                <Copy className="mr-2 h-4 w-4" />
-                                                                Duplicar Lista
-                                                            </DropdownMenuItem>
-                                                        }
-                                                    />
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleDeleteClick(list)}
-                                                        className="text-destructive focus:text-destructive"
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        Excluir Lista
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                                                )}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() => handleGenerateReport(list)}
+                                                    disabled={generatingReport === list.id}
+                                                >
+                                                    {reportCopied === list.id ? (
+                                                        <Check className="mr-2 h-4 w-4 text-primary" />
+                                                    ) : (
+                                                        <ClipboardList className="mr-2 h-4 w-4" />
+                                                    )}
+                                                    Gerar Relatório
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDownloadPDF(list)}>
+                                                    <Download className="mr-2 h-4 w-4" />
+                                                    Baixar PDF
+                                                </DropdownMenuItem>
+                                                {canEdit && (
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DuplicateListDialog
+                                                            listId={list.id}
+                                                            listName={list.name}
+                                                            onSuccess={() => window.location.reload()}
+                                                            trigger={
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                                    <Copy className="mr-2 h-4 w-4" />
+                                                                    Duplicar Lista
+                                                                </DropdownMenuItem>
+                                                            }
+                                                        />
+                                                    </>
+                                                )}
+                                                {canDelete && (
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleDeleteClick(list)}
+                                                            className="text-destructive focus:text-destructive"
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Excluir Lista
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
 
-                {/* Pagination */}
-                {pagination.pages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="text-sm text-muted-foreground order-2 sm:order-1">
-                            <span className="hidden sm:inline">
-                                Mostrando {((pagination.page - 1) * pagination.limit) + 1} a{' '}
-                                {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
-                                {pagination.total} resultado{pagination.total !== 1 ? 's' : ''}
-                            </span>
-                            <span className="sm:hidden">
-                                {pagination.page} de {pagination.pages}
-                            </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onPageChange(1)}
-                                disabled={pagination.page === 1}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                                <ChevronsLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onPageChange(pagination.page - 1)}
-                                disabled={pagination.page === 1}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-
-                            <div className="flex items-center gap-1">
-                                {Array.from({ length: Math.min(isMobile ? 3 : 5, pagination.pages) }, (_, i) => {
-                                    let pageNum
-                                    const maxPages = isMobile ? 3 : 5
-                                    if (pagination.pages <= maxPages) {
-                                        pageNum = i + 1
-                                    } else if (pagination.page <= Math.floor(maxPages / 2) + 1) {
-                                        pageNum = i + 1
-                                    } else if (pagination.page >= pagination.pages - Math.floor(maxPages / 2)) {
-                                        pageNum = pagination.pages - maxPages + 1 + i
-                                    } else {
-                                        pageNum = pagination.page - Math.floor(maxPages / 2) + i
-                                    }
-
-                                    return (
-                                        <Button
-                                            key={pageNum}
-                                            variant={pageNum === pagination.page ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={() => onPageChange(pageNum)}
-                                            className="w-8 h-8 p-0 sm:w-9 sm:h-9"
-                                        >
-                                            {pageNum}
-                                        </Button>
-                                    )
-                                })}
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onPageChange(pagination.page + 1)}
-                                disabled={pagination.page === pagination.pages}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onPageChange(pagination.pages)}
-                                disabled={pagination.page === pagination.pages}
-                                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-                            >
-                                <ChevronsRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                <Pagination
+                    page={pagination.page}
+                    pages={pagination.pages}
+                    total={pagination.total}
+                    limit={pagination.limit}
+                    onPageChange={onPageChange}
+                    itemLabel="lista"
+                />
             </div>
 
             {/* Delete Confirmation Dialog */}
@@ -550,7 +443,7 @@ export function ListsTable({
                         >
                             {isDeleting ? (
                                 <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                     Excluindo...
                                 </>
                             ) : (

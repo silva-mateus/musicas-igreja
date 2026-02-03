@@ -272,7 +272,10 @@ export const listsApi = {
                     original_name: it.file.filename,
                     title: it.file.song_name || it.file.filename?.replace('.pdf', ''),
                     artist: it.file.artist,
+                    category: it.file.category || (it.file.categories?.[0]) || undefined,
+                    liturgical_time: it.file.liturgical_time || (it.file.liturgical_times?.[0]) || undefined,
                     musical_key: it.file.musical_key,
+                    youtube_link: it.file.youtube_link,
                     file_size: 0,
                     upload_date: '',
                     uploaded_by: 0,
@@ -330,6 +333,10 @@ export const listsApi = {
         const res = await fetch(`${BASE}/merge_lists/${listId}/export`, { cache: 'no-store' })
         if (!res.ok) throw new Error('Falha ao exportar')
         return await res.blob()
+    },
+
+    async generateReport(listId: number): Promise<{ success: boolean; report?: string; message?: string }> {
+        return await request<{ success: boolean; report?: string; message?: string }>(`/merge_lists/${listId}/report`, { method: 'GET' })
     },
 }
 
@@ -426,6 +433,160 @@ export const dashboardApi = {
 
     async getArtists(): Promise<string[]> {
         return await request<string[]>('/dashboard/get_artists', { method: 'GET' })
+    }
+}
+
+// ============ AUTH ============
+export const authApi = {
+    async login(username: string, password: string): Promise<any> {
+        return await request<any>('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+            credentials: 'include',
+        })
+    },
+
+    async logout(): Promise<any> {
+        return await request<any>('/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+        })
+    },
+
+    async getCurrentUser(): Promise<any> {
+        return await request<any>('/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+        })
+    },
+
+    async changePassword(currentPassword: string, newPassword: string): Promise<any> {
+        return await request<any>('/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+            credentials: 'include',
+        })
+    }
+}
+
+// ============ ROLES ============
+export const rolesApi = {
+    async getAll(): Promise<any> {
+        return await request<any>('/roles', { method: 'GET', credentials: 'include' })
+    },
+
+    async getById(id: number): Promise<any> {
+        return await request<any>(`/roles/${id}`, { method: 'GET', credentials: 'include' })
+    },
+
+    async create(data: {
+        name: string
+        display_name: string
+        description?: string
+        priority?: number
+        is_default?: boolean
+        permissions?: {
+            can_view_music?: boolean
+            can_download_music?: boolean
+            can_edit_music_metadata?: boolean
+            can_upload_music?: boolean
+            can_delete_music?: boolean
+            can_manage_lists?: boolean
+            can_manage_categories?: boolean
+            can_manage_users?: boolean
+            can_manage_roles?: boolean
+            can_access_admin?: boolean
+        }
+    }): Promise<any> {
+        return await request<any>('/roles', {
+            method: 'POST',
+            body: JSON.stringify(data),
+            credentials: 'include',
+        })
+    },
+
+    async update(id: number, data: {
+        display_name?: string
+        description?: string
+        priority?: number
+        is_default?: boolean
+        permissions?: {
+            can_view_music?: boolean
+            can_download_music?: boolean
+            can_edit_music_metadata?: boolean
+            can_upload_music?: boolean
+            can_delete_music?: boolean
+            can_manage_lists?: boolean
+            can_manage_categories?: boolean
+            can_manage_users?: boolean
+            can_manage_roles?: boolean
+            can_access_admin?: boolean
+        }
+    }): Promise<any> {
+        return await request<any>(`/roles/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+            credentials: 'include',
+        })
+    },
+
+    async delete(id: number): Promise<any> {
+        return await request<any>(`/roles/${id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    },
+
+    async setDefault(id: number): Promise<any> {
+        return await request<any>(`/roles/${id}/set-default`, {
+            method: 'POST',
+            credentials: 'include',
+        })
+    },
+}
+
+// ============ USERS (Admin only) ============
+export const usersApi = {
+    async getAll(): Promise<any> {
+        return await request<any>('/users', { method: 'GET', credentials: 'include' })
+    },
+
+    async create(username: string, fullName: string, password: string, role: string): Promise<any> {
+        return await request<any>('/users', {
+            method: 'POST',
+            body: JSON.stringify({ username, full_name: fullName, password, role }),
+            credentials: 'include',
+        })
+    },
+
+    async updateRole(userId: number, role: string): Promise<any> {
+        return await request<any>(`/users/${userId}/role`, {
+            method: 'PUT',
+            body: JSON.stringify({ role }),
+            credentials: 'include',
+        })
+    },
+
+    async resetPassword(userId: number, newPassword: string): Promise<any> {
+        return await request<any>(`/users/${userId}/reset-password`, {
+            method: 'POST',
+            body: JSON.stringify({ new_password: newPassword }),
+            credentials: 'include',
+        })
+    },
+
+    async deactivate(userId: number): Promise<any> {
+        return await request<any>(`/users/${userId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    },
+
+    async activate(userId: number): Promise<any> {
+        return await request<any>(`/users/${userId}/activate`, {
+            method: 'PUT',
+            credentials: 'include',
+        })
     }
 }
 

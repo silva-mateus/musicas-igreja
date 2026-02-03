@@ -49,6 +49,12 @@ public class MergeListsController : ControllerBase
         var list = await _context.MergeLists
             .Include(l => l.Items)
                 .ThenInclude(i => i.PdfFile)
+                    .ThenInclude(p => p.FileCategories)
+                        .ThenInclude(fc => fc.Category)
+            .Include(l => l.Items)
+                .ThenInclude(i => i.PdfFile)
+                    .ThenInclude(p => p.FileLiturgicalTimes)
+                        .ThenInclude(flt => flt.LiturgicalTime)
             .FirstOrDefaultAsync(l => l.Id == id);
 
         if (list == null)
@@ -68,6 +74,8 @@ public class MergeListsController : ControllerBase
                     i.PdfFile.Filename,
                     i.PdfFile.SongName,
                     i.PdfFile.Artist,
+                    i.PdfFile.FileCategories.FirstOrDefault()?.Category?.Name ?? i.PdfFile.Category,
+                    i.PdfFile.FileLiturgicalTimes.FirstOrDefault()?.LiturgicalTime?.Name ?? i.PdfFile.LiturgicalTime,
                     i.PdfFile.MusicalKey,
                     i.PdfFile.YoutubeLink
                 )
@@ -155,27 +163,32 @@ public class MergeListsController : ControllerBase
             return NotFound(new { success = false, error = "Lista não encontrada" });
 
         var maxPosition = list.Items.Any() ? list.Items.Max(i => i.OrderPosition) : -1;
-        var addedCount = 0;
+        var newItems = new List<MergeListItem>();
 
         foreach (var fileId in dto.FileIds)
         {
             var file = await _context.PdfFiles.FindAsync(fileId);
             if (file != null)
             {
-                _context.MergeListItems.Add(new MergeListItem
+                var newItem = new MergeListItem
                 {
                     MergeListId = id,
                     PdfFileId = fileId,
                     OrderPosition = ++maxPosition
-                });
-                addedCount++;
+                };
+                _context.MergeListItems.Add(newItem);
+                newItems.Add(newItem);
             }
         }
 
         list.UpdatedDate = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return Ok(new { success = true, added_count = addedCount });
+        return Ok(new { 
+            success = true, 
+            added = newItems.Count, 
+            new_item_ids = newItems.Select(i => i.Id).ToList() 
+        });
     }
 
     [HttpPost("{id}/reorder")]
@@ -241,6 +254,40 @@ public class MergeListsController : ControllerBase
             items_copied = originalList.Items.Count,
             message = "Lista duplicada com sucesso"
         });
+    }
+
+    [HttpGet("{id}/report")]
+    public async Task<ActionResult<object>> GenerateReport(int id)
+    {
+        var list = await _context.MergeLists
+            .Include(l => l.Items)
+                .ThenInclude(i => i.PdfFile)
+            .FirstOrDefaultAsync(l => l.Id == id);
+
+        if (list == null)
+            return NotFound(new { success = false, error = "Lista não encontrada" });
+
+        if (!list.Items.Any())
+            return Ok(new { success = true, report = "", message = "Lista vazia" });
+
+        var lines = list.Items.OrderBy(i => i.OrderPosition).Select(item =>
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(item.PdfFile.SongName))
+                parts.Add(item.PdfFile.SongName);
+            else
+                parts.Add(item.PdfFile.Filename?.Replace(".pdf", "") ?? "Sem título");
+
+            if (!string.IsNullOrEmpty(item.PdfFile.Artist))
+                parts.Add(item.PdfFile.Artist);
+
+            if (!string.IsNullOrEmpty(item.PdfFile.YoutubeLink))
+                parts.Add(item.PdfFile.YoutubeLink);
+
+            return string.Join(" - ", parts);
+        });
+
+        return Ok(new { success = true, report = string.Join("\n", lines) });
     }
 
     [HttpGet("{id}/export")]

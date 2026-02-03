@@ -9,28 +9,26 @@ import { UploadResults } from '@/components/upload/upload-results'
 import { UploadMetadataEditor } from '@/components/upload/upload-metadata-editor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
 import { musicApi, handleApiError } from '@/lib/api'
 import type { UploadResponse } from '@/types'
-import { Upload, FileText, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react'
+import { Upload, FileText, AlertTriangle, RefreshCw, Lock, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface FileMetadata {
     file: File
     title: string
     artist: string
-    // Legacy single fields (fallbacks)
     category: string
     liturgical_time: string
-    // Preferred multi-select fields
     categories?: string[]
     liturgical_times?: string[]
-    // Creation of new items during upload
     new_categories?: string[]
     new_liturgical_times?: string[]
     new_artist?: string
-    // Others
     musical_key: string
     youtube_link: string
     observations: string
@@ -47,6 +45,7 @@ interface UploadState {
 
 export default function UploadPage() {
     const { toast } = useToast()
+    const { canUpload, isAuthenticated } = useAuth()
 
     const [uploadState, setUploadState] = useState<UploadState>({
         files: [],
@@ -85,7 +84,6 @@ export default function UploadPage() {
     const handleUpload = async () => {
         if (uploadState.files.length === 0) return
 
-        // Validar se todos os arquivos têm metadados válidos
         const invalidFiles = uploadState.metadata.filter(meta => !meta.title.trim() || !(meta.categories && meta.categories.length > 0))
         if (invalidFiles.length > 0) {
             toast({
@@ -99,12 +97,10 @@ export default function UploadPage() {
         setUploadState(prev => ({ ...prev, isUploading: true, error: '', progress: 0 }))
 
         try {
-            // Preparar metadados para envio
             const metadata = uploadState.metadata.map(meta => ({
                 title: meta.title,
                 artist: meta.artist,
                 new_artist: meta.new_artist,
-                // Prefer multi-select arrays; backend fará o primário a partir delas
                 categories: meta.categories || (meta.category ? [meta.category] : []),
                 liturgical_times: meta.liturgical_times || (meta.liturgical_time ? [meta.liturgical_time] : []),
                 new_categories: meta.new_categories || [],
@@ -159,36 +155,36 @@ export default function UploadPage() {
         })
     }
 
-    const removeFile = (index: number) => {
-        setUploadState(prev => ({
-            ...prev,
-            files: prev.files.filter((_, i) => i !== index),
-            metadata: prev.metadata.filter((_, i) => i !== index)
-        }))
+    // Permission check
+    if (!isAuthenticated || !canUpload) {
+        return (
+            <MainLayout>
+                <EmptyState
+                    icon={Lock}
+                    title="Acesso Restrito"
+                    description={!isAuthenticated
+                        ? 'Você precisa estar logado para fazer upload de arquivos.'
+                        : 'Você não tem permissão para fazer upload de arquivos. Somente Uploaders e Administradores podem fazer isso.'}
+                    className="min-h-[400px]"
+                />
+            </MainLayout>
+        )
     }
-
-
 
     return (
         <MainLayout>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                            <Upload className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
-                            <span className="truncate">Upload de Músicas</span>
-                        </h1>
-                        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-                            Envie arquivos PDF de partituras para o sistema
-                        </p>
-                    </div>
+                <PageHeader
+                    icon={Upload}
+                    title="Upload de Músicas"
+                    description="Envie arquivos PDF de partituras para o sistema"
+                >
                     {(uploadState.files.length > 0 || uploadState.results) && (
                         <Button
                             onClick={resetUpload}
                             variant="outline"
                             size="sm"
-                            className="gap-2 shrink-0 self-start sm:self-auto"
+                            className="gap-2"
                             disabled={uploadState.isUploading}
                         >
                             <RefreshCw className="h-4 w-4" />
@@ -196,9 +192,9 @@ export default function UploadPage() {
                             <span className="sm:hidden">Novo</span>
                         </Button>
                     )}
-                </div>
+                </PageHeader>
 
-                {/* Upload Instructions */}
+                {/* Instructions */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -210,9 +206,9 @@ export default function UploadPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <h4 className="font-medium text-green-600">✅ Formatos Aceitos</h4>
+                                <h4 className="font-medium text-primary">✅ Formatos Aceitos</h4>
                                 <ul className="text-sm text-muted-foreground space-y-1">
                                     <li>• Arquivos PDF (.pdf)</li>
                                     <li>• Múltiplos arquivos por vez</li>
@@ -220,7 +216,7 @@ export default function UploadPage() {
                                 </ul>
                             </div>
                             <div className="space-y-2">
-                                <h4 className="font-medium text-blue-600">💡 Dicas</h4>
+                                <h4 className="font-medium text-primary">💡 Dicas</h4>
                                 <ul className="text-sm text-muted-foreground space-y-1">
                                     <li>• Use nomes descritivos nos arquivos</li>
                                     <li>• O sistema detecta duplicatas automaticamente</li>
@@ -277,7 +273,7 @@ export default function UploadPage() {
                                 >
                                     {uploadState.isUploading ? (
                                         <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                             Enviando...
                                         </>
                                     ) : (

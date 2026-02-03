@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { listsApi, handleApiError } from '@/lib/api'
 import type { MusicList } from '@/types'
-import { Plus, Music } from 'lucide-react'
+import { Plus, Music, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface CreateListDialogProps {
@@ -175,7 +175,7 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
                     >
                         {isLoading ? (
                             <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                                 Criando...
                             </>
                         ) : (

@@ -150,7 +150,7 @@ export function UploadZone({
                                                 {fileStatus.status === 'success' ? 'OK' : 'Erro'}
                                             </Badge>
                                             {onRemoveFile && (
-                                                <Button variant="ghost" size="sm" onClick={() => onRemoveFile(index)} className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive">
+                                                <Button variant="ghost" size="icon" onClick={() => onRemoveFile(index)} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive">
                                                     <X className="h-4 w-4" />
                                                 </Button>
                                             )}

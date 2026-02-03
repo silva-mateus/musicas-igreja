@@ -65,8 +65,6 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
             const categories = Array.isArray(catsResult?.data) ? catsResult.data : (Array.isArray(catsResult) ? catsResult : [])
             const liturgicalTimes = Array.isArray(timesResult?.data) ? timesResult.data : (Array.isArray(timesResult) ? timesResult : [])
             
-            console.log('📋 Sugestões carregadas:', { artists: artists.length, categories: categories.length, liturgicalTimes: liturgicalTimes.length })
-            
             setSuggestions(prev => ({
                 ...prev,
                 artists,

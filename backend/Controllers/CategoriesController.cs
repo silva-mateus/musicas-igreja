@@ -101,18 +101,69 @@ public class CategoriesController : ControllerBase
         if (category == null)
             return NotFound(new { success = false, error = "Categoria não encontrada" });
 
-        // Check if category is in use
-        if (category.FileCategories.Any())
-            return BadRequest(new
-            {
-                success = false,
-                error = $"Categoria está em uso por {category.FileCategories.Count} arquivo(s). Remova as associações antes de excluir."
-            });
-
+        // Remove all file associations first, then delete category
+        _context.FileCategories.RemoveRange(category.FileCategories);
         _context.Categories.Remove(category);
         await _context.SaveChangesAsync();
 
         return Ok(new { success = true, deleted_name = category.Name });
+    }
+
+    /// <summary>
+    /// Merge (consolidate) one category into another.
+    /// All files from source category will be associated with target category.
+    /// Source category will be deleted.
+    /// </summary>
+    [HttpPost("{sourceId}/merge/{targetId}")]
+    public async Task<ActionResult<object>> MergeCategory(int sourceId, int targetId)
+    {
+        if (sourceId == targetId)
+            return BadRequest(new { success = false, error = "Não é possível consolidar uma categoria com ela mesma" });
+
+        var source = await _context.Categories
+            .Include(c => c.FileCategories)
+            .FirstOrDefaultAsync(c => c.Id == sourceId);
+
+        var target = await _context.Categories.FindAsync(targetId);
+
+        if (source == null)
+            return NotFound(new { success = false, error = "Categoria de origem não encontrada" });
+
+        if (target == null)
+            return NotFound(new { success = false, error = "Categoria de destino não encontrada" });
+
+        var mergedCount = source.FileCategories.Count;
+
+        // Move all file associations from source to target
+        foreach (var fileCategory in source.FileCategories.ToList())
+        {
+            // Check if target already has this file association
+            var existingAssociation = await _context.FileCategories
+                .FirstOrDefaultAsync(fc => fc.FileId == fileCategory.FileId && fc.CategoryId == targetId);
+
+            if (existingAssociation == null)
+            {
+                // Create new association with target
+                _context.FileCategories.Add(new FileCategory
+                {
+                    FileId = fileCategory.FileId,
+                    CategoryId = targetId
+                });
+            }
+
+            // Remove old association
+            _context.FileCategories.Remove(fileCategory);
+        }
+
+        // Delete the source category
+        _context.Categories.Remove(source);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { 
+            success = true, 
+            message = $"Categoria '{source.Name}' consolidada com '{target.Name}' com sucesso",
+            merged_files = mergedCount
+        });
     }
 }
 
@@ -211,17 +262,68 @@ public class LiturgicalTimesController : ControllerBase
         if (time == null)
             return NotFound(new { success = false, error = "Tempo litúrgico não encontrado" });
 
-        // Check if time is in use
-        if (time.FileLiturgicalTimes.Any())
-            return BadRequest(new
-            {
-                success = false,
-                error = $"Tempo litúrgico está em uso por {time.FileLiturgicalTimes.Count} arquivo(s). Remova as associações antes de excluir."
-            });
-
+        // Remove all file associations first, then delete
+        _context.FileLiturgicalTimes.RemoveRange(time.FileLiturgicalTimes);
         _context.LiturgicalTimes.Remove(time);
         await _context.SaveChangesAsync();
 
         return Ok(new { success = true, deleted_name = time.Name });
+    }
+
+    /// <summary>
+    /// Merge (consolidate) one liturgical time into another.
+    /// All files from source will be associated with target.
+    /// Source will be deleted.
+    /// </summary>
+    [HttpPost("{sourceId}/merge/{targetId}")]
+    public async Task<ActionResult<object>> MergeLiturgicalTime(int sourceId, int targetId)
+    {
+        if (sourceId == targetId)
+            return BadRequest(new { success = false, error = "Não é possível consolidar um tempo litúrgico com ele mesmo" });
+
+        var source = await _context.LiturgicalTimes
+            .Include(l => l.FileLiturgicalTimes)
+            .FirstOrDefaultAsync(l => l.Id == sourceId);
+
+        var target = await _context.LiturgicalTimes.FindAsync(targetId);
+
+        if (source == null)
+            return NotFound(new { success = false, error = "Tempo litúrgico de origem não encontrado" });
+
+        if (target == null)
+            return NotFound(new { success = false, error = "Tempo litúrgico de destino não encontrado" });
+
+        var mergedCount = source.FileLiturgicalTimes.Count;
+
+        // Move all file associations from source to target
+        foreach (var fileLiturgicalTime in source.FileLiturgicalTimes.ToList())
+        {
+            // Check if target already has this file association
+            var existingAssociation = await _context.FileLiturgicalTimes
+                .FirstOrDefaultAsync(flt => flt.FileId == fileLiturgicalTime.FileId && flt.LiturgicalTimeId == targetId);
+
+            if (existingAssociation == null)
+            {
+                // Create new association with target
+                _context.FileLiturgicalTimes.Add(new FileLiturgicalTime
+                {
+                    FileId = fileLiturgicalTime.FileId,
+                    LiturgicalTimeId = targetId
+                });
+            }
+
+            // Remove old association
+            _context.FileLiturgicalTimes.Remove(fileLiturgicalTime);
+        }
+
+        // Delete the source
+        _context.LiturgicalTimes.Remove(source);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { 
+            success = true, 
+            message = $"Tempo litúrgico '{source.Name}' consolidado com '{target.Name}' com sucesso",
+            merged_files = mergedCount
+        });
     }
 }

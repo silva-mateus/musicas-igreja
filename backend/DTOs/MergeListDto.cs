@@ -29,6 +29,8 @@ public record MergeListFileDto(
     string Filename,
     string? SongName,
     string? Artist,
+    string? Category,
+    string? LiturgicalTime,
     string? MusicalKey,
     string? YoutubeLink
 );

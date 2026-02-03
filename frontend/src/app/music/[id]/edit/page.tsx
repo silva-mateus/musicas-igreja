@@ -11,8 +11,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MultiSelect } from '@/components/ui/multi-select'
 import { Autocomplete } from '@/components/ui/autocomplete'
-import { ArrowLeft, Save, X, Music, User, Tag, Calendar, Link as LinkIcon, Eye } from 'lucide-react'
+import { ArrowLeft, Save, X, Music, User, Tag, Calendar, Link as LinkIcon, Eye, Lock } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
 import type { MusicFile as MusicType } from '@/types'
 import { musicApi, handleApiError } from '@/lib/api'
@@ -43,6 +44,7 @@ export default function EditMusicPage() {
     const params = useParams()
     const router = useRouter()
     const { toast } = useToast()
+    const { canEdit, isAuthenticated } = useAuth()
 
     const [music, setMusic] = useState<MusicType | null>(null)
     const [loading, setLoading] = useState(true)
@@ -174,6 +176,23 @@ export default function EditMusicPage() {
     const handleCancel = () => {
         if (hasChanges && !confirm('Você tem alterações não salvas. Deseja realmente cancelar?')) return
         router.push(`/music/${musicId}`)
+    }
+
+    // Permission check
+    if (!isAuthenticated || !canEdit) {
+        return (
+            <MainLayout>
+                <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                    <Lock className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h2 className="text-xl font-semibold mb-2">Acesso Restrito</h2>
+                    <p className="text-muted-foreground">
+                        {!isAuthenticated 
+                            ? 'Você precisa estar logado para editar músicas.'
+                            : 'Você não tem permissão para editar músicas.'}
+                    </p>
+                </div>
+            </MainLayout>
+        )
     }
 
     if (loading) {
