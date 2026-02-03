@@ -72,6 +72,7 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var fileService = scope.ServiceProvider.GetRequiredService<IFileService>();
     var migrationService = scope.ServiceProvider.GetRequiredService<IMigrationService>();
+    var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     
     // Create database if it doesn't exist
@@ -82,7 +83,10 @@ using (var scope = app.Services.CreateScope())
     }
     
     // Migrate users table schema if needed (from old email-based to new full_name-based)
-    await MigrateUsersTableSchemaAsync(context, logger, scope.ServiceProvider.GetRequiredService<IAuthService>());
+    await MigrateUsersTableSchemaAsync(context, logger, authService);
+    
+    // Check and log password hash migration status (legacy SHA256 -> BCrypt)
+    await authService.MigratePasswordHashesAsync();
     
     // Run SQL migration scripts (handles table creation and schema updates)
     await migrationService.RunMigrationsAsync();

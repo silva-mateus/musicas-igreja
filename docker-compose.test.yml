@@ -1,0 +1,15 @@
+version: '3.8'
+
+# Docker Compose for running tests in CI/CD
+# Usage: docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ./backend:/src/backend:ro
+      - ./backend.tests:/src/backend.tests:ro
+    environment:
+      - DOTNET_CLI_TELEMETRY_OPTOUT=1

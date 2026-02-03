@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
+using MusicasIgreja.Api.DTOs;
 using MusicasIgreja.Api.Models;
 using MusicasIgreja.Api.Services;
-using System.Text.Json.Serialization;
 
 namespace MusicasIgreja.Api.Controllers;
 
@@ -349,20 +349,3 @@ public class AdminController : ControllerBase
     }
 }
 
-public class FixPdfNamesRequest
-{
-    [JsonPropertyName("file_ids")]
-    public List<int>? FileIds { get; set; }
-}
-
-public class RegisterEntitiesRequest
-{
-    [JsonPropertyName("artists")]
-    public List<string>? Artists { get; set; }
-
-    [JsonPropertyName("categories")]
-    public List<string>? Categories { get; set; }
-
-    [JsonPropertyName("liturgical_times")]
-    public List<string>? LiturgicalTimes { get; set; }
-}

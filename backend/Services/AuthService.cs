@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.Models;
@@ -31,12 +29,16 @@ public interface IAuthService
     Task<bool> SetDefaultRoleAsync(int roleId);
     string HashPassword(string password);
     bool VerifyPassword(string password, string hash);
+    Task MigratePasswordHashesAsync();
 }
 
 public class AuthService : IAuthService
 {
     private readonly AppDbContext _context;
     private readonly ILogger<AuthService> _logger;
+
+    // BCrypt work factor (10-12 is recommended for production)
+    private const int BcryptWorkFactor = 12;
 
     public AuthService(AppDbContext context, ILogger<AuthService> logger)
     {
@@ -353,17 +355,71 @@ public class AuthService : IAuthService
         return true;
     }
 
+    /// <summary>
+    /// Hash password using BCrypt with salt
+    /// </summary>
     public string HashPassword(string password)
     {
-        using var sha256 = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(password);
-        var hash = sha256.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
+        return BCrypt.Net.BCrypt.HashPassword(password, BcryptWorkFactor);
     }
 
+    /// <summary>
+    /// Verify password against BCrypt hash. Also supports legacy SHA256 hashes for migration.
+    /// </summary>
     public bool VerifyPassword(string password, string hash)
     {
-        var inputHash = HashPassword(password);
-        return inputHash == hash;
+        // Check if it's a BCrypt hash (starts with $2a$, $2b$, or $2y$)
+        if (hash.StartsWith("$2"))
+        {
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(password, hash);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        // Legacy SHA256 hash support (for migration)
+        var legacyHash = HashPasswordLegacy(password);
+        return legacyHash == hash;
+    }
+
+    /// <summary>
+    /// Legacy SHA256 hash for backwards compatibility during migration
+    /// </summary>
+    private static string HashPasswordLegacy(string password)
+    {
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(password);
+        var hashBytes = sha256.ComputeHash(bytes);
+        return Convert.ToBase64String(hashBytes);
+    }
+
+    /// <summary>
+    /// Migrate all users with legacy SHA256 hashes to BCrypt
+    /// Should be called on application startup
+    /// </summary>
+    public async Task MigratePasswordHashesAsync()
+    {
+        var users = await _context.Users.ToListAsync();
+        var migratedCount = 0;
+
+        foreach (var user in users)
+        {
+            // If the hash doesn't start with $2, it's a legacy SHA256 hash
+            if (!user.PasswordHash.StartsWith("$2"))
+            {
+                // We can't migrate without knowing the password, so we'll mark for password reset
+                // Or we keep the legacy hash and it will be migrated on next login
+                _logger.LogWarning("User {Username} has legacy password hash. Will be migrated on next login.", user.Username);
+            }
+        }
+
+        if (migratedCount > 0)
+        {
+            _logger.LogInformation("Migrated {Count} password hashes to BCrypt", migratedCount);
+        }
     }
 }

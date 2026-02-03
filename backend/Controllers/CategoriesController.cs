@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
+using MusicasIgreja.Api.Helpers;
 using MusicasIgreja.Api.Models;
 
 namespace MusicasIgreja.Api.Controllers;

@@ -1,0 +1,24 @@
+# Dockerfile for running tests in CI/CD
+FROM mcr.microsoft.com/dotnet/sdk:9.0
+
+WORKDIR /src
+
+# Copy backend project
+COPY backend/MusicasIgreja.Api.csproj ./backend/
+COPY backend.tests/MusicasIgreja.Api.Tests.csproj ./backend.tests/
+
+# Restore
+WORKDIR /src/backend.tests
+RUN dotnet restore
+
+# Copy all source
+WORKDIR /src
+COPY backend/ ./backend/
+COPY backend.tests/ ./backend.tests/
+
+# Build and test
+WORKDIR /src/backend.tests
+RUN dotnet build --no-restore -c Release
+
+# Run tests - exit with non-zero if tests fail
+ENTRYPOINT ["dotnet", "test", "--no-build", "-c", "Release", "--verbosity", "normal", "--logger", "console;verbosity=detailed"]

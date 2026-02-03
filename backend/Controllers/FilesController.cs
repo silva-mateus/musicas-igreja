@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
+using MusicasIgreja.Api.Helpers;
 using MusicasIgreja.Api.Models;
 using MusicasIgreja.Api.Services;
 
@@ -35,14 +36,23 @@ public class FilesController : ControllerBase
             .Include(f => f.FileLiturgicalTimes).ThenInclude(flt => flt.LiturgicalTime)
             .AsQueryable();
 
-        // Apply search filter
+        // Apply search filter with accent-insensitive matching
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var searchTerm = q.ToLower();
-            query = query.Where(f =>
-                (f.SongName != null && f.SongName.ToLower().Contains(searchTerm)) ||
-                (f.Artist != null && f.Artist.ToLower().Contains(searchTerm)) ||
-                f.Filename.ToLower().Contains(searchTerm));
+            // Get all files and filter in memory for accent-insensitive search
+            var allFiles = await query.ToListAsync();
+            var filteredIds = allFiles
+                .Where(f => 
+                    TextHelper.ContainsIgnoreAccents(f.SongName, q) ||
+                    TextHelper.ContainsIgnoreAccents(f.Artist, q) ||
+                    TextHelper.ContainsIgnoreAccents(f.Filename, q))
+                .Select(f => f.Id)
+                .ToList();
+            
+            query = _context.PdfFiles
+                .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+                .Include(f => f.FileLiturgicalTimes).ThenInclude(flt => flt.LiturgicalTime)
+                .Where(f => filteredIds.Contains(f.Id));
         }
 
         // Apply category filter
@@ -270,8 +280,8 @@ public class FilesController : ControllerBase
         if (!System.IO.File.Exists(absolutePath))
             return NotFound(new { success = false, error = "Arquivo físico não encontrado" });
 
-        var stream = new FileStream(absolutePath, FileMode.Open, FileAccess.Read);
-        return File(stream, "application/pdf", file.Filename);
+        // Use PhysicalFile to ensure proper disposal
+        return PhysicalFile(absolutePath, "application/pdf", file.Filename);
     }
 
     [HttpGet("{id}/stream")]
@@ -285,8 +295,8 @@ public class FilesController : ControllerBase
         if (!System.IO.File.Exists(absolutePath))
             return NotFound(new { success = false, error = "Arquivo físico não encontrado" });
 
-        var stream = new FileStream(absolutePath, FileMode.Open, FileAccess.Read);
-        return File(stream, "application/pdf");
+        // Use PhysicalFile to ensure proper disposal
+        return PhysicalFile(absolutePath, "application/pdf");
     }
 
     [HttpGet("grouped/by-artist")]
