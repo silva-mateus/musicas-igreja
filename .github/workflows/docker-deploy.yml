@@ -23,9 +23,6 @@ jobs:
   test-backend:
     name: Run Backend Tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,14 +32,25 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       
-      - name: Restore dependencies
+      - name: Restore backend dependencies
+        working-directory: backend
         run: dotnet restore
       
-      - name: Build
+      - name: Restore test dependencies
+        working-directory: backend.tests
+        run: dotnet restore
+      
+      - name: Build backend
+        working-directory: backend
+        run: dotnet build --no-restore --configuration Release
+      
+      - name: Build tests
+        working-directory: backend.tests
         run: dotnet build --no-restore --configuration Release
       
       - name: Run Unit Tests
-        run: dotnet test ../backend.tests/MusicasIgreja.Api.Tests.csproj --no-build --verbosity normal --configuration Release --logger "trx;LogFileName=test-results.trx"
+        working-directory: backend.tests
+        run: dotnet test --no-build --verbosity normal --configuration Release --logger "trx;LogFileName=test-results.trx"
       
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
