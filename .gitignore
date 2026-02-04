@@ -28,10 +28,13 @@ backend/obj/
 *.userosscache
 *.sln.docstates
 
-# Data and uploads
-backend/data/
+# Data and uploads (runtime data, not source code)
+# Note: backend/Data/ is source code folder (AppDbContext.cs), not ignored
+# Only ignore lowercase data/ for runtime database
+backend/data/*.db
+backend/data/*.db-journal
 backend/organized/
-*.db
+*.db-journal
 *.db-journal
 
 # NuGet packages
