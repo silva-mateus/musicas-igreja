@@ -2,11 +2,10 @@
 **/.vs
 **/bin
 **/obj
-**/data
-**/organized
+data/
+organized/
 *.md
 *.http
 Dockerfile*
 .dockerignore
 appsettings.Development.json
-
