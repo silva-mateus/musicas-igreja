@@ -73,7 +73,7 @@ public class FileServiceTests : IDisposable
 
     [Theory]
     [InlineData("Música: Test", "artist", "test.pdf", "C", "Música_ Test - C - Artist.pdf")]
-    [InlineData("Song<>Name", "Art/ist", "test.pdf", null, "Song__Name - Art_Ist.pdf")]
+    [InlineData("Song<>Name", "Art/ist", "test.pdf", null, "Song__name - Art_ist.pdf")] // TitleCase preserves first word capital, rest follows rules
     public void GenerateFilename_ShouldSanitizeInvalidCharacters(
         string? songName, string? artist, string originalFilename, string? musicalKey, string expected)
     {

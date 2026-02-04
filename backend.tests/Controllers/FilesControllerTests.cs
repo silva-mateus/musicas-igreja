@@ -32,6 +32,39 @@ public class FilesControllerTests : IDisposable
 
         _controller = new FilesController(_context, _fileServiceMock.Object, _authServiceMock.Object, _loggerMock.Object);
 
+        // Setup HttpContext with session for authentication tests
+        var httpContext = new DefaultHttpContext();
+        var sessionMock = new Mock<ISession>();
+        var sessionData = new Dictionary<string, byte[]>
+        {
+            ["UserId"] = BitConverter.GetBytes(1),
+            ["RoleId"] = BitConverter.GetBytes(1)
+        };
+        
+        sessionMock.Setup(s => s.TryGetValue(It.IsAny<string>(), out It.Ref<byte[]>.IsAny))
+            .Returns((string key, out byte[] value) =>
+            {
+                var exists = sessionData.TryGetValue(key, out var data);
+                value = data!;
+                return exists;
+            });
+        
+        httpContext.Session = sessionMock.Object;
+        httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("127.0.0.1");
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        // Setup AuthService mock to return permissions
+        var mockRole = new Role
+        {
+            Id = 1,
+            Name = "admin",
+            CanUploadMusic = true,
+            CanEditMusicMetadata = true,
+            CanDeleteMusic = true
+        };
+        _authServiceMock.Setup(a => a.GetRoleByIdAsync(It.IsAny<int>()))
+            .ReturnsAsync(mockRole);
+
         SeedDatabase();
     }
 
