@@ -254,6 +254,7 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
         var hasRoleIdColumn = false;
         var hasFullNameColumn = false;
         var hasMustChangePasswordColumn = false;
+        var hasEmailColumn = false;
         
         using (var reader = await checkSchemaCmd.ExecuteReaderAsync())
         {
@@ -264,6 +265,53 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
                 if (columnName == "role_id") hasRoleIdColumn = true;
                 if (columnName == "full_name") hasFullNameColumn = true;
                 if (columnName == "must_change_password") hasMustChangePasswordColumn = true;
+                if (columnName == "email") hasEmailColumn = true;
+            }
+        }
+
+        // Remove legacy email column if it exists (users do not require email)
+        if (hasEmailColumn)
+        {
+            logger.LogInformation("Removing legacy email column from users table...");
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    BEGIN TRANSACTION;
+                    CREATE TABLE IF NOT EXISTS users_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT NOT NULL UNIQUE,
+                        full_name TEXT,
+                        password_hash TEXT NOT NULL,
+                        role_id INTEGER NOT NULL DEFAULT 1,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        must_change_password INTEGER NOT NULL DEFAULT 1,
+                        created_date TEXT NOT NULL DEFAULT (datetime('now')),
+                        last_login_date TEXT,
+                        FOREIGN KEY (role_id) REFERENCES roles(id)
+                    );
+
+                    INSERT INTO users_new (
+                        id, username, full_name, password_hash, role_id,
+                        is_active, must_change_password, created_date, last_login_date
+                    )
+                    SELECT
+                        id, username, COALESCE(full_name, username), password_hash, role_id,
+                        is_active, COALESCE(must_change_password, 1), created_date, last_login_date
+                    FROM users;
+
+                    DROP TABLE users;
+                    ALTER TABLE users_new RENAME TO users;
+
+                    CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users(username);
+                    COMMIT;
+                ");
+
+                hasEmailColumn = false;
+                logger.LogInformation("Legacy email column removed successfully.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to remove legacy email column from users table");
             }
         }
 

@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    email TEXT NOT NULL UNIQUE,
+    full_name TEXT,
     password_hash TEXT NOT NULL,
     role INTEGER NOT NULL DEFAULT 0,
     is_active INTEGER NOT NULL DEFAULT 1,
@@ -16,12 +16,11 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Step 2: Create indexes
 CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username ON users(username);
-CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users(email);
 
 -- Step 3: Seed default admin user (password: admin123)
 -- Password hash is SHA256 of 'admin123' in base64: jZae727K08KaOmKSgOaGzww/XVqGr/PKEgIMkjrcbJI=
-INSERT OR IGNORE INTO users (username, email, password_hash, role, is_active, created_date)
-VALUES ('admin', 'admin@igreja.local', 'jZae727K08KaOmKSgOaGzww/XVqGr/PKEgIMkjrcbJI=', 3, 1, datetime('now'));
+INSERT OR IGNORE INTO users (username, full_name, password_hash, role, is_active, created_date)
+VALUES ('admin', 'Administrador', 'jZae727K08KaOmKSgOaGzww/XVqGr/PKEgIMkjrcbJI=', 3, 1, datetime('now'));
 
 -- Log result
 SELECT 'Users table created. Admin user seeded.' as result;
