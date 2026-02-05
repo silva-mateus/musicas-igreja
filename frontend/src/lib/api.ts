@@ -235,9 +235,24 @@ export const musicApi = {
                 
                 // Upload response received
                 
-                // Backend now returns FileUploadResultDto directly
-                // with status, original_name, size, etc.
-                results.push(data)
+                // Backend returns FileUploadResultDto directly
+                // Check if it's already in the correct format or wrapped
+                if (data.filename || data.original_name || data.status) {
+                    // Direct FileUploadResultDto response
+                    results.push(data)
+                } else if (data.success && data.data) {
+                    // Wrapped response { success: true, data: {...} }
+                    results.push(data.data)
+                } else {
+                    // Unknown format, try to extract what we can
+                    results.push({
+                        filename: arr[i].name,
+                        original_name: arr[i].name,
+                        size: arr[i].size,
+                        status: 'error',
+                        message: 'Formato de resposta desconhecido'
+                    })
+                }
                 
             } catch (error) {
                 console.error('Upload error:', error)
