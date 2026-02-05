@@ -11,6 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Cookie': request.headers.get('cookie') || '',
             },
             cache: 'no-store',
         })
@@ -37,6 +38,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Cookie': request.headers.get('cookie') || '',
             },
             body: JSON.stringify(body),
         })
@@ -64,6 +66,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
+                'Cookie': request.headers.get('cookie') || '',
             },
         })
 

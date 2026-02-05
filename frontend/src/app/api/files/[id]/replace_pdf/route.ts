@@ -58,6 +58,9 @@ export async function POST(
         const backendResponse = await fetch(`${BACKEND_URL}/api/files/${fileId}/replace_pdf`, {
             method: 'POST',
             body: formData,
+            headers: {
+                'Cookie': request.headers.get('cookie') || '',
+            },
         })
 
         if (!backendResponse.ok) {

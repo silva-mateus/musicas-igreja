@@ -9,6 +9,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const response = await fetch(`${BACKEND_URL}/api/files/${fileId}/download`, {
             method: 'GET',
             cache: 'no-store',
+            headers: {
+                'Cookie': request.headers.get('cookie') || '',
+            },
         })
 
         if (!response.ok) {
