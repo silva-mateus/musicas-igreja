@@ -328,7 +328,7 @@ export default function ListDetailsPage() {
                             {canEdit && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
+                                        <Button variant="default" size="sm" asChild className="gap-1 sm:gap-2 text-xs sm:text-sm">
                                             <Link href={`/lists/${list.id}/edit`}>
                                                 <Edit className="h-4 w-4" />
                                                 <span>Editar</span>
@@ -343,7 +343,7 @@ export default function ListDetailsPage() {
                             {canDelete && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="destructive" size="sm" onClick={handleDeleteClick} className="gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
+                                        <Button variant="outline" size="sm" onClick={handleDeleteClick} className="text-destructive hover:text-destructive gap-1 sm:gap-2 text-xs sm:text-sm col-span-2 sm:col-span-1">
                                             <Trash2 className="h-4 w-4" />
                                             <span>Excluir</span>
                                         </Button>

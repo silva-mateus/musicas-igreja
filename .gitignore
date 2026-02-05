@@ -104,3 +104,10 @@ docker-compose.override.yml
 # Development scripts
 start-all.sh
 start-all.ps1
+
+backend/StudyReadme_backend.md
+
+# Cursor rules (local only)
+.cursorrules
+backend/.cursorrules
+frontend/.cursorrules

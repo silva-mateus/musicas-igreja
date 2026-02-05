@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             return NextResponse.json({ error: 'Backend error' }, { status: response.status })
         }
 
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
         // Se a rota direta falhar, tentar as rotas separadas do dashboard
         if (!response.ok) {
-            console.warn('⚠️ [PROXY] Rota direta falhou, tentando rotas separadas...')
+            // Direct route failed, trying separate routes
 
             const [catsResponse, timesResponse] = await Promise.all([
                 fetch(`${BACKEND_URL}/api/dashboard/get_categories`, {
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
                     artists = suggestionsData.artists || []
                 }
             } catch (e) {
-                console.warn('⚠️ [PROXY] Não foi possível buscar artistas:', e)
+                // Failed to fetch artists
             }
 
             const data = {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }

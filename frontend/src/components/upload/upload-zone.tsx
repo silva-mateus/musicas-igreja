@@ -107,20 +107,18 @@ export function UploadZone({
                 </div>
             </div>
 
-            {/* Selected Files List */}
-            {selectedFiles.length > 0 && (
-                <div className={cn(compact ? 'space-y-2' : 'space-y-3')}>
-                    {!compact && (
-                        <h4 className="font-medium flex items-center gap-2">
-                            <File className="h-4 w-4" /> Arquivos Selecionados ({selectedFiles.length})
-                        </h4>
-                    )}
+            {/* Selected Files List - Only show in non-compact mode */}
+            {selectedFiles.length > 0 && !compact && (
+                <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                        <File className="h-4 w-4" /> Arquivos Selecionados ({selectedFiles.length})
+                    </h4>
 
-                    <div className={cn('space-y-2', compact ? 'max-h-40' : 'max-h-60', 'overflow-y-auto')}>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
                         {selectedFiles.map((file, index) => {
                             const fileStatus = getFileStatus(file)
                             return (
-                                <Card key={index} className={cn('p-2', compact ? 'text-sm' : 'p-3')}>
+                                <Card key={index} className="p-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div
@@ -135,13 +133,11 @@ export function UploadZone({
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="font-medium truncate">{file.name}</p>
-                                                {!compact && (
-                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                        <span>{formatFileSize(file.size)}</span>
-                                                        <span>•</span>
-                                                        <span>{file.type}</span>
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>{formatFileSize(file.size)}</span>
+                                                    <span>•</span>
+                                                    <span>{file.type}</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -12,63 +15,52 @@ import type { MusicList } from '@/types'
 import { Plus, Music, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
+// Zod schema for validation
+const createListSchema = z.object({
+    name: z.string()
+        .min(1, 'Nome da lista é obrigatório')
+        .min(3, 'Nome deve ter pelo menos 3 caracteres')
+        .max(100, 'Nome deve ter no máximo 100 caracteres'),
+    observations: z.string()
+        .max(500, 'Observações devem ter no máximo 500 caracteres')
+        .optional()
+        .or(z.literal('')),
+})
+
+type CreateListFormData = z.infer<typeof createListSchema>
+
 interface CreateListDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     onListCreated: (list: MusicList) => void
 }
 
-interface FormData {
-    name: string
-    observations: string
-}
-
 export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateListDialogProps) {
     const { toast } = useToast()
     const router = useRouter()
-    const [formData, setFormData] = useState<FormData>({
-        name: '',
-        observations: ''
-    })
     const [isLoading, setIsLoading] = useState(false)
-    const [errors, setErrors] = useState<Partial<FormData>>({})
 
-    const validateForm = (): boolean => {
-        const newErrors: Partial<FormData> = {}
+    const form = useForm<CreateListFormData>({
+        resolver: zodResolver(createListSchema),
+        defaultValues: {
+            name: '',
+            observations: '',
+        },
+    })
 
-        if (!formData.name.trim()) {
-            newErrors.name = 'Nome da lista é obrigatório'
-        } else if (formData.name.length < 3) {
-            newErrors.name = 'Nome deve ter pelo menos 3 caracteres'
-        } else if (formData.name.length > 100) {
-            newErrors.name = 'Nome deve ter no máximo 100 caracteres'
-        }
-
-        if (formData.observations.length > 500) {
-            newErrors.observations = 'Observações devem ter no máximo 500 caracteres'
-        }
-
-        setErrors(newErrors)
-        return Object.keys(newErrors).length === 0
-    }
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-
-        if (!validateForm()) return
-
+    const handleSubmit = async (data: CreateListFormData) => {
         setIsLoading(true)
         try {
             const response = await listsApi.createList(
-                formData.name.trim(),
-                formData.observations.trim() || undefined
+                data.name.trim(),
+                data.observations?.trim() || undefined
             )
 
             handleClose()
 
             toast({
                 title: "Lista criada com sucesso!",
-                description: `A lista "${formData.name}" foi criada. Redirecionando para edição...`,
+                description: `A lista "${data.name}" foi criada. Redirecionando para edição...`,
             })
 
             // Redirecionar para a página de edição da lista criada
@@ -88,19 +80,12 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
     }
 
     const handleClose = () => {
-        setFormData({ name: '', observations: '' })
-        setErrors({})
+        form.reset()
         onOpenChange(false)
     }
 
-    const handleChange = (field: keyof FormData, value: string) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
-
-        // Clear error when user starts typing
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: undefined }))
-        }
-    }
+    const watchName = form.watch('name')
+    const watchObservations = form.watch('observations')
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -115,7 +100,7 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="name">
                             Nome da Lista <span className="text-destructive">*</span>
@@ -123,16 +108,15 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
                         <Input
                             id="name"
                             placeholder="Ex: Missa Dominical, Festa Junina, Casamento..."
-                            value={formData.name}
-                            onChange={(e) => handleChange('name', e.target.value)}
-                            className={errors.name ? 'border-destructive' : ''}
+                            {...form.register('name')}
+                            className={form.formState.errors.name ? 'border-destructive' : ''}
                             maxLength={100}
                         />
-                        {errors.name && (
-                            <p className="text-sm text-destructive">{errors.name}</p>
+                        {form.formState.errors.name && (
+                            <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                            {formData.name.length}/100 caracteres
+                            {watchName?.length || 0}/100 caracteres
                         </p>
                     </div>
 
@@ -143,17 +127,16 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
                         <Textarea
                             id="observations"
                             placeholder="Descreva o propósito desta lista, ocasião de uso, ou outras informações relevantes..."
-                            value={formData.observations}
-                            onChange={(e) => handleChange('observations', e.target.value)}
-                            className={errors.observations ? 'border-destructive' : ''}
+                            {...form.register('observations')}
+                            className={form.formState.errors.observations ? 'border-destructive' : ''}
                             rows={3}
                             maxLength={500}
                         />
-                        {errors.observations && (
-                            <p className="text-sm text-destructive">{errors.observations}</p>
+                        {form.formState.errors.observations && (
+                            <p className="text-sm text-destructive">{form.formState.errors.observations.message}</p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                            {formData.observations.length}/500 caracteres
+                            {watchObservations?.length || 0}/500 caracteres
                         </p>
                     </div>
                 </form>
@@ -169,8 +152,8 @@ export function CreateListDialog({ open, onOpenChange, onListCreated }: CreateLi
                     </Button>
                     <Button
                         type="submit"
-                        onClick={handleSubmit}
-                        disabled={isLoading || !formData.name.trim()}
+                        onClick={form.handleSubmit(handleSubmit)}
+                        disabled={isLoading || !watchName?.trim()}
                         className="gap-2"
                     >
                         {isLoading ? (

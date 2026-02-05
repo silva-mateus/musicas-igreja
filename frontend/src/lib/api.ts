@@ -12,6 +12,13 @@ import type {
     PaginatedResponse,
     SearchFilters,
     PaginationParams,
+    SystemEvent,
+    AuditLog,
+    SystemMetric,
+    SystemHealth,
+    MonitoringResponse,
+    AlertConfiguration,
+    AlertConfigurationInput,
 } from '@/types'
 
 const BASE = '/api'
@@ -19,6 +26,7 @@ const BASE = '/api'
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(`${BASE}${path}`, {
         ...init,
+        credentials: 'include', // Always include cookies for session auth
         headers: {
             'Content-Type': init?.body instanceof FormData ? undefined as any : 'application/json',
             ...(init?.headers || {}),
@@ -50,9 +58,21 @@ export const musicApi = {
         params.append('page', String(pagination.page || 1))
         params.append('per_page', String(pagination.limit || 20))
         if (filters.title) params.append('q', filters.title)
-        if (filters.artist) params.append('q', filters.artist)
-        if (filters.category) params.append('category', filters.category)
-        if (filters.liturgical_time) params.append('liturgical_time', filters.liturgical_time)
+        if (filters.category) {
+            // Support both single category and array of categories
+            const categories = Array.isArray(filters.category) ? filters.category : [filters.category]
+            categories.forEach(cat => params.append('category', cat))
+        }
+        if (filters.liturgical_time) {
+            // Support both single time and array of times
+            const times = Array.isArray(filters.liturgical_time) ? filters.liturgical_time : [filters.liturgical_time]
+            times.forEach(time => params.append('liturgical_time', time))
+        }
+        if (filters.artist) {
+            // Support both single artist and array of artists
+            const artists = Array.isArray(filters.artist) ? filters.artist : [filters.artist]
+            artists.forEach(artist => params.append('artist', artist))
+        }
 
         const data = await request<{ files: any[]; pagination: { page: number; per_page: number; total: number; total_pages: number } }>(
             `/files?${params.toString()}`
@@ -174,7 +194,7 @@ export const musicApi = {
             form.append('file', arr[i])
             const meta = metadata?.[i]
 
-            console.log('📋 [UPLOAD] File metadata:', meta)
+            // File metadata prepared
 
             if (meta?.title) form.append('song_name', meta.title)
             if (meta?.artist) form.append('artist', meta.artist)
@@ -207,13 +227,13 @@ export const musicApi = {
                 meta.new_liturgical_times.forEach(time => form.append('new_liturgical_times', time))
             }
 
-            console.log('📤 [UPLOAD] Form data keys:', Array.from(form.keys()))
+            // Form data ready for upload
 
             try {
                 const res = await fetch(`${BASE}/files`, { method: 'POST', body: form })
                 const data = await res.json()
                 
-                console.log('📥 [UPLOAD] Response:', data)
+                // Upload response received
                 
                 // Backend now returns FileUploadResultDto directly
                 // with status, original_name, size, etc.
@@ -244,10 +264,10 @@ export const listsApi = {
         _pagination: PaginationParams = { page: 1, limit: 20 },
         _search?: string
     ): Promise<PaginatedResponse<MusicList>> {
-        console.log('🔍 [API] listsApi.getLists called')
+        // Fetching lists
 
         const lists = await request<Array<{ id: number; name: string; observations: string | null; created_date: string; updated_date: string; file_count: number }>>('/merge_lists')
-        console.log('✅ [API] Raw response from backend:', lists.length, 'lists')
+        // Lists response received
 
         const mapped = {
             data: lists.map(l => ({
@@ -262,7 +282,7 @@ export const listsApi = {
             pagination: { page: 1, limit: lists.length, total: lists.length, pages: 1 },
         }
 
-        console.log('🎯 [API] Returning', mapped.data.length, 'lists')
+        // Returning mapped lists
         return mapped
     },
 
@@ -407,13 +427,6 @@ export const downloadFile = (blob: Blob, filename: string) => {
     window.URL.revokeObjectURL(url)
 }
 
-
-
-export const handleApiError = (error: any): string => {
-    if (error.message) return error.message
-    return 'Erro desconhecido'
-}
-
 // ============ ADMIN / DISCOVERY API ============
 export const adminApi = {
     async discoverEntities(): Promise<any> {
@@ -478,6 +491,14 @@ export const authApi = {
         return await request<any>('/auth/change-password', {
             method: 'POST',
             body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+            credentials: 'include',
+        })
+    },
+
+    async updateProfile(fullName: string): Promise<any> {
+        return await request<any>('/auth/profile', {
+            method: 'PUT',
+            body: JSON.stringify({ full_name: fullName }),
             credentials: 'include',
         })
     }
@@ -609,6 +630,145 @@ export const usersApi = {
             credentials: 'include',
         })
     }
+}
+
+// ============ MONITORING ============
+export const monitoringApi = {
+    async getAlerts(): Promise<MonitoringResponse<SystemEvent[]>> {
+        return await request<MonitoringResponse<SystemEvent[]>>('/monitoring/alerts', {
+            credentials: 'include',
+        })
+    },
+
+    async getAlertCount(): Promise<{ count: number }> {
+        return await request<{ count: number }>('/monitoring/alerts/count', {
+            credentials: 'include',
+        })
+    },
+
+    async markAlertAsRead(alertId: number): Promise<{ success: boolean }> {
+        return await request<{ success: boolean }>(`/monitoring/alerts/${alertId}/read`, {
+            method: 'POST',
+            credentials: 'include',
+        })
+    },
+
+    async getEvents(filters?: {
+        event_type?: string
+        severity?: string
+        user_id?: number
+        start_date?: string
+        end_date?: string
+        page?: number
+        limit?: number
+    }): Promise<MonitoringResponse<SystemEvent[]>> {
+        const params = new URLSearchParams()
+        if (filters?.event_type) params.append('event_type', filters.event_type)
+        if (filters?.severity) params.append('severity', filters.severity)
+        if (filters?.user_id) params.append('user_id', String(filters.user_id))
+        if (filters?.start_date) params.append('start_date', filters.start_date)
+        if (filters?.end_date) params.append('end_date', filters.end_date)
+        if (filters?.page) params.append('page', String(filters.page))
+        if (filters?.limit) params.append('limit', String(filters.limit))
+
+        return await request<MonitoringResponse<SystemEvent[]>>(
+            `/monitoring/events?${params.toString()}`,
+            { credentials: 'include' }
+        )
+    },
+
+    async getAuditLogs(filters?: {
+        action?: string
+        entity_type?: string
+        user_id?: number
+        start_date?: string
+        end_date?: string
+        page?: number
+        limit?: number
+    }): Promise<MonitoringResponse<AuditLog[]>> {
+        const params = new URLSearchParams()
+        if (filters?.action) params.append('action', filters.action)
+        if (filters?.entity_type) params.append('entity_type', filters.entity_type)
+        if (filters?.user_id) params.append('user_id', String(filters.user_id))
+        if (filters?.start_date) params.append('start_date', filters.start_date)
+        if (filters?.end_date) params.append('end_date', filters.end_date)
+        if (filters?.page) params.append('page', String(filters.page))
+        if (filters?.limit) params.append('limit', String(filters.limit))
+
+        return await request<MonitoringResponse<AuditLog[]>>(
+            `/monitoring/audit?${params.toString()}`,
+            { credentials: 'include' }
+        )
+    },
+
+    async getMetrics(filters?: {
+        metric_type?: string
+        start_date?: string
+        end_date?: string
+        limit?: number
+    }): Promise<MonitoringResponse<SystemMetric[]>> {
+        const params = new URLSearchParams()
+        if (filters?.metric_type) params.append('metric_type', filters.metric_type)
+        if (filters?.start_date) params.append('start_date', filters.start_date)
+        if (filters?.end_date) params.append('end_date', filters.end_date)
+        if (filters?.limit) params.append('limit', String(filters.limit))
+
+        return await request<MonitoringResponse<SystemMetric[]>>(
+            `/monitoring/metrics?${params.toString()}`,
+            { credentials: 'include' }
+        )
+    },
+
+    async getHealthExtended(): Promise<MonitoringResponse<SystemHealth>> {
+        return await request<MonitoringResponse<SystemHealth>>('/monitoring/health-extended', {
+            credentials: 'include',
+        })
+    },
+}
+
+// ============ ALERT CONFIGURATIONS ============
+export const alertConfigApi = {
+    async getAll(): Promise<MonitoringResponse<AlertConfiguration[]>> {
+        return await request<MonitoringResponse<AlertConfiguration[]>>('/alert_configurations', {
+            credentials: 'include',
+        })
+    },
+
+    async getById(id: number): Promise<MonitoringResponse<AlertConfiguration>> {
+        return await request<MonitoringResponse<AlertConfiguration>>(`/alert_configurations/${id}`, {
+            credentials: 'include',
+        })
+    },
+
+    async create(config: AlertConfigurationInput): Promise<MonitoringResponse<AlertConfiguration>> {
+        return await request<MonitoringResponse<AlertConfiguration>>('/alert_configurations', {
+            method: 'POST',
+            credentials: 'include',
+            body: JSON.stringify(config),
+        })
+    },
+
+    async update(id: number, config: Partial<AlertConfigurationInput>): Promise<MonitoringResponse<AlertConfiguration>> {
+        return await request<MonitoringResponse<AlertConfiguration>>(`/alert_configurations/${id}`, {
+            method: 'PUT',
+            credentials: 'include',
+            body: JSON.stringify(config),
+        })
+    },
+
+    async delete(id: number): Promise<{ success: boolean }> {
+        return await request<{ success: boolean }>(`/alert_configurations/${id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        })
+    },
+}
+
+export function handleApiError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message
+    }
+    return 'Ocorreu um erro desconhecido'
 }
 
 export default {}

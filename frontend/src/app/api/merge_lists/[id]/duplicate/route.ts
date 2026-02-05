@@ -7,7 +7,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const listId = params.id
         const body = await request.json()
 
-        console.log('📋 [PROXY] Duplicating list:', listId, 'with name:', body.name)
+        // Duplicating list
 
         const response = await fetch(`${BACKEND_URL}/api/merge_lists/${listId}/duplicate`, {
             method: 'POST',
@@ -17,11 +17,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             body: JSON.stringify(body),
         })
 
-        console.log('📡 [PROXY] Duplicate response status:', response.status, response.statusText)
+        // Duplicate response received
 
         if (!response.ok) {
             const errorText = await response.text()
-            console.error('❌ [PROXY] Backend error details:', errorText)
+            console.error('[PROXY] Backend error details:', errorText)
             return NextResponse.json({
                 error: 'Backend error',
                 status: response.status,
@@ -30,10 +30,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         }
 
         const data = await response.json()
-        console.log('✅ [PROXY] List duplicated successfully, new ID:', data.new_list_id)
+        // List duplicated successfully
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Duplicate error:', error)
+        console.error('[PROXY] Duplicate error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }

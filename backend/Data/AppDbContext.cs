@@ -20,6 +20,12 @@ public class AppDbContext : DbContext
     public DbSet<FileArtist> FileArtists { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
+    
+    // Monitoring tables
+    public DbSet<SystemEvent> SystemEvents { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<SystemMetric> SystemMetrics { get; set; }
+    public DbSet<AlertConfiguration> AlertConfigurations { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

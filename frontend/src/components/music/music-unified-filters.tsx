@@ -78,9 +78,18 @@ export function MusicUnifiedFilters({
             setIsLoading(true)
             // Build query params for dynamic filtering
             const params = new URLSearchParams()
-            if (filters.category) params.append('category', filters.category)
-            if (filters.liturgical_time) params.append('liturgical_time', filters.liturgical_time)
-            if (filters.artist) params.append('artist', filters.artist)
+            if (filters.category) {
+                const categories = Array.isArray(filters.category) ? filters.category : [filters.category]
+                categories.forEach(cat => params.append('category', cat))
+            }
+            if (filters.liturgical_time) {
+                const times = Array.isArray(filters.liturgical_time) ? filters.liturgical_time : [filters.liturgical_time]
+                times.forEach(time => params.append('liturgical_time', time))
+            }
+            if (filters.artist) {
+                const artists = Array.isArray(filters.artist) ? filters.artist : [filters.artist]
+                artists.forEach(artist => params.append('artist', artist))
+            }
             if (filters.musical_key) params.append('musical_key', filters.musical_key)
 
             const response = await fetch(`/api/filters/suggestions?${params.toString()}`)
@@ -199,7 +208,7 @@ export function MusicUnifiedFilters({
                     {/* Quick Filters (always visible on desktop) */}
                     <div className="hidden lg:flex gap-2">
                         <Select 
-                            value={filters.category || ALL_VALUE} 
+                            value={(Array.isArray(filters.category) ? filters.category[0] : filters.category) || ALL_VALUE} 
                             onValueChange={(v) => handleFilterChange('category', v === ALL_VALUE ? undefined : v)}
                         >
                             <SelectTrigger className="w-40 gap-2">
@@ -215,7 +224,7 @@ export function MusicUnifiedFilters({
                         </Select>
 
                         <Select 
-                            value={filters.artist || ALL_VALUE} 
+                            value={(Array.isArray(filters.artist) ? filters.artist[0] : filters.artist) || ALL_VALUE} 
                             onValueChange={(v) => handleFilterChange('artist', v === ALL_VALUE ? undefined : v)}
                         >
                             <SelectTrigger className="w-40 gap-2">
@@ -245,16 +254,14 @@ export function MusicUnifiedFilters({
                                 <SelectValue placeholder="Ordenar" />
                             </SelectTrigger>
                             <SelectContent>
-                                {sortFields.map(field => (
-                                    <>
-                                        <SelectItem key={`${field.value}:asc`} value={`${field.value}:asc`}>
-                                            {field.label} - Crescente
-                                        </SelectItem>
-                                        <SelectItem key={`${field.value}:desc`} value={`${field.value}:desc`}>
-                                            {field.label} - Decrescente
-                                        </SelectItem>
-                                    </>
-                                ))}
+                                {sortFields.flatMap(field => [
+                                    <SelectItem key={`${field.value}:asc`} value={`${field.value}:asc`}>
+                                        {field.label} - Crescente
+                                    </SelectItem>,
+                                    <SelectItem key={`${field.value}:desc`} value={`${field.value}:desc`}>
+                                        {field.label} - Decrescente
+                                    </SelectItem>
+                                ])}
                             </SelectContent>
                         </Select>
                     )}
@@ -298,7 +305,7 @@ export function MusicUnifiedFilters({
                                     {/* Category (mobile/tablet) */}
                                     <div className="lg:hidden">
                                         <Select 
-                                            value={filters.category || ALL_VALUE} 
+                                            value={(Array.isArray(filters.category) ? filters.category[0] : filters.category) || ALL_VALUE} 
                                             onValueChange={(v) => handleFilterChange('category', v === ALL_VALUE ? undefined : v)}
                                         >
                                             <SelectTrigger className="gap-2">
@@ -317,7 +324,7 @@ export function MusicUnifiedFilters({
                                     {/* Artist (mobile/tablet) */}
                                     <div className="lg:hidden">
                                         <Select 
-                                            value={filters.artist || ALL_VALUE} 
+                                            value={(Array.isArray(filters.artist) ? filters.artist[0] : filters.artist) || ALL_VALUE} 
                                             onValueChange={(v) => handleFilterChange('artist', v === ALL_VALUE ? undefined : v)}
                                         >
                                             <SelectTrigger className="gap-2">
@@ -335,7 +342,7 @@ export function MusicUnifiedFilters({
 
                                     {/* Liturgical Time */}
                                     <Select 
-                                        value={filters.liturgical_time || ALL_VALUE} 
+                                        value={(Array.isArray(filters.liturgical_time) ? filters.liturgical_time[0] : filters.liturgical_time) || ALL_VALUE} 
                                         onValueChange={(v) => handleFilterChange('liturgical_time', v === ALL_VALUE ? undefined : v)}
                                     >
                                         <SelectTrigger className="gap-2">

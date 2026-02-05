@@ -17,14 +17,14 @@ export async function POST(request: NextRequest) {
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             return NextResponse.json({ error: 'Backend error' }, { status: response.status })
         }
 
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }

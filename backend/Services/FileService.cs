@@ -182,8 +182,13 @@ public class FileService : IFileService
             return normalizedPath;
         }
 
-        // Unknown format - return as is (might be just Category/file.pdf)
-        _logger.LogWarning("Unknown path format, returning as-is: {Path}", path);
+        // Unknown format - return as is (might be just Category/file.pdf or a directory name)
+        // Only log as debug since this can happen for directory paths like "organized" or "data"
+        if (!string.IsNullOrEmpty(path) && path.Contains('.'))
+        {
+            // Only warn if it looks like a file path (has extension)
+            _logger.LogDebug("Non-standard path format, returning as-is: {Path}", path);
+        }
         return path;
     }
 

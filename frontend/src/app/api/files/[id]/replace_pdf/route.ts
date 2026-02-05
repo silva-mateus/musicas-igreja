@@ -7,14 +7,14 @@ const BACKEND_URL = process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     'http://127.0.0.1:5000'
 
-console.log('🔧 [REPLACE_PDF_API] Backend URL:', BACKEND_URL)
+// Backend URL configured at startup
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const fileId = params.id
+        const { id: fileId } = await params
 
         if (!fileId || isNaN(Number(fileId))) {
             return NextResponse.json(
@@ -74,7 +74,7 @@ export async function POST(
         return NextResponse.json(data)
 
     } catch (error: any) {
-        console.error('❌ [PROXY] Replace PDF error:', error)
+        console.error('[PROXY] Replace PDF error:', error)
         return NextResponse.json(
             { error: 'Erro interno do servidor', details: error.message },
             { status: 500 }

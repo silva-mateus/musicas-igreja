@@ -23,32 +23,35 @@ public class FiltersController : ControllerBase
 
     [HttpGet("suggestions")]
     public async Task<ActionResult<object>> GetSuggestions(
-        [FromQuery] string? category = null,
-        [FromQuery] string? liturgical_time = null,
-        [FromQuery] string? artist = null,
+        [FromQuery] List<string>? category = null,
+        [FromQuery] List<string>? liturgical_time = null,
+        [FromQuery] List<string>? artist = null,
         [FromQuery] string? musical_key = null)
     {
         // Start with all files
         var query = _context.PdfFiles.AsQueryable();
 
         // Apply filters progressively to get dynamic suggestions
-        if (!string.IsNullOrWhiteSpace(category))
+        var categories = category?.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (categories != null && categories.Count > 0)
         {
             query = query.Where(f => 
-                f.Category == category ||
-                f.FileCategories.Any(fc => fc.Category.Name == category));
+                categories.Contains(f.Category!) ||
+                f.FileCategories.Any(fc => categories.Contains(fc.Category.Name)));
         }
 
-        if (!string.IsNullOrWhiteSpace(liturgical_time))
+        var liturgicalTimes = liturgical_time?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+        if (liturgicalTimes != null && liturgicalTimes.Count > 0)
         {
             query = query.Where(f => 
-                f.LiturgicalTime == liturgical_time ||
-                f.FileLiturgicalTimes.Any(flt => flt.LiturgicalTime.Name == liturgical_time));
+                liturgicalTimes.Contains(f.LiturgicalTime!) ||
+                f.FileLiturgicalTimes.Any(flt => liturgicalTimes.Contains(flt.LiturgicalTime.Name)));
         }
 
-        if (!string.IsNullOrWhiteSpace(artist))
+        var artists = artist?.Where(a => !string.IsNullOrWhiteSpace(a)).ToList();
+        if (artists != null && artists.Count > 0)
         {
-            query = query.Where(f => f.Artist == artist);
+            query = query.Where(f => artists.Contains(f.Artist!));
         }
 
         if (!string.IsNullOrWhiteSpace(musical_key))

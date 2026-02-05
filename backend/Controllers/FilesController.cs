@@ -15,22 +15,24 @@ public class FilesController : ControllerBase
     private readonly AppDbContext _context;
     private readonly IFileService _fileService;
     private readonly IAuthService _authService;
+    private readonly IMonitoringService _monitoringService;
     private readonly ILogger<FilesController> _logger;
 
-    public FilesController(AppDbContext context, IFileService fileService, IAuthService authService, ILogger<FilesController> logger)
+    public FilesController(AppDbContext context, IFileService fileService, IAuthService authService, IMonitoringService monitoringService, ILogger<FilesController> logger)
     {
         _context = context;
         _fileService = fileService;
         _authService = authService;
+        _monitoringService = monitoringService;
         _logger = logger;
     }
 
     [HttpGet]
     public async Task<ActionResult<FileListResponseDto>> GetFiles(
         [FromQuery] string? q = null,
-        [FromQuery] string? category = null,
-        [FromQuery] string? liturgical_time = null,
-        [FromQuery] string? artist = null,
+        [FromQuery] List<string>? category = null,
+        [FromQuery] List<string>? liturgical_time = null,
+        [FromQuery] List<string>? artist = null,
         [FromQuery] string? musical_key = null,
         [FromQuery] int page = 1,
         [FromQuery] int per_page = 20,
@@ -61,26 +63,29 @@ public class FilesController : ControllerBase
                 .Where(f => filteredIds.Contains(f.Id));
         }
 
-        // Apply category filter
-        if (!string.IsNullOrWhiteSpace(category))
+        // Apply category filter (supports multiple categories with OR logic)
+        var categories = category?.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (categories != null && categories.Count > 0)
         {
             query = query.Where(f =>
-                f.Category == category ||
-                f.FileCategories.Any(fc => fc.Category.Name == category));
+                categories.Contains(f.Category!) ||
+                f.FileCategories.Any(fc => categories.Contains(fc.Category.Name)));
         }
 
-        // Apply liturgical time filter
-        if (!string.IsNullOrWhiteSpace(liturgical_time))
+        // Apply liturgical time filter (supports multiple times with OR logic)
+        var liturgicalTimes = liturgical_time?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
+        if (liturgicalTimes != null && liturgicalTimes.Count > 0)
         {
             query = query.Where(f =>
-                f.LiturgicalTime == liturgical_time ||
-                f.FileLiturgicalTimes.Any(flt => flt.LiturgicalTime.Name == liturgical_time));
+                liturgicalTimes.Contains(f.LiturgicalTime!) ||
+                f.FileLiturgicalTimes.Any(flt => liturgicalTimes.Contains(flt.LiturgicalTime.Name)));
         }
 
-        // Apply artist filter
-        if (!string.IsNullOrWhiteSpace(artist))
+        // Apply artist filter (supports multiple artists with OR logic)
+        var artists = artist?.Where(a => !string.IsNullOrWhiteSpace(a)).ToList();
+        if (artists != null && artists.Count > 0)
         {
-            query = query.Where(f => f.Artist == artist);
+            query = query.Where(f => artists.Contains(f.Artist!));
         }
 
         // Apply musical key filter
@@ -181,11 +186,11 @@ public class FilesController : ControllerBase
         [FromForm] List<string>? new_liturgical_times = null,
         [FromForm] string? new_artist = null)
     {
-        // 🔒 SECURITY: Check authentication
+        // Check authentication
         var authCheck = AuthHelper.CheckAuthentication(HttpContext, _logger);
         if (authCheck != null) return authCheck;
 
-        // 🔒 SECURITY: Check upload permission
+        // Check upload permission
         var canUpload = await AuthHelper.HasPermissionAsync(HttpContext, _authService, role => role.CanUploadMusic);
         var permissionCheck = AuthHelper.CheckPermission(HttpContext, canUpload, _logger);
         if (permissionCheck != null) return permissionCheck;
@@ -239,6 +244,14 @@ public class FilesController : ControllerBase
                 Description = description
             });
 
+            // Log upload metrics and audit
+            var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+            var username = HttpContext.Session.GetString("Username") ?? "unknown";
+            var ipAddress = AuthHelper.GetClientIp(HttpContext);
+            
+            await _monitoringService.RecordMetricAsync("upload_size", file.Length / (1024.0 * 1024.0), "MB");
+            await _monitoringService.LogAuditActionAsync("upload", "file", result.Id, userId, username, ipAddress);
+
             return StatusCode(201, new FileUploadResultDto
             {
                 Filename = result.Filename,
@@ -279,11 +292,11 @@ public class FilesController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<object>> UpdateFile(int id, [FromBody] FileUpdateDto dto)
     {
-        // 🔒 SECURITY: Check authentication
+        // Check authentication
         var authCheck = AuthHelper.CheckAuthentication(HttpContext, _logger);
         if (authCheck != null) return authCheck;
 
-        // 🔒 SECURITY: Check edit permission
+        // Check edit permission
         var canEdit = await AuthHelper.HasPermissionAsync(HttpContext, _authService, role => role.CanEditMusicMetadata);
         var permissionCheck = AuthHelper.CheckPermission(HttpContext, canEdit, _logger);
         if (permissionCheck != null) return permissionCheck;
@@ -356,11 +369,11 @@ public class FilesController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<ActionResult<object>> DeleteFile(int id)
     {
-        // 🔒 SECURITY: Check authentication
+        // Check authentication
         var authCheck = AuthHelper.CheckAuthentication(HttpContext, _logger);
         if (authCheck != null) return authCheck;
 
-        // 🔒 SECURITY: Check delete permission
+        // Check delete permission
         var canDelete = await AuthHelper.HasPermissionAsync(HttpContext, _authService, role => role.CanDeleteMusic);
         var permissionCheck = AuthHelper.CheckPermission(HttpContext, canDelete, _logger);
         if (permissionCheck != null) return permissionCheck;
@@ -368,6 +381,13 @@ public class FilesController : ControllerBase
         var file = await _context.PdfFiles.FindAsync(id);
         if (file == null)
             return NotFound(new { success = false, error = "Arquivo não encontrado" });
+
+        // Log audit before deleting
+        var userId = HttpContext.Session.GetInt32("UserId") ?? 0;
+        var username = HttpContext.Session.GetString("Username") ?? "unknown";
+        var ipAddress = AuthHelper.GetClientIp(HttpContext);
+        
+        await _monitoringService.LogAuditActionAsync("delete", "file", id, userId, username, ipAddress);
 
         // Delete physical file
         _fileService.DeleteFile(file.FilePath);
@@ -561,7 +581,7 @@ public class FilesController : ControllerBase
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("PDF substituído com sucesso: {FileId}, novo tamanho: {Size} bytes", id, file.FileSize);
+            _logger.LogInformation("[Files] PDF replaced successfully: {FileId}, new size: {Size} bytes", id, file.FileSize);
 
             return Ok(new
             {

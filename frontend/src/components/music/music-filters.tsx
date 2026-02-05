@@ -131,7 +131,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                             </Button>
                         )}
                     </div>
-                    <Select value={localFilters.artist || ''} onValueChange={(value) => handleFilterChange('artist', value)}>
+                    <Select value={(Array.isArray(localFilters.artist) ? localFilters.artist[0] : localFilters.artist) || ''} onValueChange={(value) => handleFilterChange('artist', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar artista"} />
                         </SelectTrigger>
@@ -161,7 +161,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                             </Button>
                         )}
                     </div>
-                    <Select value={localFilters.category || ''} onValueChange={(value) => handleFilterChange('category', value)}>
+                    <Select value={(Array.isArray(localFilters.category) ? localFilters.category[0] : localFilters.category) || ''} onValueChange={(value) => handleFilterChange('category', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar categoria"} />
                         </SelectTrigger>
@@ -191,7 +191,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                             </Button>
                         )}
                     </div>
-                    <Select value={localFilters.liturgical_time || ''} onValueChange={(value) => handleFilterChange('liturgical_time', value)}>
+                    <Select value={(Array.isArray(localFilters.liturgical_time) ? localFilters.liturgical_time[0] : localFilters.liturgical_time) || ''} onValueChange={(value) => handleFilterChange('liturgical_time', value)}>
                         <SelectTrigger>
                             <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar tempo"} />
                         </SelectTrigger>

@@ -20,6 +20,12 @@ public class ChangePasswordRequest
     public string NewPassword { get; set; } = string.Empty;
 }
 
+public class UpdateProfileRequest
+{
+    [JsonPropertyName("full_name")]
+    public string? FullName { get; set; }
+}
+
 public class CreateUserRequest
 {
     [JsonPropertyName("username")]

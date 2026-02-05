@@ -59,6 +59,7 @@ interface AuthContextType {
     logout: () => Promise<void>
     refreshUser: () => Promise<void>
     changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>
+    updateProfile: (fullName: string) => Promise<{ success: boolean; error?: string }>
     clearMustChangePassword: () => void
 }
 
@@ -83,6 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true)
     const [mustChangePassword, setMustChangePassword] = useState(false)
 
+    const clearSession = () => {
+        setUser(null)
+        setPermissions(null)
+        setMustChangePassword(false)
+        localStorage.removeItem('user')
+        localStorage.removeItem('permissions')
+        localStorage.removeItem('instanceId')
+    }
+
     const refreshUser = async () => {
         try {
             // First check if we have a stored user (to know if we should try to refresh)
@@ -95,7 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Try to get current user from server to get updated permissions
             try {
                 const result = await authApi.getCurrentUser()
+                
+                // Check if server instance changed (server was restarted)
+                const storedInstanceId = localStorage.getItem('instanceId')
+                if (result.instance_id && storedInstanceId && result.instance_id !== storedInstanceId) {
+                    console.warn('Server instance changed, logging out user')
+                    clearSession()
+                    setIsLoading(false)
+                    return
+                }
+                
                 if (result.success && result.user) {
+                    // Update instance ID if present
+                    if (result.instance_id) {
+                        localStorage.setItem('instanceId', result.instance_id)
+                    }
+                    
                     // Update with fresh data from server
                     setUser(result.user)
                     setMustChangePassword(result.user.must_change_password || false)
@@ -107,9 +132,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
                     return
                 }
-            } catch (apiError) {
-                // API call failed (maybe server is down or session expired)
-                // Fall back to local storage data
+            } catch (apiError: any) {
+                // If we get an auth error, clear session
+                if (apiError.message === 'Não autenticado' || apiError.message === 'Acesso negado') {
+                    console.warn('Session expired or invalid, clearing session')
+                    clearSession()
+                    setIsLoading(false)
+                    return
+                }
+                // Other errors: fall back to local storage data
                 console.warn('Failed to refresh user from server, using cached data:', apiError)
             }
 
@@ -126,11 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         } catch (error) {
             console.error('Error refreshing user:', error)
-            setUser(null)
-            setPermissions(null)
-            setMustChangePassword(false)
-            localStorage.removeItem('user')
-            localStorage.removeItem('permissions')
+            clearSession()
         } finally {
             setIsLoading(false)
         }
@@ -146,6 +173,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (result.success && result.user) {
                 setUser(result.user)
                 localStorage.setItem('user', JSON.stringify(result.user))
+                
+                // Store instance ID to detect server restarts
+                if (result.instance_id) {
+                    localStorage.setItem('instanceId', result.instance_id)
+                }
                 
                 // Store permissions separately for easy access
                 if (result.user.permissions) {
@@ -173,11 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error('Logout error:', error)
         } finally {
-            setUser(null)
-            setPermissions(null)
-            setMustChangePassword(false)
-            localStorage.removeItem('user')
-            localStorage.removeItem('permissions')
+            clearSession()
         }
     }
 
@@ -193,10 +221,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 return { success: true }
             }
+            // Check if session expired
+            if (result.error === 'Não autenticado' || result.error === 'Acesso negado') {
+                await logout()
+                return { success: false, error: 'Sessão expirada. Por favor, faça login novamente.' }
+            }
             return { success: false, error: result.error || 'Erro ao alterar senha' }
         } catch (error: any) {
-            console.error('Change password error:', error)
+            // Check if session expired
+            if (error.message === 'Não autenticado' || error.message === 'Acesso negado') {
+                await logout()
+                return { success: false, error: 'Sessão expirada. Por favor, faça login novamente.' }
+            }
             return { success: false, error: error.message || 'Erro ao alterar senha' }
+        }
+    }
+
+    const updateProfile = async (fullName: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            const result = await authApi.updateProfile(fullName)
+            if (result.success && result.user) {
+                const updatedUser = { ...user, ...result.user }
+                setUser(updatedUser)
+                localStorage.setItem('user', JSON.stringify(updatedUser))
+                return { success: true }
+            }
+            // Check if session expired
+            if (result.error === 'Não autenticado' || result.error === 'Acesso negado') {
+                await logout()
+                return { success: false, error: 'Sessão expirada. Por favor, faça login novamente.' }
+            }
+            return { success: false, error: result.error || 'Erro ao atualizar perfil' }
+        } catch (error: any) {
+            // Check if session expired
+            if (error.message === 'Não autenticado' || error.message === 'Acesso negado') {
+                await logout()
+                return { success: false, error: 'Sessão expirada. Por favor, faça login novamente.' }
+            }
+            return { success: false, error: error.message || 'Erro ao atualizar perfil' }
         }
     }
 
@@ -237,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 logout,
                 refreshUser,
                 changePassword,
+                updateProfile,
                 clearMustChangePassword,
             }}
         >

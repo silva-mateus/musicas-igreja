@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Music, BarChart3, Upload, List, Settings, Menu, Search, FileMusic, FolderOpen, LogOut, LogIn, Users, User, ChevronDown, ChevronRight, Shield } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Music, BarChart3, Upload, List, Settings, Menu, Search, FileMusic, FolderOpen, LogOut, LogIn, Users, User, ChevronDown, ChevronRight, Shield, Bell, AlertCircle, AlertTriangle, Info, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { LoginModal } from '@/components/auth/login-modal'
+import { ProfileModal } from '@/components/auth/profile-modal'
+import { monitoringApi } from '@/lib/api'
+import type { SystemEvent } from '@/types'
 
 interface NavigationItem {
     title: string
@@ -35,6 +39,8 @@ const navigation: NavigationItem[] = [
         requiresEdit: true,
         children: [
             { title: 'Gerenciar Entidades', href: '/settings/manage', icon: FolderOpen, requiresEdit: true },
+            { title: 'Monitoramento', href: '/settings/monitoring', icon: Bell, requiresAdmin: true },
+            { title: 'Config. de Alertas', href: '/settings/alert-configs', icon: Settings, requiresAdmin: true },
             { title: 'Usuários', href: '/settings/users', icon: Users, requiresAdmin: true },
             { title: 'Roles', href: '/settings/roles', icon: Shield, requiresAdmin: true },
             { title: 'Sistema', href: '/settings/system', icon: Settings, requiresAdmin: true },
@@ -49,11 +55,15 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [loginModalOpen, setLoginModalOpen] = useState(false)
+    const [profileModalOpen, setProfileModalOpen] = useState(false)
     const pathname = usePathname()
     const router = useRouter()
     const { user, isAuthenticated, isAdmin, canEdit, canUpload, logout } = useAuth()
     
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [alertCount, setAlertCount] = useState(0)
+    const [recentAlerts, setRecentAlerts] = useState<SystemEvent[]>([])
+    const [loadingAlerts, setLoadingAlerts] = useState(false)
 
     const canAccessItem = (item: NavigationItem) => {
         if (item.requiresAdmin) return isAdmin
@@ -99,6 +109,68 @@ export function MainLayout({ children }: MainLayoutProps) {
             viewer: 'Visualizador'
         }
         return labels[role.toLowerCase()] || role
+    }
+
+    // Fetch alerts for admin users
+    const fetchAlerts = async () => {
+        if (!isAdmin) return
+        
+        try {
+            setLoadingAlerts(true)
+            const countResponse = await monitoringApi.getAlertCount()
+            setAlertCount(countResponse.count || 0)
+            
+            if (countResponse.count > 0) {
+                const alertsResponse = await monitoringApi.getAlerts()
+                setRecentAlerts((alertsResponse.data || []).slice(0, 5))
+            }
+        } catch (error: any) {
+            // Silently ignore auth errors (session expired) - these are expected
+            if (error.message !== 'Acesso negado' && error.message !== 'Não autenticado') {
+                console.error('Error fetching alerts:', error)
+            }
+            setAlertCount(0)
+            setRecentAlerts([])
+        } finally {
+            setLoadingAlerts(false)
+        }
+    }
+
+    // Poll for alerts every 30 seconds
+    useEffect(() => {
+        if (!isAdmin) return
+
+        fetchAlerts()
+        const interval = setInterval(fetchAlerts, 30000) // 30 seconds
+
+        return () => clearInterval(interval)
+    }, [isAdmin])
+
+    const getSeverityIcon = (severity: string) => {
+        switch (severity) {
+            case 'critical':
+                return <AlertCircle className="h-4 w-4 text-destructive" />
+            case 'high':
+                return <AlertTriangle className="h-4 w-4 text-orange-500" />
+            case 'medium':
+                return <Info className="h-4 w-4 text-yellow-500" />
+            default:
+                return <Info className="h-4 w-4 text-blue-500" />
+        }
+    }
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString)
+        const now = new Date()
+        const diff = now.getTime() - date.getTime()
+        const minutes = Math.floor(diff / 60000)
+        const hours = Math.floor(diff / 3600000)
+        const days = Math.floor(diff / 86400000)
+
+        if (minutes < 1) return 'Agora'
+        if (minutes < 60) return `${minutes}m atrás`
+        if (hours < 24) return `${hours}h atrás`
+        return `${days}d atrás`
     }
 
     const SidebarContent = () => (
@@ -192,26 +264,37 @@ export function MainLayout({ children }: MainLayoutProps) {
             <div className="border-t border-border p-4 space-y-3">
                 {isAuthenticated && user ? (
                     <>
-                        <div className="flex items-center gap-2">
-                            <div className="p-2 bg-primary/10 rounded-full">
-                                <User className="h-4 w-4 text-primary" />
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{user.full_name || user.username}</p>
+                                    <Badge variant="outline" className="text-xs">
+                                        {getRoleLabel(user.role)}
+                                    </Badge>
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{user.username}</p>
-                                <Badge variant="outline" className="text-xs">
-                                    {getRoleLabel(user.role)}
-                                </Badge>
-                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                        <Settings2 className="h-4 w-4" />
+                                        <span className="sr-only">Configurações do usuário</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setProfileModalOpen(true)}>
+                                        <User className="h-4 w-4 mr-2" />
+                                        Ver Perfil
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                                        <LogOut className="h-4 w-4 mr-2" />
+                                        Sair
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="w-full justify-start gap-2 text-muted-foreground" 
-                            onClick={handleLogout}
-                        >
-                            <LogOut className="h-4 w-4" />
-                            Sair
-                        </Button>
                     </>
                 ) : (
                     <Button 
@@ -269,6 +352,74 @@ export function MainLayout({ children }: MainLayoutProps) {
                                 <span className="sm:hidden">Buscar</span>
                             </Link>
                         </Button>
+                        
+                        {/* Notification Bell (Admin only) */}
+                        {isAdmin && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="relative">
+                                        <Bell className="h-5 w-5" />
+                                        {alertCount > 0 && (
+                                            <Badge 
+                                                variant="destructive" 
+                                                className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                                            >
+                                                {alertCount > 9 ? '9+' : alertCount}
+                                            </Badge>
+                                        )}
+                                        <span className="sr-only">Notificações</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-80">
+                                    <DropdownMenuLabel className="flex items-center justify-between">
+                                        <span>Alertas do Sistema</span>
+                                        {alertCount > 0 && (
+                                            <Badge variant="secondary">{alertCount}</Badge>
+                                        )}
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {loadingAlerts ? (
+                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                            Carregando...
+                                        </div>
+                                    ) : recentAlerts.length === 0 ? (
+                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                            Nenhum alerta novo
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {recentAlerts.map((alert) => (
+                                                <DropdownMenuItem
+                                                    key={alert.id}
+                                                    className="flex flex-col items-start gap-1 p-3 cursor-pointer"
+                                                    onClick={() => router.push('/settings/monitoring')}
+                                                >
+                                                    <div className="flex items-center gap-2 w-full">
+                                                        {getSeverityIcon(alert.severity)}
+                                                        <span className="font-medium text-sm flex-1">
+                                                            {alert.event_type.replace(/_/g, ' ')}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {formatDate(alert.created_date)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                                        {alert.message}
+                                                    </p>
+                                                </DropdownMenuItem>
+                                            ))}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem asChild>
+                                                <Link href="/settings/monitoring" className="w-full text-center justify-center">
+                                                    Ver todos os alertas
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                        
                         {!isAuthenticated && (
                             <Button 
                                 variant="default" 
@@ -286,6 +437,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             </div>
             
             <LoginModal open={loginModalOpen} onOpenChange={setLoginModalOpen} />
+            <ProfileModal open={profileModalOpen} onOpenChange={setProfileModalOpen} />
         </div>
     )
 }

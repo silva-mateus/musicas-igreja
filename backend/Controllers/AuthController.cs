@@ -11,13 +11,23 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IRateLimitService _rateLimitService;
+    private readonly IMonitoringService _monitoringService;
+    private readonly IAppInstanceService _appInstanceService;
     private readonly ILogger<AuthController> _logger;
     private readonly IWebHostEnvironment _environment;
 
-    public AuthController(IAuthService authService, IRateLimitService rateLimitService, ILogger<AuthController> logger, IWebHostEnvironment environment)
+    public AuthController(
+        IAuthService authService, 
+        IRateLimitService rateLimitService, 
+        IMonitoringService monitoringService, 
+        IAppInstanceService appInstanceService,
+        ILogger<AuthController> logger, 
+        IWebHostEnvironment environment)
     {
         _authService = authService;
         _rateLimitService = rateLimitService;
+        _monitoringService = monitoringService;
+        _appInstanceService = appInstanceService;
         _logger = logger;
         _environment = environment;
     }
@@ -28,15 +38,25 @@ public class AuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { success = false, error = "Username e password são obrigatórios" });
 
-        // 🔒 SECURITY: Rate limiting - Usar IP + Username como chave
+        // Rate limiting - Use IP + Username as key
         var clientIp = AuthHelper.GetClientIp(HttpContext);
         var rateLimitKey = $"login:{clientIp}:{request.Username.ToLower()}";
         
         if (_rateLimitService.IsRateLimited(rateLimitKey))
         {
             _logger.LogWarning(
-                "🚫 Rate limit exceeded for login attempt - User: {Username}, IP: {IP}",
+                "[Auth] Rate limit exceeded for login attempt - User: {Username}, IP: {IP}",
                 request.Username, clientIp);
+            
+            // Log security event
+            await _monitoringService.LogSecurityEventAsync(
+                "rate_limit_exceeded",
+                "high",
+                $"Rate limit exceeded for user {request.Username}",
+                null,
+                clientIp,
+                HttpContext.Request.Headers["User-Agent"].ToString()
+            );
             
             return StatusCode(429, new 
             { 
@@ -45,39 +65,61 @@ public class AuthController : ControllerBase
             });
         }
 
-        _logger.LogInformation("🔐 Login attempt for user: {Username} from IP: {IP}", request.Username, clientIp);
+        _logger.LogInformation("[Auth] Login attempt for user: {Username} from IP: {IP}", request.Username, clientIp);
 
         var user = await _authService.ValidateUserAsync(request.Username, request.Password);
 
         if (user == null)
         {
-            // 🔒 SECURITY: Registrar tentativa falhada para rate limiting
+            // Record failed attempt for rate limiting
             _rateLimitService.RecordAttempt(rateLimitKey);
             
             _logger.LogWarning(
-                "❌ Login failed for user: {Username} from IP: {IP}",
+                "[Auth] Login failed for user: {Username} from IP: {IP}",
                 request.Username, clientIp);
+            
+            // Log security event
+            await _monitoringService.LogSecurityEventAsync(
+                "login_failed",
+                "medium",
+                $"Failed login attempt for user {request.Username}",
+                null,
+                clientIp,
+                HttpContext.Request.Headers["User-Agent"].ToString()
+            );
             
             return Unauthorized(new { success = false, error = "Credenciais inválidas" });
         }
 
-        // 🔒 SECURITY: Login bem-sucedido - resetar rate limit
+        // Login successful - reset rate limit
         _rateLimitService.ResetAttempts(rateLimitKey);
         
         // Criar sessão
         HttpContext.Session.SetInt32("UserId", user.Id);
         HttpContext.Session.SetInt32("RoleId", user.RoleId);
         HttpContext.Session.SetString("RoleName", user.Role?.Name ?? "viewer");
+        HttpContext.Session.SetString("Username", user.Username); // Store username for audit
         HttpContext.Session.SetString("LastActivity", DateTime.UtcNow.ToString("O"));
         
         _logger.LogInformation(
-            "✅ Login successful for user: {Username} (ID: {UserId}) from IP: {IP}",
+            "[Auth] Login successful for user: {Username} (ID: {UserId}) from IP: {IP}",
             request.Username, user.Id, clientIp);
+        
+        // Log audit action for successful login
+        await _monitoringService.LogAuditActionAsync(
+            "login",
+            "auth",
+            user.Id,
+            user.Id,
+            user.Username,
+            clientIp
+        );
 
         return Ok(new
         {
             success = true,
             message = "Login realizado com sucesso",
+            instance_id = _appInstanceService.InstanceId,
             must_change_password = user.MustChangePassword,
             user = new
             {
@@ -130,6 +172,7 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             success = true,
+            instance_id = _appInstanceService.InstanceId,
             user = new
             {
                 id = user.Id,
@@ -178,5 +221,43 @@ public class AuthController : ControllerBase
             return BadRequest(new { success = false, error = "Senha atual incorreta" });
 
         return Ok(new { success = true, message = "Senha alterada com sucesso" });
+    }
+
+    [HttpPut("profile")]
+    public async Task<ActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var userId = HttpContext.Session.GetInt32("UserId");
+
+        if (userId == null)
+            return Unauthorized(new { success = false, error = "Não autenticado" });
+
+        if (string.IsNullOrWhiteSpace(request.FullName))
+            return BadRequest(new { success = false, error = "Nome é obrigatório" });
+
+        if (request.FullName.Length < 2)
+            return BadRequest(new { success = false, error = "Nome deve ter pelo menos 2 caracteres" });
+
+        var result = await _authService.UpdateUserAsync(userId.Value, request.FullName, null);
+
+        if (!result)
+            return BadRequest(new { success = false, error = "Erro ao atualizar perfil" });
+
+        // Return updated user data
+        var user = await _authService.GetUserWithRoleAsync(userId.Value);
+        
+        return Ok(new
+        {
+            success = true,
+            message = "Perfil atualizado com sucesso",
+            user = new
+            {
+                id = user!.Id,
+                username = user.Username,
+                full_name = user.FullName,
+                role = user.Role?.Name ?? "viewer",
+                role_id = user.RoleId,
+                is_active = user.IsActive
+            }
+        });
     }
 }

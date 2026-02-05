@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5000'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const fileId = params.id
+        const { id: fileId } = await params
 
         const response = await fetch(`${BACKEND_URL}/api/files/${fileId}/download`, {
             method: 'GET',
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             return NextResponse.json({ error: 'Backend error' }, { status: response.status })
         }
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             },
         })
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }

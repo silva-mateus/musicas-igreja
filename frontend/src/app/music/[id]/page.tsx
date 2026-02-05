@@ -15,6 +15,7 @@ import { musicApi, handleApiError } from '@/lib/api'
 import { AddToListModal } from '@/components/music/add-to-list-modal'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '@/contexts/AuthContext'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 function isValidYouTube(url?: string) {
     if (!url) return false
@@ -77,7 +78,7 @@ export default function MusicDetailsPage() {
 
             if (!response.ok) {
                 const errorText = await response.text()
-                console.error('❌ Error response:', errorText)
+                console.error('[Music] Error response:', errorText)
                 throw new Error(`Falha ao carregar PDF: ${response.status} ${response.statusText}`)
             }
 
@@ -85,7 +86,7 @@ export default function MusicDetailsPage() {
             const url = URL.createObjectURL(blob)
             setPdfUrl(url)
         } catch (error) {
-            console.error('❌ Erro ao carregar PDF:', error)
+            console.error('[Music] Error loading PDF:', error)
             setPdfError(true)
         } finally {
             setLoadingPdf(false)
@@ -215,7 +216,12 @@ export default function MusicDetailsPage() {
                         
                         {/* Actions - Desktop: inline, Mobile: grid */}
                         <TooltipProvider>
-                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 shrink-0">
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 shrink-0 items-center">
+                                <InstructionsModal
+                                    title={PAGE_INSTRUCTIONS.musicDetails.title}
+                                    description={PAGE_INSTRUCTIONS.musicDetails.description}
+                                    sections={PAGE_INSTRUCTIONS.musicDetails.sections}
+                                />
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button variant="outline" size="sm" onClick={() => window.open(`/api/files/${music.id}/stream`, '_blank')} className="gap-1 sm:gap-2 text-xs sm:text-sm">
@@ -260,7 +266,7 @@ export default function MusicDetailsPage() {
                                 {canDelete && (
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 gap-1 sm:gap-2 text-xs sm:text-sm" onClick={handleDeleteClick}>
+                                            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive gap-1 sm:gap-2 text-xs sm:text-sm" onClick={handleDeleteClick}>
                                                 <Trash2 className="h-4 w-4" />
                                                 <span>Excluir</span>
                                             </Button>

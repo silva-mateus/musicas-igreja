@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { MainLayout } from '@/components/layout/main-layout'
 import { MusicUnifiedFilters } from '@/components/music/music-unified-filters'
 import { MusicTable } from '@/components/music/music-table'
@@ -9,34 +10,24 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
-import { musicApi, handleApiError, request } from '@/lib/api'
-import type { MusicFile, SearchFilters, PaginationParams, PaginatedResponse } from '@/types'
+import { useMusic, musicKeys } from '@/hooks/use-music'
+import { request } from '@/lib/api'
+import type { SearchFilters, PaginationParams } from '@/types'
 import { Music, Upload, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
+import { useQuery } from '@tanstack/react-query'
 
 type TabValue = 'all' | 'by-artist' | 'by-category' | 'by-liturgical-time'
 
-interface GroupedData {
-    groups: any[]
-    isLoading: boolean
-    error: string | null
-}
-
 export default function MusicPage() {
     const { canUpload } = useAuth()
+    const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState<TabValue>('all')
     
     // Unified filters state (shared across tabs)
     const [filters, setFilters] = useState<SearchFilters>({})
-    
-    // All tab data
-    const [musics, setMusics] = useState<PaginatedResponse<MusicFile>>({
-        data: [],
-        pagination: { page: 1, limit: 20, total: 0, pages: 0 },
-    })
-    const [isLoading, setIsLoading] = useState(true)
-    const [error, setError] = useState('')
     const [pagination, setPagination] = useState<PaginationParams>({
         page: 1,
         limit: 20,
@@ -44,66 +35,35 @@ export default function MusicPage() {
         sort_order: 'desc',
     })
 
-    // Grouped tabs data
-    const [byArtist, setByArtist] = useState<GroupedData>({ groups: [], isLoading: false, error: null })
-    const [byCategory, setByCategory] = useState<GroupedData>({ groups: [], isLoading: false, error: null })
-    const [byLiturgicalTime, setByLiturgicalTime] = useState<GroupedData>({ groups: [], isLoading: false, error: null })
+    // All tab data using TanStack Query
+    const { 
+        data: musics, 
+        isLoading, 
+        error,
+        refetch: refetchMusics 
+    } = useMusic(filters, pagination)
 
-    const loadMusics = useCallback(async () => {
-        try {
-            setIsLoading(true)
-            setError('')
-            const data = await musicApi.search(filters, pagination)
-            setMusics(data)
-        } catch (error) {
-            setError(handleApiError(error))
-        } finally {
-            setIsLoading(false)
-        }
-    }, [filters, pagination])
+    // Grouped data queries
+    const byArtistQuery = useQuery({
+        queryKey: ['music', 'grouped', 'by-artist'],
+        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-artist'),
+        enabled: activeTab === 'by-artist',
+        staleTime: 5 * 60 * 1000,
+    })
 
-    const loadByArtist = useCallback(async () => {
-        try {
-            setByArtist(prev => ({ ...prev, isLoading: true, error: null }))
-            const data = await request<any>('/files/grouped/by-artist')
-            setByArtist({ groups: data.groups || [], isLoading: false, error: null })
-        } catch (error) {
-            setByArtist({ groups: [], isLoading: false, error: handleApiError(error) })
-        }
-    }, [])
+    const byCategoryQuery = useQuery({
+        queryKey: ['music', 'grouped', 'by-category'],
+        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-category'),
+        enabled: activeTab === 'by-category',
+        staleTime: 5 * 60 * 1000,
+    })
 
-    const loadByCategory = useCallback(async () => {
-        try {
-            setByCategory(prev => ({ ...prev, isLoading: true, error: null }))
-            const data = await request<any>('/files/grouped/by-category')
-            setByCategory({ groups: data.groups || [], isLoading: false, error: null })
-        } catch (error) {
-            setByCategory({ groups: [], isLoading: false, error: handleApiError(error) })
-        }
-    }, [])
-
-    const loadByLiturgicalTime = useCallback(async () => {
-        try {
-            setByLiturgicalTime(prev => ({ ...prev, isLoading: true, error: null }))
-            const data = await request<any>('/files/grouped/by-liturgical-time')
-            setByLiturgicalTime({ groups: data.groups || [], isLoading: false, error: null })
-        } catch (error) {
-            setByLiturgicalTime({ groups: [], isLoading: false, error: handleApiError(error) })
-        }
-    }, [])
-
-    // Load data based on active tab
-    useEffect(() => {
-        if (activeTab === 'all') {
-            loadMusics()
-        } else if (activeTab === 'by-artist' && byArtist.groups.length === 0 && !byArtist.isLoading) {
-            loadByArtist()
-        } else if (activeTab === 'by-category' && byCategory.groups.length === 0 && !byCategory.isLoading) {
-            loadByCategory()
-        } else if (activeTab === 'by-liturgical-time' && byLiturgicalTime.groups.length === 0 && !byLiturgicalTime.isLoading) {
-            loadByLiturgicalTime()
-        }
-    }, [activeTab, loadMusics, loadByArtist, loadByCategory, loadByLiturgicalTime, byArtist.groups.length, byArtist.isLoading, byCategory.groups.length, byCategory.isLoading, byLiturgicalTime.groups.length, byLiturgicalTime.isLoading])
+    const byLiturgicalTimeQuery = useQuery({
+        queryKey: ['music', 'grouped', 'by-liturgical-time'],
+        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-liturgical-time'),
+        enabled: activeTab === 'by-liturgical-time',
+        staleTime: 5 * 60 * 1000,
+    })
 
     // Reset pagination when filters change
     const handleFiltersChange = (newFilters: SearchFilters) => {
@@ -120,21 +80,13 @@ export default function MusicPage() {
     }
 
     const handleRefreshAll = () => {
-        // Reset grouped data to force reload
-        setByArtist({ groups: [], isLoading: false, error: null })
-        setByCategory({ groups: [], isLoading: false, error: null })
-        setByLiturgicalTime({ groups: [], isLoading: false, error: null })
-        
-        // Reload current tab
-        if (activeTab === 'all') {
-            loadMusics()
-        } else if (activeTab === 'by-artist') {
-            loadByArtist()
-        } else if (activeTab === 'by-category') {
-            loadByCategory()
-        } else if (activeTab === 'by-liturgical-time') {
-            loadByLiturgicalTime()
-        }
+        // Invalidate all music queries
+        queryClient.invalidateQueries({ queryKey: musicKeys.all })
+        queryClient.invalidateQueries({ queryKey: ['music', 'grouped'] })
+    }
+
+    const handleMusicUpdate = () => {
+        refetchMusics()
     }
 
     return (
@@ -145,7 +97,12 @@ export default function MusicPage() {
                     title="Músicas"
                     description="Busque, visualize e organize suas músicas"
                     actions={
-                        <>
+                        <div className="flex items-center gap-2">
+                            <InstructionsModal
+                                title={PAGE_INSTRUCTIONS.musicList.title}
+                                description={PAGE_INSTRUCTIONS.musicList.description}
+                                sections={PAGE_INSTRUCTIONS.musicList.sections}
+                            />
                             <Button onClick={handleRefreshAll} variant="outline" size="sm" className="gap-2">
                                 <RefreshCw className="h-4 w-4" />
                                 <span className="hidden sm:inline">Atualizar</span>
@@ -158,7 +115,7 @@ export default function MusicPage() {
                                     </Link>
                                 </Button>
                             )}
-                        </>
+                        </div>
                     }
                 />
 
@@ -204,8 +161,8 @@ export default function MusicPage() {
                             <CardContent>
                                 {error ? (
                                     <div className="text-center py-8">
-                                        <p className="text-destructive">{error}</p>
-                                        <Button onClick={loadMusics} className="mt-4">
+                                        <p className="text-destructive">{error instanceof Error ? error.message : 'Erro ao carregar músicas'}</p>
+                                        <Button onClick={() => refetchMusics()} className="mt-4">
                                             Tentar novamente
                                         </Button>
                                     </div>
@@ -215,7 +172,7 @@ export default function MusicPage() {
                                         isLoading={isLoading}
                                         pagination={musics?.pagination}
                                         onPageChange={handlePageChange}
-                                        onMusicUpdate={loadMusics}
+                                        onMusicUpdate={handleMusicUpdate}
                                     />
                                 )}
                             </CardContent>
@@ -233,10 +190,10 @@ export default function MusicPage() {
                             <CardContent>
                                 <MusicGroupedView
                                     groupType="artist"
-                                    groups={byArtist.groups}
-                                    isLoading={byArtist.isLoading}
-                                    error={byArtist.error}
-                                    onRefresh={loadByArtist}
+                                    groups={byArtistQuery.data?.groups || []}
+                                    isLoading={byArtistQuery.isLoading}
+                                    error={byArtistQuery.error?.message || null}
+                                    onRefresh={() => byArtistQuery.refetch()}
                                     filters={filters}
                                 />
                             </CardContent>
@@ -254,10 +211,10 @@ export default function MusicPage() {
                             <CardContent>
                                 <MusicGroupedView
                                     groupType="category"
-                                    groups={byCategory.groups}
-                                    isLoading={byCategory.isLoading}
-                                    error={byCategory.error}
-                                    onRefresh={loadByCategory}
+                                    groups={byCategoryQuery.data?.groups || []}
+                                    isLoading={byCategoryQuery.isLoading}
+                                    error={byCategoryQuery.error?.message || null}
+                                    onRefresh={() => byCategoryQuery.refetch()}
                                     filters={filters}
                                 />
                             </CardContent>
@@ -275,10 +232,10 @@ export default function MusicPage() {
                             <CardContent>
                                 <MusicGroupedView
                                     groupType="liturgical-time"
-                                    groups={byLiturgicalTime.groups}
-                                    isLoading={byLiturgicalTime.isLoading}
-                                    error={byLiturgicalTime.error}
-                                    onRefresh={loadByLiturgicalTime}
+                                    groups={byLiturgicalTimeQuery.data?.groups || []}
+                                    isLoading={byLiturgicalTimeQuery.isLoading}
+                                    error={byLiturgicalTimeQuery.error?.message || null}
+                                    onRefresh={() => byLiturgicalTimeQuery.refetch()}
                                     filters={filters}
                                 />
                             </CardContent>

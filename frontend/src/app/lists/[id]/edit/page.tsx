@@ -14,6 +14,8 @@ import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { listsApi, musicApi, handleApiError } from '@/lib/api'
 import type { MusicList, MusicFile } from '@/types'
@@ -38,11 +40,15 @@ import {
     ArrowUp,
     ArrowDown,
     Lock,
-    Loader2
+    Loader2,
+    Filter,
+    Check,
+    User
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 interface FilterSuggestions {
     categories: string[]
@@ -74,8 +80,8 @@ export default function EditListPage() {
     const [name, setName] = useState('')
     const [observations, setObservations] = useState('')
 
-    // Collapsible states
-    const [infoOpen, setInfoOpen] = useState(true)
+    // Collapsible states - Info colapsado por padrão, outros abertos
+    const [infoOpen, setInfoOpen] = useState(false)
     const [musicListOpen, setMusicListOpen] = useState(true)
     const [searchOpen, setSearchOpen] = useState(true)
 
@@ -83,9 +89,17 @@ export default function EditListPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
     const [selectedLiturgicalTimes, setSelectedLiturgicalTimes] = useState<string[]>([])
+    const [selectedArtists, setSelectedArtists] = useState<string[]>([])
     const [searchResults, setSearchResults] = useState<MusicFile[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [suggestions, setSuggestions] = useState<FilterSuggestions>({
+        categories: [],
+        liturgical_times: [],
+        artists: [],
+        musical_keys: []
+    })
+    // Filtered options based on current search results
+    const [filteredOptions, setFilteredOptions] = useState<FilterSuggestions>({
         categories: [],
         liturgical_times: [],
         artists: [],
@@ -134,13 +148,65 @@ export default function EditListPage() {
                 filters.liturgical_time = selectedLiturgicalTimes
             }
 
+            if (selectedArtists.length > 0) {
+                filters.artist = selectedArtists
+            }
+
             const response = await musicApi.search(filters, { page: 1, limit: 50 })
             setSearchResults(response.data)
+
+            // Update filtered options based on results
+            updateFilteredOptions(response.data)
         } catch (error) {
             console.error('Erro ao buscar músicas:', error)
         } finally {
             setIsSearching(false)
         }
+    }
+
+    // Update available filter options based on search results
+    const updateFilteredOptions = (results: MusicFile[]) => {
+        const hasActiveFilters = selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0
+
+        if (!hasActiveFilters) {
+            // No filters active, show all options
+            setFilteredOptions(suggestions)
+            return
+        }
+
+        // Extract unique values from results
+        const categories = new Set<string>()
+        const liturgicalTimes = new Set<string>()
+        const artists = new Set<string>()
+
+        results.forEach(music => {
+            // Categories
+            if (music.categories && music.categories.length > 0) {
+                music.categories.forEach(cat => cat && categories.add(cat))
+            } else if (music.category) {
+                categories.add(music.category)
+            }
+
+            // Liturgical times
+            if (music.liturgical_times && music.liturgical_times.length > 0) {
+                music.liturgical_times.forEach(time => time && liturgicalTimes.add(time))
+            } else if (music.liturgical_time) {
+                liturgicalTimes.add(music.liturgical_time)
+            }
+
+            // Artists
+            if (music.artist) {
+                artists.add(music.artist)
+            }
+        })
+
+        // Keep selected values + available values from results
+        setFilteredOptions({
+            categories: Array.from(new Set([...selectedCategories, ...Array.from(categories)])).filter(c => suggestions.categories.includes(c)),
+            liturgical_times: Array.from(new Set([...selectedLiturgicalTimes, ...Array.from(liturgicalTimes)])).filter(t => suggestions.liturgical_times.includes(t)),
+            artists: Array.from(new Set([...selectedArtists, ...Array.from(artists)])).filter(a => suggestions.artists.includes(a)),
+            musical_keys: suggestions.musical_keys
+        })
     }
 
     useEffect(() => {
@@ -150,12 +216,17 @@ export default function EditListPage() {
         }
     }, [listId])
 
+    // Initialize filtered options when suggestions load
+    useEffect(() => {
+        setFilteredOptions(suggestions)
+    }, [suggestions])
+
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             searchMusic()
         }, 300)
         return () => clearTimeout(timeoutId)
-    }, [searchTerm, selectedCategories, selectedLiturgicalTimes])
+    }, [searchTerm, selectedCategories, selectedLiturgicalTimes, selectedArtists])
 
     const handleSave = async () => {
         if (!list || !name.trim()) return
@@ -455,7 +526,12 @@ export default function EditListPage() {
                         </div>
 
                         <TooltipProvider>
-                            <div className="flex gap-2 shrink-0">
+                            <div className="flex gap-2 shrink-0 items-center">
+                                <InstructionsModal
+                                    title={PAGE_INSTRUCTIONS.listEdit.title}
+                                    description={PAGE_INSTRUCTIONS.listEdit.description}
+                                    sections={PAGE_INSTRUCTIONS.listEdit.sections}
+                                />
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
@@ -586,7 +662,7 @@ export default function EditListPage() {
                                                                                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                                                                             </td>
                                                                             <td className="py-2 px-1">
-                                                                                <Badge variant="outline" className="w-7 h-7 rounded-full flex items-center justify-center text-xs">
+                                                                                <Badge variant="outline" className="w-8 h-8 rounded-full flex items-center justify-center text-xs">
                                                                                     {index + 1}
                                                                                 </Badge>
                                                                             </td>
@@ -617,20 +693,20 @@ export default function EditListPage() {
                                                                                     <Button
                                                                                         variant="ghost"
                                                                                         size="icon"
-                                                                                        className="h-7 w-7"
+                                                                                        className="h-8 w-8"
                                                                                         onClick={() => handleMoveUp(index)}
                                                                                         disabled={index === 0}
                                                                                     >
-                                                                                        <ArrowUp className="h-3.5 w-3.5" />
+                                                                                        <ArrowUp className="h-4 w-4" />
                                                                                     </Button>
                                                                                     <Button
                                                                                         variant="ghost"
                                                                                         size="icon"
-                                                                                        className="h-7 w-7"
+                                                                                        className="h-8 w-8"
                                                                                         onClick={() => handleMoveDown(index)}
                                                                                         disabled={index === (list.items?.length || 0) - 1}
                                                                                     >
-                                                                                        <ArrowDown className="h-3.5 w-3.5" />
+                                                                                        <ArrowDown className="h-4 w-4" />
                                                                                     </Button>
                                                                                 </div>
                                                                             </td>
@@ -639,9 +715,9 @@ export default function EditListPage() {
                                                                                     <TooltipProvider>
                                                                                         <Tooltip>
                                                                                             <TooltipTrigger asChild>
-                                                                                                <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                                                                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                                                                                                     <Link href={`/music/${item.music_id}`} target="_blank">
-                                                                                                        <FileText className="h-3.5 w-3.5" />
+                                                                                                        <FileText className="h-4 w-4" />
                                                                                                     </Link>
                                                                                                 </Button>
                                                                                             </TooltipTrigger>
@@ -652,10 +728,10 @@ export default function EditListPage() {
                                                                                                 <Button
                                                                                                     variant="ghost"
                                                                                                     size="icon"
-                                                                                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
                                                                                                     onClick={() => handleRemoveMusicClick(item.id)}
                                                                                                 >
-                                                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                                                    <Trash2 className="h-4 w-4" />
                                                                                                 </Button>
                                                                                             </TooltipTrigger>
                                                                                             <TooltipContent><p>Remover</p></TooltipContent>
@@ -710,93 +786,281 @@ export default function EditListPage() {
                             </CardHeader>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                            <CardContent>
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                                    {/* Filtros */}
-                                    <div className="space-y-4">
-                                        <h4 className="font-medium">Filtros</h4>
-
-                                        {/* Busca por título */}
-                                        <div>
-                                            <Label htmlFor="search">Buscar por título</Label>
-                                            <div className="relative mt-1">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    id="search"
-                                                    placeholder="Digite o título da música..."
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                    className="pl-10"
-                                                />
-                                                {searchTerm && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                                                        onClick={() => setSearchTerm('')}
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Categorias */}
-                                        <div>
-                                            <Label>Categorias</Label>
-                                            <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
-                                                {suggestions.categories.map((category) => (
-                                                    <div key={category} className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`cat-${category}`}
-                                                            checked={selectedCategories.includes(category)}
-                                                            onCheckedChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedCategories([...selectedCategories, category])
-                                                                } else {
-                                                                    setSelectedCategories(selectedCategories.filter(c => c !== category))
-                                                                }
-                                                            }}
-                                                        />
-                                                        <Label htmlFor={`cat-${category}`} className="text-sm">{category}</Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Tempos Litúrgicos */}
-                                        <div>
-                                            <Label>Tempos Litúrgicos</Label>
-                                            <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
-                                                {suggestions.liturgical_times.map((time) => (
-                                                    <div key={time} className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`time-${time}`}
-                                                            checked={selectedLiturgicalTimes.includes(time)}
-                                                            onCheckedChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedLiturgicalTimes([...selectedLiturgicalTimes, time])
-                                                                } else {
-                                                                    setSelectedLiturgicalTimes(selectedLiturgicalTimes.filter(t => t !== time))
-                                                                }
-                                                            }}
-                                                        />
-                                                        <Label htmlFor={`time-${time}`} className="text-sm">{time}</Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
+                            <CardContent className="space-y-4">
+                                {/* Barra de Filtros Compacta */}
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    {/* Busca por título */}
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Buscar por título..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-10 pr-10"
+                                        />
+                                        {searchTerm && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                                                onClick={() => setSearchTerm('')}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
 
-                                    {/* Resultados */}
-                                    <div className="lg:col-span-2">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h4 className="font-medium">Resultados</h4>
-                                            {isSearching && (
-                                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                            )}
-                                        </div>
+                                    {/* Dropdown de Categorias */}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="justify-between min-w-[160px]">
+                                                <span className="flex items-center gap-2">
+                                                    <Filter className="h-4 w-4" />
+                                                    Categorias
+                                                </span>
+                                                {selectedCategories.length > 0 && (
+                                                    <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                                                        {selectedCategories.length}
+                                                    </Badge>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56 p-0" align="start">
+                                            <div className="p-2 border-b">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium">Categorias</span>
+                                                    {selectedCategories.length > 0 && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-xs"
+                                                            onClick={() => setSelectedCategories([])}
+                                                        >
+                                                            Limpar
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ScrollArea className="h-[200px]">
+                                                <div className="p-2 space-y-1">
+                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
+                                                        ? filteredOptions.categories 
+                                                        : suggestions.categories
+                                                    ).filter(c => c && c.trim()).map((category) => (
+                                                        <div
+                                                            key={category}
+                                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                            onClick={() => {
+                                                                if (selectedCategories.includes(category)) {
+                                                                    setSelectedCategories(selectedCategories.filter(c => c !== category))
+                                                                } else {
+                                                                    setSelectedCategories([...selectedCategories, category])
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedCategories.includes(category) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                {selectedCategories.includes(category) && (
+                                                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm">{category}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
 
+                                    {/* Dropdown de Artistas */}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="justify-between min-w-[140px]">
+                                                <span className="flex items-center gap-2">
+                                                    <User className="h-4 w-4" />
+                                                    Artistas
+                                                </span>
+                                                {selectedArtists.length > 0 && (
+                                                    <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                                                        {selectedArtists.length}
+                                                    </Badge>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56 p-0" align="start">
+                                            <div className="p-2 border-b">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium">Artistas</span>
+                                                    {selectedArtists.length > 0 && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-xs"
+                                                            onClick={() => setSelectedArtists([])}
+                                                        >
+                                                            Limpar
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ScrollArea className="h-[200px]">
+                                                <div className="p-2 space-y-1">
+                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
+                                                        ? filteredOptions.artists 
+                                                        : suggestions.artists
+                                                    ).filter(a => a && a.trim()).map((artist) => (
+                                                        <div
+                                                            key={artist}
+                                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                            onClick={() => {
+                                                                if (selectedArtists.includes(artist)) {
+                                                                    setSelectedArtists(selectedArtists.filter(a => a !== artist))
+                                                                } else {
+                                                                    setSelectedArtists([...selectedArtists, artist])
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedArtists.includes(artist) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                {selectedArtists.includes(artist) && (
+                                                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm truncate">{artist}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
+
+                                    {/* Dropdown de Tempos Litúrgicos */}
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="justify-between min-w-[180px]">
+                                                <span className="flex items-center gap-2">
+                                                    <Filter className="h-4 w-4" />
+                                                    T. Litúrgicos
+                                                </span>
+                                                {selectedLiturgicalTimes.length > 0 && (
+                                                    <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                                                        {selectedLiturgicalTimes.length}
+                                                    </Badge>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56 p-0" align="start">
+                                            <div className="p-2 border-b">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium">Tempos Litúrgicos</span>
+                                                    {selectedLiturgicalTimes.length > 0 && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-xs"
+                                                            onClick={() => setSelectedLiturgicalTimes([])}
+                                                        >
+                                                            Limpar
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ScrollArea className="h-[200px]">
+                                                <div className="p-2 space-y-1">
+                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
+                                                        ? filteredOptions.liturgical_times 
+                                                        : suggestions.liturgical_times
+                                                    ).filter(t => t && t.trim()).map((time) => (
+                                                        <div
+                                                            key={time}
+                                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                            onClick={() => {
+                                                                if (selectedLiturgicalTimes.includes(time)) {
+                                                                    setSelectedLiturgicalTimes(selectedLiturgicalTimes.filter(t => t !== time))
+                                                                } else {
+                                                                    setSelectedLiturgicalTimes([...selectedLiturgicalTimes, time])
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedLiturgicalTimes.includes(time) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                {selectedLiturgicalTimes.includes(time) && (
+                                                                    <Check className="h-3 w-3 text-primary-foreground" />
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm">{time}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
+
+                                    {/* Indicador de busca */}
+                                    {isSearching && (
+                                        <div className="flex items-center">
+                                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Filtros ativos */}
+                                {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0) && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedCategories.map((cat) => (
+                                            <Badge key={cat} variant="secondary" className="gap-1 pr-1">
+                                                {cat}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 ml-1 hover:bg-transparent"
+                                                    onClick={() => setSelectedCategories(selectedCategories.filter(c => c !== cat))}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </Badge>
+                                        ))}
+                                        {selectedArtists.map((artist) => (
+                                            <Badge key={artist} variant="default" className="gap-1 pr-1">
+                                                <User className="h-3 w-3" />
+                                                {artist}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 ml-1 hover:bg-transparent"
+                                                    onClick={() => setSelectedArtists(selectedArtists.filter(a => a !== artist))}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </Badge>
+                                        ))}
+                                        {selectedLiturgicalTimes.map((time) => (
+                                            <Badge key={time} variant="outline" className="gap-1 pr-1">
+                                                {time}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 ml-1 hover:bg-transparent"
+                                                    onClick={() => setSelectedLiturgicalTimes(selectedLiturgicalTimes.filter(t => t !== time))}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </Badge>
+                                        ))}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs text-muted-foreground"
+                                            onClick={() => {
+                                                setSelectedCategories([])
+                                                setSelectedLiturgicalTimes([])
+                                                setSelectedArtists([])
+                                            }}
+                                        >
+                                            Limpar todos
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {/* Resultados */}
+                                <div>
                                         {searchResults.length > 0 ? (
                                             <div className="max-h-96 overflow-y-auto">
                                                 <table className="w-full">
@@ -835,49 +1099,48 @@ export default function EditListPage() {
                                                                         <Badge className="text-xs">{music.musical_key}</Badge>
                                                                     ) : '-'}
                                                                 </td>
-                                                                <td className="py-2 px-1">
-                                                                    <div className="flex gap-0.5 justify-end">
-                                                                        <TooltipProvider>
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                                                                                        <Link href={`/music/${music.id}`} target="_blank">
-                                                                                            <FileText className="h-3.5 w-3.5" />
-                                                                                        </Link>
-                                                                                    </Button>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent><p>Detalhes</p></TooltipContent>
-                                                                            </Tooltip>
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewPdf(music)}>
-                                                                                        <Eye className="h-3.5 w-3.5" />
-                                                                                    </Button>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent><p>Ver PDF</p></TooltipContent>
-                                                                            </Tooltip>
-                                                                            {music.youtube_link && (
-                                                                                <Tooltip>
-                                                                                    <TooltipTrigger asChild>
-                                                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openYouTube(music.youtube_link!)}>
-                                                                                            <Youtube className="h-3.5 w-3.5 text-red-500" />
-                                                                                        </Button>
-                                                                                    </TooltipTrigger>
-                                                                                    <TooltipContent><p>YouTube</p></TooltipContent>
-                                                                                </Tooltip>
-                                                                            )}
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                    <Button size="sm" className="h-7 gap-1" onClick={() => handleAddMusic(music)}>
-                                                                                        <Plus className="h-3.5 w-3.5" />
-                                                                                        <span className="hidden sm:inline">Add</span>
-                                                                                    </Button>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent><p>Adicionar</p></TooltipContent>
-                                                                            </Tooltip>
-                                                                        </TooltipProvider>
-                                                                    </div>
-                                                                </td>
+                                                                                <td className="py-2 px-1">
+                                                                                    <div className="flex gap-0.5 justify-end">
+                                                                                        <TooltipProvider>
+                                                                                            <Tooltip>
+                                                                                                <TooltipTrigger asChild>
+                                                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                                                                        <Link href={`/music/${music.id}`} target="_blank">
+                                                                                                            <FileText className="h-4 w-4" />
+                                                                                                        </Link>
+                                                                                                    </Button>
+                                                                                                </TooltipTrigger>
+                                                                                                <TooltipContent><p>Detalhes</p></TooltipContent>
+                                                                                            </Tooltip>
+                                                                                            <Tooltip>
+                                                                                                <TooltipTrigger asChild>
+                                                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewPdf(music)}>
+                                                                                                        <Eye className="h-4 w-4" />
+                                                                                                    </Button>
+                                                                                                </TooltipTrigger>
+                                                                                                <TooltipContent><p>Ver PDF</p></TooltipContent>
+                                                                                            </Tooltip>
+                                                                                            {music.youtube_link && (
+                                                                                                <Tooltip>
+                                                                                                    <TooltipTrigger asChild>
+                                                                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openYouTube(music.youtube_link!)}>
+                                                                                                            <Youtube className="h-4 w-4" />
+                                                                                                        </Button>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent><p>YouTube</p></TooltipContent>
+                                                                                                </Tooltip>
+                                                                                            )}
+                                                                                            <Tooltip>
+                                                                                                <TooltipTrigger asChild>
+                                                                                                    <Button variant="default" size="icon" className="h-8 w-8" onClick={() => handleAddMusic(music)}>
+                                                                                                        <Plus className="h-4 w-4" />
+                                                                                                    </Button>
+                                                                                                </TooltipTrigger>
+                                                                                                <TooltipContent><p>Adicionar à lista</p></TooltipContent>
+                                                                                            </Tooltip>
+                                                                                        </TooltipProvider>
+                                                                                    </div>
+                                                                                </td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
@@ -894,7 +1157,6 @@ export default function EditListPage() {
                                                 </p>
                                             </div>
                                         )}
-                                    </div>
                                 </div>
                             </CardContent>
                         </CollapsibleContent>

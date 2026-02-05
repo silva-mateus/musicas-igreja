@@ -17,6 +17,7 @@ import type { UploadResponse } from '@/types'
 import { Upload, FileText, AlertTriangle, RefreshCw, Lock, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 interface FileMetadata {
     file: File
@@ -57,13 +58,26 @@ export default function UploadPage() {
     })
 
     const handleFilesSelected = (files: File[]) => {
-        setUploadState(prev => ({
-            ...prev,
-            files,
-            metadata: [],
-            results: null,
-            error: ''
-        }))
+        setUploadState(prev => {
+            // Preserve existing metadata for files that are still present
+            const existingMetadataMap = new Map(
+                prev.metadata.map(m => [m.file.name + m.file.size, m])
+            )
+            
+            // Keep metadata for files that still exist
+            const preservedMetadata = files
+                .map(file => existingMetadataMap.get(file.name + file.size))
+                .filter((m): m is FileMetadata => m !== undefined)
+            
+            return {
+                ...prev,
+                files,
+                // Only reset metadata for truly new sessions, preserve for additions
+                metadata: prev.files.length === 0 ? [] : preservedMetadata,
+                results: null,
+                error: ''
+            }
+        })
     }
 
     const handleMetadataChange = useCallback((metadata: FileMetadata[]) => {
@@ -179,113 +193,101 @@ export default function UploadPage() {
                     title="Upload de Músicas"
                     description="Envie arquivos PDF de partituras para o sistema"
                 >
-                    {(uploadState.files.length > 0 || uploadState.results) && (
-                        <Button
-                            onClick={resetUpload}
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            disabled={uploadState.isUploading}
-                        >
-                            <RefreshCw className="h-4 w-4" />
-                            <span className="hidden sm:inline">Novo Upload</span>
-                            <span className="sm:hidden">Novo</span>
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <InstructionsModal
+                            title={PAGE_INSTRUCTIONS.upload.title}
+                            description={PAGE_INSTRUCTIONS.upload.description}
+                            sections={PAGE_INSTRUCTIONS.upload.sections}
+                        />
+                        {(uploadState.files.length > 0 || uploadState.results) && (
+                            <Button
+                                onClick={resetUpload}
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                disabled={uploadState.isUploading}
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                <span className="hidden sm:inline">Novo Upload</span>
+                                <span className="sm:hidden">Novo</span>
+                            </Button>
+                        )}
+                    </div>
                 </PageHeader>
 
-                {/* Instructions */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5" />
-                            Instruções de Upload
-                        </CardTitle>
-                        <CardDescription>
-                            Siga estas diretrizes para obter melhores resultados
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium text-primary">✅ Formatos Aceitos</h4>
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                    <li>• Arquivos PDF (.pdf)</li>
-                                    <li>• Múltiplos arquivos por vez</li>
-                                    <li>• Máximo 50MB por arquivo</li>
-                                </ul>
-                            </div>
-                            <div className="space-y-2">
-                                <h4 className="font-medium text-primary">💡 Dicas</h4>
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                    <li>• Use nomes descritivos nos arquivos</li>
-                                    <li>• O sistema detecta duplicatas automaticamente</li>
-                                    <li>• Metadados podem ser editados após upload</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Upload Zone */}
+                {/* Upload Zone - Full when no files, Compact when files exist */}
                 {!uploadState.results && (
-                    <Card>
-                        <CardContent className="p-6">
-                            <UploadZone
-                                onFilesSelected={handleFilesSelected}
-                                disabled={uploadState.isUploading}
-                                selectedFiles={uploadState.files}
-                                onRemoveFile={handleRemoveFile}
-                            />
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Metadata Editor */}
-                {uploadState.files.length > 0 && !uploadState.results && (
-                    <UploadMetadataEditor
-                        files={uploadState.files}
-                        onMetadataChange={handleMetadataChange}
-                        onRemoveFile={handleRemoveFile}
-                    />
-                )}
-
-                {/* Upload Controls */}
-                {uploadState.files.length > 0 && !uploadState.results && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between">
-                                <span>Arquivos Selecionados</span>
-                                <Badge variant="secondary">
-                                    {uploadState.files.length} arquivo{uploadState.files.length !== 1 ? 's' : ''}
-                                </Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <div className="text-sm text-muted-foreground">
-                                    Total: {(uploadState.files.reduce((acc, file) => acc + file.size, 0) / 1024 / 1024).toFixed(2)} MB
-                                </div>
-                                <Button
-                                    onClick={handleUpload}
-                                    disabled={uploadState.isUploading}
-                                    className="gap-2"
-                                >
-                                    {uploadState.isUploading ? (
-                                        <>
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            Enviando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload className="h-4 w-4" />
-                                            Enviar Arquivos
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <>
+                        {uploadState.files.length === 0 ? (
+                            <Card>
+                                <CardContent className="p-6">
+                                    <UploadZone
+                                        onFilesSelected={handleFilesSelected}
+                                        disabled={uploadState.isUploading}
+                                        selectedFiles={uploadState.files}
+                                    />
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            /* Metadata Editor with integrated controls */
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between">
+                                        <span className="flex items-center gap-2">
+                                            <FileText className="h-5 w-5" />
+                                            Arquivos para Upload
+                                            <Badge variant="secondary">
+                                                {uploadState.files.length}
+                                            </Badge>
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-normal text-muted-foreground">
+                                                {(uploadState.files.reduce((acc, file) => acc + file.size, 0) / 1024 / 1024).toFixed(1)} MB
+                                            </span>
+                                            <Button
+                                                onClick={handleUpload}
+                                                disabled={uploadState.isUploading}
+                                                size="sm"
+                                                className="gap-2"
+                                            >
+                                                {uploadState.isUploading ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        Enviando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Upload className="h-4 w-4" />
+                                                        Enviar
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Preencha as informações de cada arquivo. Campos com * são obrigatórios.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Compact Upload Zone to add more files */}
+                                    <UploadZone
+                                        onFilesSelected={handleFilesSelected}
+                                        disabled={uploadState.isUploading}
+                                        selectedFiles={uploadState.files}
+                                        compact
+                                        className="border-dashed"
+                                    />
+                                    
+                                    {/* Metadata Editor */}
+                                    <UploadMetadataEditor
+                                        files={uploadState.files}
+                                        onMetadataChange={handleMetadataChange}
+                                        onRemoveFile={handleRemoveFile}
+                                    />
+                                </CardContent>
+                            </Card>
+                        )}
+                    </>
                 )}
 
                 {/* Upload Progress */}

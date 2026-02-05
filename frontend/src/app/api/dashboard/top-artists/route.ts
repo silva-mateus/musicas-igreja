@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             const errorText = await response.text()
-            console.error('❌ [PROXY] Error details:', errorText)
+            console.error('[PROXY] Error details:', errorText)
             return NextResponse.json({
                 error: 'Backend error',
                 status: response.status,
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({
             error: 'Network error',
             details: error.message

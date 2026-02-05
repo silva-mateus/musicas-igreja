@@ -84,9 +84,9 @@ export interface MusicListItem {
 // Search and Filter types
 export interface SearchFilters {
     title?: string
-    artist?: string
-    category?: string
-    liturgical_time?: string
+    artist?: string | string[]
+    category?: string | string[]
+    liturgical_time?: string | string[]
     musical_key?: string
     has_youtube?: boolean
 }
@@ -146,4 +146,109 @@ export interface ChartData {
         borderWidth?: number
         fill?: boolean
     }[]
+}
+
+// Monitoring types
+export type EventSeverity = 'low' | 'medium' | 'high' | 'critical'
+
+export interface SystemEvent {
+    id: number
+    event_type: string
+    severity: EventSeverity
+    source: string
+    message: string
+    user_id?: number
+    username?: string
+    ip_address?: string
+    user_agent?: string
+    metadata?: string
+    is_read: boolean
+    created_date: string
+}
+
+export interface AuditLog {
+    id: number
+    action: string
+    entity_type: string
+    entity_id?: number
+    user_id: number
+    username: string
+    ip_address?: string
+    old_value?: string
+    new_value?: string
+    created_date: string
+}
+
+export interface SystemMetric {
+    id: number
+    metric_type: string
+    value: number
+    unit: string
+    metadata?: string
+    timestamp: string
+}
+
+export interface SystemHealth {
+    database: {
+        status: string
+        latency_ms: number
+        total_files: number
+        total_users: number
+        total_lists: number
+    }
+    storage: {
+        organized_size_mb: number
+        data_size_mb: number
+        total_size_mb: number
+        file_count: number
+        orphaned_files: number
+    }
+    system: {
+        uptime_seconds: number
+        uptime_formatted: string
+        dotnet_version: string
+    }
+    processing_time_ms: number
+}
+
+export interface MonitoringResponse<T> {
+    success: boolean
+    data: T
+    pagination?: {
+        page: number
+        limit: number
+        total: number
+        pages: number
+    }
+    count?: number
+    error?: string
+}
+
+export type ComparisonOperator = 'greater_than' | 'greater_than_or_equal' | 'less_than' | 'less_than_or_equal' | 'equals'
+
+export interface AlertConfiguration {
+    id: number
+    config_key: string
+    name: string
+    description?: string
+    metric_type: string
+    threshold_value: number
+    threshold_unit: string
+    comparison_operator: ComparisonOperator
+    severity: EventSeverity
+    is_enabled: boolean
+    created_date: string
+    updated_date?: string
+}
+
+export interface AlertConfigurationInput {
+    config_key: string
+    name: string
+    description?: string
+    metric_type: string
+    threshold_value: number
+    threshold_unit: string
+    comparison_operator: ComparisonOperator
+    severity: EventSeverity
+    is_enabled: boolean
 }

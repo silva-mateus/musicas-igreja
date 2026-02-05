@@ -16,14 +16,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             return NextResponse.json({ success: false, message: 'Backend error' }, { status: response.status })
         }
 
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ success: false, message: 'Network error', details: error.message }, { status: 500 })
     }
 }

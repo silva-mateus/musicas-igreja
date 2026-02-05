@@ -33,6 +33,7 @@ import {
     AlertTriangle,
     Lock
 } from 'lucide-react'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 interface EntityItem {
     id: number
@@ -450,7 +451,13 @@ export default function ManagePage() {
                     icon={Settings}
                     title="Gerenciar Entidades"
                     description="Edite, consolide e gerencie categorias, tempos litúrgicos e artistas"
-                />
+                >
+                    <InstructionsModal
+                        title={PAGE_INSTRUCTIONS.settings.title}
+                        description={PAGE_INSTRUCTIONS.settings.description}
+                        sections={PAGE_INSTRUCTIONS.settings.sections}
+                    />
+                </PageHeader>
 
                 {/* Info Card */}
                 <Card className="border-primary/20 bg-primary/5">

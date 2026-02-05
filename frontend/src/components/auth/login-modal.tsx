@@ -1,6 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +11,23 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { LogIn, Loader2, Music, Key, Eye, EyeOff, AlertCircle } from 'lucide-react'
+
+// Zod schemas for validation
+const loginSchema = z.object({
+    username: z.string().min(1, 'Usuário é obrigatório'),
+    password: z.string().min(1, 'Senha é obrigatória'),
+})
+
+const changePasswordSchema = z.object({
+    newPassword: z.string().min(4, 'A nova senha deve ter pelo menos 4 caracteres'),
+    confirmPassword: z.string().min(1, 'Confirmação de senha é obrigatória'),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'As senhas não coincidem',
+    path: ['confirmPassword'],
+})
+
+type LoginFormData = z.infer<typeof loginSchema>
+type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
 
 interface LoginModalProps {
     open: boolean
@@ -17,35 +37,38 @@ interface LoginModalProps {
 export function LoginModal({ open, onOpenChange }: LoginModalProps) {
     const { toast } = useToast()
     const { login, changePassword } = useAuth()
-    const [username, setUsername] = useState('')
-    const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     
     const [showChangePassword, setShowChangePassword] = useState(false)
     const [currentPassword, setCurrentPassword] = useState('')
-    const [newPassword, setNewPassword] = useState('')
-    const [confirmPassword, setConfirmPassword] = useState('')
     const [showNewPassword, setShowNewPassword] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    // Login form
+    const loginForm = useForm<LoginFormData>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: {
+            username: '',
+            password: '',
+        },
+    })
 
-        if (!username || !password) {
-            toast({
-                title: 'Erro',
-                description: 'Preencha todos os campos',
-                variant: 'destructive',
-            })
-            return
-        }
+    // Change password form
+    const changePasswordForm = useForm<ChangePasswordFormData>({
+        resolver: zodResolver(changePasswordSchema),
+        defaultValues: {
+            newPassword: '',
+            confirmPassword: '',
+        },
+    })
 
+    const handleLogin = async (data: LoginFormData) => {
         setIsLoading(true)
 
-        const result = await login(username, password)
+        const result = await login(data.username, data.password)
 
         if (result.success) {
             if (result.mustChangePassword) {
-                setCurrentPassword(password)
+                setCurrentPassword(data.password)
                 setShowChangePassword(true)
                 toast({
                     title: 'Troca de senha obrigatória',
@@ -57,7 +80,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                     description: 'Bem-vindo ao sistema!',
                 })
                 onOpenChange(false)
-                resetForm()
+                resetForms()
                 window.location.reload()
             }
         } else {
@@ -71,39 +94,10 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         setIsLoading(false)
     }
 
-    const handleChangePassword = async (e: React.FormEvent) => {
-        e.preventDefault()
-
-        if (!newPassword || !confirmPassword) {
-            toast({
-                title: 'Erro',
-                description: 'Preencha todos os campos',
-                variant: 'destructive',
-            })
-            return
-        }
-
-        if (newPassword.length < 4) {
-            toast({
-                title: 'Erro',
-                description: 'A nova senha deve ter pelo menos 4 caracteres',
-                variant: 'destructive',
-            })
-            return
-        }
-
-        if (newPassword !== confirmPassword) {
-            toast({
-                title: 'Erro',
-                description: 'As senhas não coincidem',
-                variant: 'destructive',
-            })
-            return
-        }
-
+    const handleChangePassword = async (data: ChangePasswordFormData) => {
         setIsLoading(true)
 
-        const result = await changePassword(currentPassword, newPassword)
+        const result = await changePassword(currentPassword, data.newPassword)
 
         if (result.success) {
             toast({
@@ -111,7 +105,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                 description: 'Sua senha foi alterada com sucesso.',
             })
             onOpenChange(false)
-            resetForm()
+            resetForms()
             window.location.reload()
         } else {
             toast({
@@ -124,19 +118,17 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
         setIsLoading(false)
     }
 
-    const resetForm = () => {
-        setUsername('')
-        setPassword('')
+    const resetForms = () => {
+        loginForm.reset()
+        changePasswordForm.reset()
         setShowChangePassword(false)
         setCurrentPassword('')
-        setNewPassword('')
-        setConfirmPassword('')
         setShowNewPassword(false)
     }
 
     const handleOpenChange = (isOpen: boolean) => {
         if (!isOpen) {
-            resetForm()
+            resetForms()
         }
         onOpenChange(isOpen)
     }
@@ -160,7 +152,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                         </DialogDescription>
                     </DialogHeader>
                     
-                    <form onSubmit={handleChangePassword} className="space-y-4 mt-4">
+                    <form onSubmit={changePasswordForm.handleSubmit(handleChangePassword)} className="space-y-4 mt-4">
                         <div className="space-y-2">
                             <Label htmlFor="new-password">Nova Senha</Label>
                             <div className="relative">
@@ -168,10 +160,10 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                                     id="new-password"
                                     type={showNewPassword ? 'text' : 'password'}
                                     placeholder="Digite a nova senha"
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    {...changePasswordForm.register('newPassword')}
                                     disabled={isLoading}
                                     autoComplete="new-password"
+                                    className={changePasswordForm.formState.errors.newPassword ? 'border-destructive' : ''}
                                 />
                                 <Button
                                     type="button"
@@ -183,6 +175,9 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                                     {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                             </div>
+                            {changePasswordForm.formState.errors.newPassword && (
+                                <p className="text-sm text-destructive">{changePasswordForm.formState.errors.newPassword.message}</p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
@@ -190,11 +185,14 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                                 id="confirm-password"
                                 type={showNewPassword ? 'text' : 'password'}
                                 placeholder="Confirme a nova senha"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                {...changePasswordForm.register('confirmPassword')}
                                 disabled={isLoading}
                                 autoComplete="new-password"
+                                className={changePasswordForm.formState.errors.confirmPassword ? 'border-destructive' : ''}
                             />
+                            {changePasswordForm.formState.errors.confirmPassword && (
+                                <p className="text-sm text-destructive">{changePasswordForm.formState.errors.confirmPassword.message}</p>
+                            )}
                         </div>
                         <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                             {isLoading ? (
@@ -230,18 +228,21 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                     </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 mt-4">
                     <div className="space-y-2">
                         <Label htmlFor="modal-username">Usuário</Label>
                         <Input
                             id="modal-username"
                             type="text"
                             placeholder="Digite seu usuário"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            {...loginForm.register('username')}
                             disabled={isLoading}
                             autoComplete="username"
+                            className={loginForm.formState.errors.username ? 'border-destructive' : ''}
                         />
+                        {loginForm.formState.errors.username && (
+                            <p className="text-sm text-destructive">{loginForm.formState.errors.username.message}</p>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="modal-password">Senha</Label>
@@ -249,11 +250,14 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                             id="modal-password"
                             type="password"
                             placeholder="Digite sua senha"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            {...loginForm.register('password')}
                             disabled={isLoading}
                             autoComplete="current-password"
+                            className={loginForm.formState.errors.password ? 'border-destructive' : ''}
                         />
+                        {loginForm.formState.errors.password && (
+                            <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
+                        )}
                     </div>
                     <Button type="submit" className="w-full gap-2" disabled={isLoading}>
                         {isLoading ? (
@@ -270,10 +274,6 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                     </Button>
                 </form>
 
-                <div className="mt-4 pt-4 border-t text-center text-sm text-muted-foreground">
-                    <p>Usuário padrão: <code className="bg-muted px-1 rounded">admin</code></p>
-                    <p>Senha: <code className="bg-muted px-1 rounded">admin123</code></p>
-                </div>
             </DialogContent>
         </Dialog>
     )

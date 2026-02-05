@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
         const searchParams = url.searchParams
 
         const backendUrl = `${BACKEND_URL}/api/merge_lists?${searchParams.toString()}`
-        console.log('🔄 [PROXY] Proxying request to:', backendUrl)
+        // Proxying request to backend
 
         const response = await fetch(backendUrl, {
             method: 'GET',
@@ -19,17 +19,17 @@ export async function GET(request: NextRequest) {
             cache: 'no-store',
         })
 
-        console.log('📡 [PROXY] Response status:', response.status, response.statusText)
+        // Response received from backend
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             const errorText = await response.text()
-            console.error('❌ [PROXY] Error details:', errorText)
+            console.error('[PROXY] Error details:', errorText)
             return NextResponse.json({ error: 'Backend error', status: response.status, details: errorText }, { status: response.status })
         }
 
         const data = await response.json()
-        console.log('✅ [PROXY] Backend response received:', Array.isArray(data) ? `Array with ${data.length} items` : typeof data)
+        // Backend response received
 
         return NextResponse.json(data, {
             headers: {
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
             },
         })
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error) {
-        console.error('❌ Proxy error:', error)
+        console.error('[PROXY] Error:', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }

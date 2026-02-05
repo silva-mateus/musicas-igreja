@@ -17,6 +17,7 @@ public class FilesControllerTests : IDisposable
     private readonly FilesController _controller;
     private readonly Mock<IFileService> _fileServiceMock;
     private readonly Mock<IAuthService> _authServiceMock;
+    private readonly Mock<IMonitoringService> _monitoringServiceMock;
     private readonly Mock<ILogger<FilesController>> _loggerMock;
 
     public FilesControllerTests()
@@ -28,9 +29,10 @@ public class FilesControllerTests : IDisposable
         _context = new AppDbContext(options);
         _fileServiceMock = new Mock<IFileService>();
         _authServiceMock = new Mock<IAuthService>();
+        _monitoringServiceMock = new Mock<IMonitoringService>();
         _loggerMock = new Mock<ILogger<FilesController>>();
 
-        _controller = new FilesController(_context, _fileServiceMock.Object, _authServiceMock.Object, _loggerMock.Object);
+        _controller = new FilesController(_context, _fileServiceMock.Object, _authServiceMock.Object, _monitoringServiceMock.Object, _loggerMock.Object);
 
         // Setup HttpContext with session for authentication tests
         var httpContext = new DefaultHttpContext();
@@ -155,7 +157,7 @@ public class FilesControllerTests : IDisposable
     [Fact]
     public async Task GetFiles_WithCategoryFilter_ShouldReturnFilteredFiles()
     {
-        var result = await _controller.GetFiles(category: "Entrada");
+        var result = await _controller.GetFiles(category: new List<string> { "Entrada" });
 
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsType<FileListResponseDto>(okResult.Value);

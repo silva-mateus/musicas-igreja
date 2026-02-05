@@ -1,50 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { MainLayout } from '@/components/layout/main-layout'
 import { ListsTable } from '@/components/lists/lists-table'
 import { CreateListDialog } from '@/components/lists/create-list-dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
-import { listsApi, handleApiError } from '@/lib/api'
-import type { MusicList, PaginatedResponse } from '@/types'
+import { listsKeys } from '@/hooks/use-lists'
+import type { MusicList } from '@/types'
 import { List, Plus, Search, RefreshCw, ArrowUpDown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { debounce } from '@/lib/utils'
-import Link from 'next/link'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 export default function ListsPage() {
     const { toast } = useToast()
     const { canEdit } = useAuth()
+    const queryClient = useQueryClient()
 
-    const [lists, setLists] = useState<PaginatedResponse<MusicList>>({
-        data: [],
-        pagination: { page: 1, limit: 20, total: 0, pages: 0 }
-    })
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState('')
     const [searchTerm, setSearchTerm] = useState('')
     const [showCreateDialog, setShowCreateDialog] = useState(false)
     const [page, setPage] = useState(1)
-    const [isLoadingRef, setIsLoadingRef] = useState(false)
     const [sortBy, setSortBy] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_date', order: 'desc' })
 
-    const loadLists = async () => {
-        if (isLoadingRef) return
-
-        try {
-            setIsLoadingRef(true)
-            setIsLoading(true)
-            setError('')
-
-            // Build query params
+    // Fetch lists using TanStack Query
+    const { data: listsResponse, isLoading, error, refetch } = useQuery({
+        queryKey: [...listsKeys.lists(), { search: searchTerm, sortBy, page }],
+        queryFn: async () => {
             const params = new URLSearchParams()
             if (searchTerm) params.append('search', searchTerm)
             if (sortBy.field) params.append('sort_by', sortBy.field)
@@ -53,8 +42,7 @@ export default function ListsPage() {
             const response = await fetch(`/api/merge_lists?${params.toString()}`)
             const listsData = await response.json()
 
-            // Map to expected format
-            const data = {
+            return {
                 data: listsData.map((l: any) => ({
                     id: l.id,
                     name: l.name,
@@ -63,7 +51,7 @@ export default function ListsPage() {
                     updated_date: l.updated_date,
                     file_count: l.file_count,
                     items: []
-                })),
+                })) as MusicList[],
                 pagination: { 
                     page: 1, 
                     limit: listsData.length, 
@@ -71,24 +59,11 @@ export default function ListsPage() {
                     pages: 1 
                 }
             }
+        },
+        staleTime: 60 * 1000, // 1 minute
+    })
 
-            setLists(data)
-        } catch (error) {
-            setError(handleApiError(error))
-        } finally {
-            setIsLoading(false)
-            setIsLoadingRef(false)
-        }
-    }
-
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            loadLists()
-        }, 50)
-
-        return () => clearTimeout(timeoutId)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchTerm, page, sortBy])
+    const lists = listsResponse || { data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } }
 
     const debouncedSearch = debounce((term: string) => {
         setSearchTerm(term)
@@ -104,7 +79,7 @@ export default function ListsPage() {
             title: "Lista criada!",
             description: `Lista "${newList.name}" foi criada com sucesso.`,
         })
-        loadLists()
+        queryClient.invalidateQueries({ queryKey: listsKeys.lists() })
         setShowCreateDialog(false)
     }
 
@@ -113,11 +88,15 @@ export default function ListsPage() {
             title: "Lista excluída",
             description: "A lista foi removida com sucesso.",
         })
-        loadLists()
+        queryClient.invalidateQueries({ queryKey: listsKeys.lists() })
     }
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage)
+    }
+
+    const handleRefresh = () => {
+        queryClient.invalidateQueries({ queryKey: listsKeys.lists() })
     }
 
     return (
@@ -128,17 +107,24 @@ export default function ListsPage() {
                     title="Listas de Música"
                     description="Organize suas músicas em listas personalizadas"
                 >
-                    <Button onClick={loadLists} variant="outline" size="sm" className="gap-2">
-                        <RefreshCw className="h-4 w-4" />
-                        <span className="hidden sm:inline">Atualizar</span>
-                    </Button>
-                    {canEdit && (
-                        <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden sm:inline">Nova Lista</span>
-                            <span className="sm:hidden">Nova</span>
+                    <div className="flex items-center gap-2">
+                        <InstructionsModal
+                            title={PAGE_INSTRUCTIONS.lists.title}
+                            description={PAGE_INSTRUCTIONS.lists.description}
+                            sections={PAGE_INSTRUCTIONS.lists.sections}
+                        />
+                        <Button onClick={handleRefresh} variant="outline" size="sm" className="gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            <span className="hidden sm:inline">Atualizar</span>
                         </Button>
-                    )}
+                        {canEdit && (
+                            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                <span className="hidden sm:inline">Nova Lista</span>
+                                <span className="sm:hidden">Nova</span>
+                            </Button>
+                        )}
+                    </div>
                 </PageHeader>
 
                 {/* Search and Sort */}
@@ -203,8 +189,8 @@ export default function ListsPage() {
                         <CardContent className="pt-4">
                             {error ? (
                                 <div className="text-center py-8">
-                                    <p className="text-destructive">{error}</p>
-                                    <Button onClick={loadLists} className="mt-4">
+                                    <p className="text-destructive">{error instanceof Error ? error.message : 'Erro ao carregar listas'}</p>
+                                    <Button onClick={() => refetch()} className="mt-4">
                                         Tentar novamente
                                     </Button>
                                 </div>

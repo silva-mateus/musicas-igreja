@@ -49,9 +49,9 @@ export const musicApi = {
         params.append('page', String(pagination.page || 1))
         params.append('per_page', String(pagination.limit || 20))
         if (filters.title) params.append('q', filters.title)
-        if (filters.artist) params.append('q', filters.artist)
-        if (filters.category) params.append('category', filters.category)
-        if (filters.liturgical_time) params.append('liturgical_time', filters.liturgical_time)
+        // Artist filter moved below
+        
+        
 
         const data = await request<{ files: any[]; pagination: { page: number; per_page: number; total: number; total_pages: number } }>(
             `/files?${params.toString()}`

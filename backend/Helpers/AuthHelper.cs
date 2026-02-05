@@ -71,7 +71,7 @@ public static class AuthHelper
             var method = context.Request.Method;
             
             logger?.LogWarning(
-                "🔒 Unauthorized access attempt from {IP} to {Method} {Path}",
+                "[Auth] Unauthorized access attempt from {IP} to {Method} {Path}",
                 ip, method, path);
             
             return new UnauthorizedObjectResult(new { success = false, error = "Autenticação necessária" });
@@ -97,7 +97,7 @@ public static class AuthHelper
             var method = context.Request.Method;
             
             logger?.LogWarning(
-                "🚫 Forbidden access attempt from User {UserId} (IP: {IP}) to {Method} {Path}",
+                "[Auth] Forbidden access attempt from User {UserId} (IP: {IP}) to {Method} {Path}",
                 userId, ip, method, path);
             
             return new ObjectResult(new { success = false, error = "Você não tem permissão para realizar esta ação" })
@@ -106,5 +106,16 @@ public static class AuthHelper
             };
         }
         return null;
+    }
+
+    /// <summary>
+    /// Checks if the current user is an admin (role name is "admin")
+    /// </summary>
+    public static bool IsAdmin(HttpContext context)
+    {
+        if (!IsAuthenticated(context)) return false;
+        
+        var roleName = context.Session.GetString("RoleName");
+        return string.Equals(roleName, "admin", StringComparison.OrdinalIgnoreCase);
     }
 }

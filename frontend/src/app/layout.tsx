@@ -9,6 +9,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
     title: 'Sistema de Músicas da Igreja',
     description: 'Gerenciamento de partituras e listas musicais',
+    icons: {
+        icon: [
+            { url: '/icon.svg', type: 'image/svg+xml' },
+        ],
+    },
 }
 
 export default function RootLayout({

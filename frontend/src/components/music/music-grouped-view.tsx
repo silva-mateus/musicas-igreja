@@ -97,18 +97,27 @@ export function MusicGroupedView({
 
                 // Category filter
                 if (filters.category) {
-                    const hasCategory = 
-                        (file.categories?.includes(filters.category)) ||
-                        (file.category === filters.category)
+                    const categories = Array.isArray(filters.category) ? filters.category : [filters.category]
+                    const hasCategory = categories.some(cat => 
+                        file.categories?.includes(cat) || file.category === cat
+                    )
                     if (!hasCategory) return false
                 }
 
                 // Liturgical time filter
                 if (filters.liturgical_time) {
-                    const hasTime = 
-                        (file.liturgical_times?.includes(filters.liturgical_time)) ||
-                        (file.liturgical_time === filters.liturgical_time)
+                    const times = Array.isArray(filters.liturgical_time) ? filters.liturgical_time : [filters.liturgical_time]
+                    const hasTime = times.some(time =>
+                        file.liturgical_times?.includes(time) || file.liturgical_time === time
+                    )
                     if (!hasTime) return false
+                }
+
+                // Artist filter
+                if (filters.artist) {
+                    const artists = Array.isArray(filters.artist) ? filters.artist : [filters.artist]
+                    const hasArtist = artists.some(artist => file.artist === artist)
+                    if (!hasArtist) return false
                 }
 
                 // Musical key filter

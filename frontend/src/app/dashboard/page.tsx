@@ -13,6 +13,7 @@ import { DashboardCharts } from '@/components/dashboard/charts'
 import { QuickActions } from '@/components/dashboard/quick-actions'
 import type { DashboardStats } from '@/types'
 import { BarChart3, RefreshCw } from 'lucide-react'
+import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 export default function DashboardPage() {
     const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -60,10 +61,17 @@ export default function DashboardPage() {
                     title="Dashboard"
                     description="Visão geral do sistema de músicas da igreja"
                 >
-                    <Button onClick={loadStats} variant="outline" size="sm" className="gap-2">
-                        <RefreshCw className="h-4 w-4" />
-                        <span className="hidden sm:inline">Atualizar</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <InstructionsModal
+                            title={PAGE_INSTRUCTIONS.dashboard.title}
+                            description={PAGE_INSTRUCTIONS.dashboard.description}
+                            sections={PAGE_INSTRUCTIONS.dashboard.sections}
+                        />
+                        <Button onClick={loadStats} variant="outline" size="sm" className="gap-2">
+                            <RefreshCw className="h-4 w-4" />
+                            <span className="hidden sm:inline">Atualizar</span>
+                        </Button>
+                    </div>
                 </PageHeader>
 
                 <StatsCards stats={stats} />

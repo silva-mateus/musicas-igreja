@@ -10,9 +10,11 @@ Acesse a aplicação em produção: **[https://cifras.networkmat.uk/](https://ci
 
 - 📤 **Upload e Organização de PDFs** - Upload de partituras com metadados completos
 - 🔍 **Busca Inteligente** - Busca por título, artista, categoria, tempo litúrgico e tom
+- 🎯 **Filtros Dinâmicos** - Múltiplos filtros com sugestões baseadas em seleções anteriores
 - 📋 **Listas de Músicas** - Crie repertórios e exporte como PDF único
 - 🎼 **Gestão de Entidades** - Gerenciamento de artistas, categorias e tempos litúrgicos
 - 👥 **Sistema de Usuários** - Autenticação com controle de permissões (RBAC)
+- 🔐 **Perfil de Usuário** - Altere nome e senha sem intervenção de admin
 - 📊 **Dashboard** - Estatísticas e visualização de dados
 - 🎨 **Interface Moderna** - Design responsivo com tema dark
 
@@ -27,6 +29,8 @@ Acesse a aplicação em produção: **[https://cifras.networkmat.uk/](https://ci
 ### Frontend
 - **Next.js 14** - Framework React com Server-Side Rendering
 - **TypeScript** - Tipagem estática
+- **TanStack Query** - Gerenciamento de estado e cache
+- **React Hook Form + Zod** - Validação de formulários
 - **Tailwind CSS** - Estilização
 - **shadcn/ui** - Componentes UI
 
@@ -85,11 +89,16 @@ Ao iniciar pela primeira vez, um usuário administrador é criado automaticament
 
 ## 🧪 Testes
 
-O projeto inclui 143+ testes automatizados:
+O projeto inclui 142+ testes automatizados:
 
 ```bash
+# Backend
 cd backend.tests
 dotnet test --configuration Release
+
+# Frontend
+cd frontend
+npm run build  # Inclui type-checking
 ```
 
 Os testes são executados automaticamente no CI/CD antes de cada deploy.
@@ -117,6 +126,8 @@ musicas-igreja/
 ## 🔒 Segurança
 
 - ✅ Senhas com hash BCrypt (work factor 12)
+- ✅ Migração automática de senhas legadas (SHA256 → BCrypt)
+- ✅ Invalidação de sessões ao reiniciar servidor
 - ✅ Proteção contra SQL Injection (Entity Framework)
 - ✅ Validação de uploads (apenas PDFs, limite 50MB)
 - ✅ Cookies HttpOnly e SameSite

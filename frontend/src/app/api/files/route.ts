@@ -19,26 +19,26 @@ export async function GET(request: NextRequest) {
         })
 
         if (!response.ok) {
-            console.error('❌ [PROXY] Backend error:', response.status, response.statusText)
+            console.error('[PROXY] Backend error:', response.status, response.statusText)
             return NextResponse.json({ error: 'Backend error' }, { status: response.status })
         }
 
         const data = await response.json()
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Network error:', error)
+        console.error('[PROXY] Network error:', error)
         return NextResponse.json({ error: 'Network error', details: error.message }, { status: 500 })
     }
 }
 
 export async function POST(request: NextRequest) {
     try {
-        console.log('🔄 [PROXY] Processing file upload...')
+        // Processing file upload
 
         // Get form data from request
         const formData = await request.formData()
 
-        console.log('📋 [PROXY] Form data received with keys:', Array.from(formData.keys()))
+        // Form data received
 
         // Forward the form data to backend
         const response = await fetch(`${BACKEND_URL}/api/files`, {
@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
             // Don't set Content-Type header, let browser set it with boundary
         })
 
-        console.log('📡 [PROXY] Backend response status:', response.status, response.statusText)
+        // Backend response received
 
         if (!response.ok) {
             const errorText = await response.text()
-            console.error('❌ [PROXY] Backend error details:', errorText)
+            console.error('[PROXY] Backend error details:', errorText)
             return NextResponse.json({
                 error: 'Backend error',
                 status: response.status,
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
         }
 
         const data = await response.json()
-        console.log('✅ [PROXY] Upload successful, file_id:', data.file_id)
+        // Upload successful
 
         return NextResponse.json(data)
     } catch (error: any) {
-        console.error('❌ [PROXY] Upload error:', error)
+        console.error('[PROXY] Upload error:', error)
         return NextResponse.json({
             error: 'Network error',
             details: error.message

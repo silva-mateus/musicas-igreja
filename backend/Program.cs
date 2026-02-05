@@ -2,8 +2,14 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.Services;
+using MusicasIgreja.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// App Instance Service (singleton) - generates unique ID on each startup
+var appInstanceService = new AppInstanceService();
+builder.Services.AddSingleton<IAppInstanceService>(appInstanceService);
+Console.WriteLine($"[Startup] Application instance ID: {appInstanceService.InstanceId} - All previous sessions will be invalidated");
 
 // Database configuration
 var dbPath = builder.Configuration.GetValue<string>("Database:Path") 
@@ -15,15 +21,22 @@ if (!string.IsNullOrEmpty(dbDirectory))
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite($"Data Source={dbPath}"));
+    options.UseSqlite($"Data Source={dbPath}", sqliteOptions =>
+        sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // Services
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IMigrationService, MigrationService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<IRateLimitService, RateLimitService>();
+builder.Services.AddScoped<IMonitoringService, MonitoringService>();
+builder.Services.AddScoped<IAlertConfigurationService, AlertConfigurationService>();
+
+// Background Services
+builder.Services.AddHostedService<MetricsCollectorService>();
 
 // Session configuration with sliding expiration
+// Cookie name includes instance ID to invalidate all sessions on server restart
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -31,7 +44,7 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.Name = ".MusicasIgreja.Session";
+    options.Cookie.Name = $".MusicasIgreja.Session.{appInstanceService.InstanceId}";
     // Renovação automática: a sessão é renovada a cada request
     // O IdleTimeout é resetado automaticamente pelo ASP.NET Core
 });
@@ -133,6 +146,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseSession();
+app.UseMiddleware<AuditMiddleware>(); // Audit middleware for tracking user actions
 app.UseAuthorization();
 app.MapControllers();
 
@@ -182,10 +196,14 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
             (4, 'admin', 'Administrador', 'Acesso total ao sistema', 1, 100, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
         ");
 
-        // Add is_default column to roles table (migration)
-        try
+        // Add is_default column to roles table (migration) - only if it doesn't exist
+        using var checkColumnCmd = connection.CreateCommand();
+        checkColumnCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('roles') WHERE name='is_default'";
+        var columnExists = Convert.ToInt32(await checkColumnCmd.ExecuteScalarAsync()) > 0;
+        
+        if (!columnExists)
         {
-            logger.LogInformation("Checking for is_default column in roles table...");
+            logger.LogInformation("Adding is_default column to roles table...");
             await context.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE roles ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0"
             );
@@ -194,11 +212,6 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
                 "UPDATE roles SET is_default = 1 WHERE name = 'viewer'"
             );
             logger.LogInformation("Added is_default column to roles table.");
-        }
-        catch (Exception ex)
-        {
-            // Column likely already exists
-            logger.LogDebug("is_default column check: {Message}", ex.Message);
         }
 
         // Step 2: Check users table structure
@@ -225,9 +238,9 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
             ");
             
             var adminHash = authService.HashPassword("admin123");
-            await context.Database.ExecuteSqlRawAsync($@"
+            await context.Database.ExecuteSqlAsync($@"
                 INSERT INTO users (username, full_name, password_hash, role_id, is_active, must_change_password, created_date)
-                VALUES ('admin', 'Administrador', '{adminHash}', 4, 1, 0, datetime('now'))
+                VALUES ('admin', 'Administrador', {adminHash}, 4, 1, 0, datetime('now'))
             ");
             logger.LogInformation("Users table created with admin user.");
             return;
@@ -323,9 +336,9 @@ static async Task MigrateUsersTableSchemaAsync(AppDbContext context, ILogger log
         {
             logger.LogInformation("Seeding admin user...");
             var adminHash = authService.HashPassword("admin123");
-            await context.Database.ExecuteSqlRawAsync($@"
+            await context.Database.ExecuteSqlAsync($@"
                 INSERT INTO users (username, full_name, password_hash, role_id, is_active, must_change_password, created_date)
-                VALUES ('admin', 'Administrador', '{adminHash}', 4, 1, 0, datetime('now'))
+                VALUES ('admin', 'Administrador', {adminHash}, 4, 1, 0, datetime('now'))
             ");
         }
         

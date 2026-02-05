@@ -18,6 +18,8 @@ public class AuthControllerTests : IDisposable
     private readonly AuthController _controller;
     private readonly AuthService _authService;
     private readonly Mock<IRateLimitService> _rateLimitServiceMock;
+    private readonly Mock<IMonitoringService> _monitoringServiceMock;
+    private readonly Mock<IAppInstanceService> _appInstanceServiceMock;
     private readonly Mock<ILogger<AuthController>> _loggerMock;
     private readonly Mock<ILogger<AuthService>> _authLoggerMock;
     private readonly Mock<IWebHostEnvironment> _environmentMock;
@@ -33,6 +35,11 @@ public class AuthControllerTests : IDisposable
         _authLoggerMock = new Mock<ILogger<AuthService>>();
         _environmentMock = new Mock<IWebHostEnvironment>();
         _rateLimitServiceMock = new Mock<IRateLimitService>();
+        _monitoringServiceMock = new Mock<IMonitoringService>();
+        _appInstanceServiceMock = new Mock<IAppInstanceService>();
+        
+        // Setup AppInstanceService to return a test instance ID
+        _appInstanceServiceMock.Setup(a => a.InstanceId).Returns("TEST123");
         
         _authService = new AuthService(_context, _authLoggerMock.Object);
         
@@ -41,7 +48,7 @@ public class AuthControllerTests : IDisposable
         // Setup rate limit mock to not block by default
         _rateLimitServiceMock.Setup(r => r.IsRateLimited(It.IsAny<string>())).Returns(false);
 
-        _controller = new AuthController(_authService, _rateLimitServiceMock.Object, _loggerMock.Object, _environmentMock.Object);
+        _controller = new AuthController(_authService, _rateLimitServiceMock.Object, _monitoringServiceMock.Object, _appInstanceServiceMock.Object, _loggerMock.Object, _environmentMock.Object);
         
         // Setup HttpContext with session and connection info
         var httpContext = new DefaultHttpContext();

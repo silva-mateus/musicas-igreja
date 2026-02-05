@@ -58,6 +58,13 @@ public class AuthService : IAuthService
         if (!VerifyPassword(password, user.PasswordHash))
             return null;
 
+        // Migrate legacy SHA256 hash to BCrypt on successful login
+        if (!user.PasswordHash.StartsWith("$2"))
+        {
+            user.PasswordHash = HashPassword(password);
+            _logger.LogInformation("Migrated password hash from SHA256 to BCrypt for user {Username}", user.Username);
+        }
+
         // Update last login
         user.LastLoginDate = DateTime.UtcNow;
         await _context.SaveChangesAsync();
