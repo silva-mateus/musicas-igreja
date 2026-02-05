@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError } from '@/lib/api'
 import type { SearchFilters } from '@/types'
-import { Search, X, Filter, ChevronDown, RotateCcw, ArrowUpDown, Music2, User, FolderOpen, Calendar, Hash, Youtube } from 'lucide-react'
+import { Search, X, Filter, ChevronDown, RotateCcw, ArrowUpDown, Music2, Hash, Youtube } from 'lucide-react'
 import { debounce } from '@/lib/utils'
 
 interface SortOption {
@@ -35,9 +36,6 @@ interface FilterOptions {
 
 const MUSICAL_KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
 
-// Special value for "all" option since Radix Select doesn't allow empty string
-const ALL_VALUE = '__all__'
-
 const DEFAULT_SORT_FIELDS = [
     { value: 'title', label: 'Título' },
     { value: 'artist', label: 'Artista' },
@@ -55,7 +53,6 @@ export function MusicUnifiedFilters({
 }: MusicUnifiedFiltersProps) {
     const [searchTerm, setSearchTerm] = useState(filters.title || '')
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
     const [options, setOptions] = useState<FilterOptions>({
         artists: [],
         categories: [],
@@ -75,7 +72,6 @@ export function MusicUnifiedFilters({
 
     const loadFilterOptions = async () => {
         try {
-            setIsLoading(true)
             // Build query params for dynamic filtering
             const params = new URLSearchParams()
             if (filters.category) {
@@ -95,10 +91,13 @@ export function MusicUnifiedFilters({
             const response = await fetch(`/api/filters/suggestions?${params.toString()}`)
             const data = await response.json()
 
+            const clean = (values: unknown) =>
+                (Array.isArray(values) ? values : []).filter((value) => typeof value === 'string' && value.trim().length > 0)
+
             setOptions({
-                artists: Array.isArray(data.artists) ? data.artists : [],
-                categories: Array.isArray(data.categories) ? data.categories : [],
-                liturgicalTimes: Array.isArray(data.liturgical_times) ? data.liturgical_times : [],
+                artists: clean(data.artists),
+                categories: clean(data.categories),
+                liturgicalTimes: clean(data.liturgical_times),
                 musicalKeys: Array.isArray(data.musical_keys) && data.musical_keys.length > 0 ? data.musical_keys : MUSICAL_KEYS
             })
         } catch (error) {
@@ -110,8 +109,6 @@ export function MusicUnifiedFilters({
                 liturgicalTimes: [],
                 musicalKeys: MUSICAL_KEYS
             })
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -134,14 +131,24 @@ export function MusicUnifiedFilters({
         debouncedSearch(value)
     }
 
-    const handleFilterChange = (key: keyof SearchFilters, value: string | boolean | undefined) => {
+    const handleFilterChange = (key: keyof SearchFilters, value: string | boolean | string[] | undefined) => {
         const newFilters = { ...filters }
-        if (value === '' || value === undefined || value === null) {
+        if (value === '' || value === undefined || value === null || (Array.isArray(value) && value.length === 0)) {
             delete newFilters[key]
         } else {
             (newFilters as any)[key] = value
         }
         onFiltersChange(newFilters)
+    }
+
+    const handleFilterValueRemove = (key: keyof SearchFilters, value: string) => {
+        const current = filters[key]
+        if (!Array.isArray(current)) {
+            clearFilter(key)
+            return
+        }
+        const next = current.filter((item) => item !== value)
+        handleFilterChange(key, next)
     }
 
     const clearFilter = (key: keyof SearchFilters) => {
@@ -160,6 +167,7 @@ export function MusicUnifiedFilters({
 
     const activeFilterCount = Object.keys(filters).filter(k => {
         const val = filters[k as keyof SearchFilters]
+        if (Array.isArray(val)) return val.length > 0
         return val !== undefined && val !== null && val !== ''
     }).length
 
@@ -207,37 +215,21 @@ export function MusicUnifiedFilters({
 
                     {/* Quick Filters (always visible on desktop) */}
                     <div className="hidden lg:flex gap-2">
-                        <Select 
-                            value={(Array.isArray(filters.category) ? filters.category[0] : filters.category) || ALL_VALUE} 
-                            onValueChange={(v) => handleFilterChange('category', v === ALL_VALUE ? undefined : v)}
-                        >
-                            <SelectTrigger className="w-40 gap-2">
-                                <FolderOpen className="h-4 w-4 shrink-0" />
-                                <SelectValue placeholder="Categoria" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ALL_VALUE}>Todas categorias</SelectItem>
-                                {options.categories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <MultiSelect
+                            options={options.categories.filter((cat) => cat && cat.trim())}
+                            value={Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []}
+                            onChange={(values) => handleFilterChange('category', values)}
+                            placeholder="Categoria"
+                            className="w-52"
+                        />
 
-                        <Select 
-                            value={(Array.isArray(filters.artist) ? filters.artist[0] : filters.artist) || ALL_VALUE} 
-                            onValueChange={(v) => handleFilterChange('artist', v === ALL_VALUE ? undefined : v)}
-                        >
-                            <SelectTrigger className="w-40 gap-2">
-                                <User className="h-4 w-4 shrink-0" />
-                                <SelectValue placeholder="Artista" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ALL_VALUE}>Todos artistas</SelectItem>
-                                {options.artists.map(artist => (
-                                    <SelectItem key={artist} value={artist}>{artist}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <MultiSelect
+                            options={options.artists.filter((artist) => artist && artist.trim())}
+                            value={Array.isArray(filters.artist) ? filters.artist : filters.artist ? [filters.artist] : []}
+                            onChange={(values) => handleFilterChange('artist', values)}
+                            placeholder="Artista"
+                            className="w-52"
+                        />
                     </div>
 
                     {/* Sort Dropdown */}
@@ -303,71 +295,47 @@ export function MusicUnifiedFilters({
                             <div className="pt-4 border-t space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                     {/* Category (mobile/tablet) */}
-                                    <div className="lg:hidden">
-                                        <Select 
-                                            value={(Array.isArray(filters.category) ? filters.category[0] : filters.category) || ALL_VALUE} 
-                                            onValueChange={(v) => handleFilterChange('category', v === ALL_VALUE ? undefined : v)}
-                                        >
-                                            <SelectTrigger className="gap-2">
-                                                <FolderOpen className="h-4 w-4 shrink-0" />
-                                                <SelectValue placeholder="Categoria" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={ALL_VALUE}>Todas categorias</SelectItem>
-                                                {options.categories.map(cat => (
-                                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                     <div className="lg:hidden">
+                                         <MultiSelect
+                                             options={options.categories.filter((cat) => cat && cat.trim())}
+                                             value={Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []}
+                                             onChange={(values) => handleFilterChange('category', values)}
+                                             placeholder="Categoria"
+                                             className="w-full"
+                                         />
+                                     </div>
 
-                                    {/* Artist (mobile/tablet) */}
-                                    <div className="lg:hidden">
-                                        <Select 
-                                            value={(Array.isArray(filters.artist) ? filters.artist[0] : filters.artist) || ALL_VALUE} 
-                                            onValueChange={(v) => handleFilterChange('artist', v === ALL_VALUE ? undefined : v)}
-                                        >
-                                            <SelectTrigger className="gap-2">
-                                                <User className="h-4 w-4 shrink-0" />
-                                                <SelectValue placeholder="Artista" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={ALL_VALUE}>Todos artistas</SelectItem>
-                                                {options.artists.map(artist => (
-                                                    <SelectItem key={artist} value={artist}>{artist}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                     {/* Artist (mobile/tablet) */}
+                                     <div className="lg:hidden">
+                                         <MultiSelect
+                                             options={options.artists.filter((artist) => artist && artist.trim())}
+                                             value={Array.isArray(filters.artist) ? filters.artist : filters.artist ? [filters.artist] : []}
+                                             onChange={(values) => handleFilterChange('artist', values)}
+                                             placeholder="Artista"
+                                             className="w-full"
+                                         />
+                                     </div>
 
                                     {/* Liturgical Time */}
-                                    <Select 
-                                        value={(Array.isArray(filters.liturgical_time) ? filters.liturgical_time[0] : filters.liturgical_time) || ALL_VALUE} 
-                                        onValueChange={(v) => handleFilterChange('liturgical_time', v === ALL_VALUE ? undefined : v)}
-                                    >
-                                        <SelectTrigger className="gap-2">
-                                            <Calendar className="h-4 w-4 shrink-0" />
-                                            <SelectValue placeholder="Tempo Litúrgico" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ALL_VALUE}>Todos tempos</SelectItem>
-                                            {options.liturgicalTimes.map(time => (
-                                                <SelectItem key={time} value={time}>{time}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                     <MultiSelect
+                                         options={options.liturgicalTimes.filter((time) => time && time.trim())}
+                                         value={Array.isArray(filters.liturgical_time) ? filters.liturgical_time : filters.liturgical_time ? [filters.liturgical_time] : []}
+                                         onChange={(values) => handleFilterChange('liturgical_time', values)}
+                                         placeholder="Tempo Litúrgico"
+                                         className="w-full"
+                                     />
 
                                     {/* Musical Key */}
-                                    <Select 
-                                        value={filters.musical_key || ALL_VALUE} 
-                                        onValueChange={(v) => handleFilterChange('musical_key', v === ALL_VALUE ? undefined : v)}
-                                    >
+                                     <Select 
+                                         value={filters.musical_key || '__all__'} 
+                                         onValueChange={(v) => handleFilterChange('musical_key', v === '__all__' ? undefined : v)}
+                                     >
                                         <SelectTrigger className="gap-2">
                                             <Hash className="h-4 w-4 shrink-0" />
                                             <SelectValue placeholder="Tom" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value={ALL_VALUE}>Todos tons</SelectItem>
+                                            <SelectItem value="__all__">Todos tons</SelectItem>
                                             {options.musicalKeys.map(key => (
                                                 <SelectItem key={key} value={key}>{key}</SelectItem>
                                             ))}
@@ -375,10 +343,10 @@ export function MusicUnifiedFilters({
                                     </Select>
 
                                     {/* YouTube Filter */}
-                                    <Select 
-                                        value={filters.has_youtube === undefined ? ALL_VALUE : filters.has_youtube.toString()} 
+                                     <Select 
+                                         value={filters.has_youtube === undefined ? '__all__' : filters.has_youtube.toString()} 
                                         onValueChange={(v) => {
-                                            if (v === ALL_VALUE) handleFilterChange('has_youtube', undefined)
+                                             if (v === '__all__') handleFilterChange('has_youtube', undefined)
                                             else handleFilterChange('has_youtube', v === 'true')
                                         }}
                                     >
@@ -387,7 +355,7 @@ export function MusicUnifiedFilters({
                                             <SelectValue placeholder="YouTube" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                                            <SelectItem value="__all__">Todos</SelectItem>
                                             <SelectItem value="true">Com YouTube</SelectItem>
                                             <SelectItem value="false">Sem YouTube</SelectItem>
                                         </SelectContent>
@@ -402,8 +370,21 @@ export function MusicUnifiedFilters({
                 {hasActiveFilters && (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm text-muted-foreground">Filtros:</span>
-                        {Object.entries(filters).map(([key, value]) => {
-                            if (value === undefined || value === null || value === '') return null
+                        {Object.entries(filters).flatMap(([key, value]) => {
+                            if (value === undefined || value === null || value === '') return []
+                            if (Array.isArray(value)) {
+                                return value.map((item) => (
+                                    <Badge 
+                                        key={`${key}:${item}`} 
+                                        variant="secondary" 
+                                        className="gap-1 cursor-pointer hover:bg-destructive/20"
+                                        onClick={() => handleFilterValueRemove(key as keyof SearchFilters, item)}
+                                    >
+                                        {getFilterLabel(key, item)}
+                                        <X className="h-3 w-3" />
+                                    </Badge>
+                                ))
+                            }
                             return (
                                 <Badge 
                                     key={key} 

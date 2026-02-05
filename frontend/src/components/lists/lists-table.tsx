@@ -200,18 +200,18 @@ export function ListsTable({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Nome da Lista</TableHead>
-                            <TableHead className="hidden md:table-cell">Descrição</TableHead>
-                            <TableHead className="hidden sm:table-cell">Músicas</TableHead>
-                            <TableHead className="hidden lg:table-cell">Criada em</TableHead>
-                            <TableHead className="hidden xl:table-cell">Última Atualização</TableHead>
-                            <TableHead className="text-right">Ações</TableHead>
+                            <TableHead className="min-w-[200px] max-w-[360px]">Nome da Lista</TableHead>
+                            <TableHead className="hidden md:table-cell min-w-[200px] max-w-[360px]">Descrição</TableHead>
+                            <TableHead className="hidden sm:table-cell w-20">Músicas</TableHead>
+                            <TableHead className="hidden lg:table-cell w-28">Criada em</TableHead>
+                            <TableHead className="hidden xl:table-cell w-36">Última Atualização</TableHead>
+                            <TableHead className="text-right w-28">Ações</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {lists.map((list) => (
                             <TableRow key={list.id} className="hover:bg-muted/50">
-                                <TableCell className="font-medium w-full max-w-0">
+                                <TableCell className="font-medium min-w-[200px] max-w-[360px]">
                                     <div>
                                         <span className="line-clamp-2">{list.name}</span>
                                         {/* Mobile info */}
@@ -234,9 +234,9 @@ export function ListsTable({
                                         </div>
                                     </div>
                                 </TableCell>
-                                <TableCell className="hidden md:table-cell">
+                                <TableCell className="hidden md:table-cell min-w-[200px] max-w-[360px]">
                                     {list.observations ? (
-                                        <div className="max-w-xs line-clamp-2 text-sm text-muted-foreground">
+                                        <div className="line-clamp-2 text-sm text-muted-foreground">
                                             {list.observations}
                                         </div>
                                     ) : (

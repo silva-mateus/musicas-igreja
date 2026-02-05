@@ -636,10 +636,10 @@ export default function EditListPage() {
                                                             <tr className="border-b text-xs text-muted-foreground">
                                                                 <th className="text-left py-2 px-1 w-8"></th>
                                                                 <th className="text-left py-2 px-1 w-10">#</th>
-                                                                <th className="text-left py-2 px-2">Música</th>
-                                                                <th className="text-left py-2 px-2 hidden md:table-cell">Artista</th>
-                                                                <th className="text-left py-2 px-2 hidden lg:table-cell">Categoria</th>
-                                                                <th className="text-left py-2 px-2 hidden lg:table-cell">T. Litúrgico</th>
+                                                                <th className="text-left py-2 px-2 min-w-[180px] max-w-[320px]">Música</th>
+                                                                <th className="text-left py-2 px-2 hidden md:table-cell min-w-[140px] max-w-[220px]">Artista</th>
+                                                                <th className="text-left py-2 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">Categoria</th>
+                                                                <th className="text-left py-2 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">T. Litúrgico</th>
                                                                 <th className="text-center py-2 px-1 w-14">Tom</th>
                                                                 <th className="text-center py-2 px-1 w-20">Ordem</th>
                                                                 <th className="text-right py-2 px-1 w-24">Ações</th>
@@ -666,19 +666,19 @@ export default function EditListPage() {
                                                                                     {index + 1}
                                                                                 </Badge>
                                                                             </td>
-                                                                            <td className="py-2 px-2">
-                                                                                <div className="font-medium text-sm">{item.music?.title || 'Sem título'}</div>
+                                                                            <td className="py-2 px-2 min-w-[180px] max-w-[320px]">
+                                                                                <div className="font-medium text-sm truncate">{item.music?.title || 'Sem título'}</div>
                                                                                 <div className="text-xs text-muted-foreground md:hidden">{item.music?.artist || ''}</div>
                                                                             </td>
-                                                                            <td className="py-2 px-2 hidden md:table-cell text-sm text-muted-foreground">
+                                                                            <td className="py-2 px-2 hidden md:table-cell text-sm text-muted-foreground min-w-[140px] max-w-[220px]">
                                                                                 {item.music?.artist || '-'}
                                                                             </td>
-                                                                            <td className="py-2 px-2 hidden lg:table-cell">
+                                                                            <td className="py-2 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">
                                                                                 {item.music?.category ? (
                                                                                     <Badge variant="secondary" className="text-xs">{item.music.category}</Badge>
                                                                                 ) : '-'}
                                                                             </td>
-                                                                            <td className="py-2 px-2 hidden lg:table-cell">
+                                                                            <td className="py-2 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">
                                                                                 {item.music?.liturgical_time ? (
                                                                                     <Badge variant="outline" className="text-xs">{item.music.liturgical_time}</Badge>
                                                                                 ) : '-'}

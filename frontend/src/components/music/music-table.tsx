@@ -73,37 +73,37 @@ export function MusicTable({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>
+                                <TableHead className="min-w-[180px] max-w-[320px]">
                                     <div className="flex items-center gap-2">
                                         <Music2 className="h-4 w-4" />
                                         <span>Título</span>
                                     </div>
                                 </TableHead>
-                                <TableHead>
+                                <TableHead className="min-w-[140px] max-w-[240px]">
                                     <div className="flex items-center gap-2">
                                         <User className="h-4 w-4" />
                                         <span>Artista</span>
                                     </div>
                                 </TableHead>
-                                <TableHead className="hidden sm:table-cell">
+                                <TableHead className="hidden sm:table-cell w-16">
                                     <div className="flex items-center gap-2">
                                         <Hash className="h-4 w-4" />
                                         <span>Tom</span>
                                     </div>
                                 </TableHead>
-                                <TableHead className="hidden md:table-cell">
+                                <TableHead className="hidden md:table-cell min-w-[140px] max-w-[240px]">
                                     <div className="flex items-center gap-2">
                                         <FolderOpen className="h-4 w-4" />
                                         <span>Categoria</span>
                                     </div>
                                 </TableHead>
-                                <TableHead className="hidden lg:table-cell">
+                                <TableHead className="hidden lg:table-cell min-w-[140px] max-w-[220px]">
                                     <div className="flex items-center gap-2">
                                         <Calendar className="h-4 w-4" />
                                         <span>Tempo</span>
                                     </div>
                                 </TableHead>
-                                <TableHead>Ações</TableHead>
+                                <TableHead className="w-24">Ações</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -138,43 +138,43 @@ export function MusicTable({
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>
+                        <TableHead className="min-w-[180px] max-w-[320px]">
                             <div className="flex items-center gap-2">
                                 <Music2 className="h-4 w-4" />
                                 <span>Título</span>
                             </div>
                         </TableHead>
-                        <TableHead>
+                        <TableHead className="min-w-[140px] max-w-[240px]">
                             <div className="flex items-center gap-2">
                                 <User className="h-4 w-4" />
                                 <span>Artista</span>
                             </div>
                         </TableHead>
-                        <TableHead className="hidden sm:table-cell">
+                        <TableHead className="hidden sm:table-cell w-16">
                             <div className="flex items-center gap-2">
                                 <Hash className="h-4 w-4" />
                                 <span>Tom</span>
                             </div>
                         </TableHead>
-                        <TableHead className="hidden md:table-cell">
+                        <TableHead className="hidden md:table-cell min-w-[140px] max-w-[240px]">
                             <div className="flex items-center gap-2">
                                 <FolderOpen className="h-4 w-4" />
                                 <span>Categoria</span>
                             </div>
                         </TableHead>
-                        <TableHead className="hidden lg:table-cell">
+                        <TableHead className="hidden lg:table-cell min-w-[140px] max-w-[220px]">
                             <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
                                 <span>Tempo</span>
                             </div>
                         </TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                        <TableHead className="text-right w-24">Ações</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {musics.map((music) => (
                         <TableRow key={music.id} className="hover:bg-muted/50">
-                            <TableCell className="font-medium w-full max-w-0">
+                            <TableCell className="font-medium min-w-[180px] max-w-[320px] md:max-w-[420px]">
                                 <div>
                                     <div className="font-medium line-clamp-2">
                                         {music.title || music.original_name}
@@ -214,14 +214,14 @@ export function MusicTable({
                                     </div>
                                 </div>
                             </TableCell>
-                            <TableCell className="max-w-[150px] sm:max-w-[200px]">
+                            <TableCell className="min-w-[140px] max-w-[240px]">
                                 {music.artist ? (
                                     <span className="truncate">{music.artist}</span>
                                 ) : (
                                     <span className="text-muted-foreground">-</span>
                                 )}
                             </TableCell>
-                            <TableCell className="hidden sm:table-cell">
+                            <TableCell className="hidden sm:table-cell w-16">
                                 {music.musical_key ? (
                                     <Badge variant="outline" className="text-xs">
                                         {music.musical_key}
@@ -230,7 +230,7 @@ export function MusicTable({
                                     <span className="text-muted-foreground">-</span>
                                 )}
                             </TableCell>
-                            <TableCell className="hidden md:table-cell">
+                            <TableCell className="hidden md:table-cell min-w-[140px] max-w-[240px]">
                                 {music.categories && music.categories.length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
                                         {music.categories.map((cat, idx) => (
@@ -245,7 +245,7 @@ export function MusicTable({
                                     <span className="text-muted-foreground">-</span>
                                 )}
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell">
+                            <TableCell className="hidden lg:table-cell min-w-[140px] max-w-[220px]">
                                 {music.liturgical_times && music.liturgical_times.length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
                                         {music.liturgical_times.map((time, idx) => (
@@ -260,7 +260,7 @@ export function MusicTable({
                                     <span className="text-muted-foreground">-</span>
                                 )}
                             </TableCell>
-                            <TableCell className="text-right w-auto">
+                            <TableCell className="text-right w-24">
                                 {/* Desktop Actions */}
                                 <div className="hidden sm:flex justify-end gap-1">
                                     <Button
