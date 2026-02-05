@@ -163,7 +163,10 @@ export const musicApi = {
     },
 
     async downloadMusic(id: number): Promise<Blob> {
-        const res = await fetch(`${BASE}/files/${id}/download`, { cache: 'no-store' })
+        const res = await fetch(`${BASE}/files/${id}/download`, { 
+            cache: 'no-store',
+            credentials: 'include'
+        })
         if (!res.ok) throw new Error('Falha ao baixar')
         return await res.blob()
     },
@@ -230,7 +233,11 @@ export const musicApi = {
             // Form data ready for upload
 
             try {
-                const res = await fetch(`${BASE}/files`, { method: 'POST', body: form })
+                const res = await fetch(`${BASE}/files`, { 
+                    method: 'POST', 
+                    body: form,
+                    credentials: 'include'  // Send session cookies
+                })
                 const data = await res.json()
                 
                 // Upload response received
@@ -379,7 +386,10 @@ export const listsApi = {
     },
 
     async mergeListPdfs(listId: number): Promise<Blob> {
-        const res = await fetch(`${BASE}/merge_lists/${listId}/export`, { cache: 'no-store' })
+        const res = await fetch(`${BASE}/merge_lists/${listId}/export`, { 
+            cache: 'no-store',
+            credentials: 'include'
+        })
         if (!res.ok) throw new Error('Falha ao exportar')
         return await res.blob()
     },
