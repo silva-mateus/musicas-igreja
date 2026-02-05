@@ -125,7 +125,7 @@ export function MultiSelect({
                                         onClick={handleCreateNew}
                                     >
                                         <Plus className="mr-2 h-4 w-4" />
-                                        {createLabel}: "{searchValue.trim()}"
+                                        {createLabel}: &quot;{searchValue.trim()}&quot;
                                     </Button>
                                 </div>
                             ) : (
@@ -155,7 +155,7 @@ export function MultiSelect({
                                     className="text-primary"
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
-                                    {createLabel}: "{searchValue.trim()}"
+                                    {createLabel}: &quot;{searchValue.trim()}&quot;
                                 </CommandItem>
                             )}
                         </CommandGroup>

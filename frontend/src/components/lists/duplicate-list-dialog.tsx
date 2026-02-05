@@ -94,7 +94,7 @@ export function DuplicateListDialog({ listId, listName, trigger, onSuccess }: Du
                     </div>
 
                     <div className="text-sm text-muted-foreground">
-                        A nova lista será criada com todas as músicas da lista "{listName}".
+                        A nova lista será criada com todas as músicas da lista &quot;{listName}&quot;.
                     </div>
 
                     <div className="flex justify-end gap-3">

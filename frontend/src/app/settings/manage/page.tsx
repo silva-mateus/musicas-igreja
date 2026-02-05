@@ -689,7 +689,7 @@ export default function ManagePage() {
                                 Consolidar {getEntityTypeLabel(mergeType)}
                             </DialogTitle>
                             <DialogDescription>
-                                Todas as músicas de "{mergeSource?.name}" serão transferidas para o item selecionado, e "{mergeSource?.name}" será excluído.
+                                Todas as músicas de &quot;{mergeSource?.name}&quot; serão transferidas para o item selecionado, e &quot;{mergeSource?.name}&quot; será excluído.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
@@ -734,7 +734,7 @@ export default function ManagePage() {
                         <AlertDialogHeader>
                             <AlertDialogTitle>Excluir {getEntityTypeLabel(deleteDialog.type)}</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Tem certeza que deseja excluir "{deleteDialog.item?.name}"? 
+                                Tem certeza que deseja excluir &quot;{deleteDialog.item?.name}&quot;? 
                                 Todas as músicas associadas perderão essa classificação.
                                 <br /><br />
                                 <strong className="text-destructive">Esta ação não pode ser desfeita.</strong>
@@ -766,3 +766,4 @@ export default function ManagePage() {
         </MainLayout>
     )
 }
+

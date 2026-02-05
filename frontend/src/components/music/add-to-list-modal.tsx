@@ -129,7 +129,7 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                         Adicionar à Lista
                     </DialogTitle>
                     <p className="text-sm text-muted-foreground">
-                        Selecione uma lista para adicionar "<span className="font-medium">{musicTitle}</span>"
+                        Selecione uma lista para adicionar &quot;<span className="font-medium">{musicTitle}</span>&quot;
                     </p>
                 </DialogHeader>
 

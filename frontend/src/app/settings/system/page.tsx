@@ -325,7 +325,7 @@ export default function SystemSettingsPage() {
                             Verificação de PDFs
                         </CardTitle>
                         <CardDescription>
-                            Verifique se os nomes dos arquivos PDF seguem o padrão "Nome da Música - Tom - Artista"
+                            Verifique se os nomes dos arquivos PDF seguem o padrão &quot;Nome da Música - Tom - Artista&quot;
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">

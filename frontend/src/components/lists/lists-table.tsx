@@ -422,7 +422,7 @@ export function ListsTable({
                     <DialogHeader>
                         <DialogTitle>Excluir Lista</DialogTitle>
                         <DialogDescription>
-                            Tem certeza que deseja excluir a lista "{deleteDialog.list?.name}"?
+                            Tem certeza que deseja excluir a lista &quot;{deleteDialog.list?.name}&quot;?
                             <br />
                             <strong className="text-destructive">Esta ação não pode ser desfeita.</strong>
                         </DialogDescription>
