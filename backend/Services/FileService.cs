@@ -27,9 +27,8 @@ public class FileService : IFileService
         Directory.CreateDirectory(_organizedFolder);
     }
 
-    public async Task<PdfFile> SaveFileAsync(IFormFile file, FileUploadDto metadata)
+    public async Task<PdfFile> SaveFileAsync(IFormFile file, FileUploadDto metadata, int workspaceId, string workspaceSlug)
     {
-        // Compute hash to check for duplicates
         string fileHash;
         using (var stream = file.OpenReadStream())
         {
@@ -42,79 +41,64 @@ public class FileService : IFileService
             throw new InvalidOperationException($"Arquivo duplicado encontrado: {existingFile.Filename}");
         }
 
-        // Determine category
         var categoryName = metadata.Categories?.FirstOrDefault() ?? "Diversos";
-        var categoryFolder = Path.Combine(_organizedFolder, categoryName);
+        var categoryFolder = Path.Combine(_organizedFolder, workspaceSlug, categoryName);
         Directory.CreateDirectory(categoryFolder);
 
-        // Generate filename
         var filename = GenerateFilename(metadata.SongName, metadata.Artist, file.FileName, metadata.MusicalKey);
-        var uniqueFilename = GetUniqueFilename(filename, categoryFolder);
+        var uniqueFilename = GetUniqueFilename(categoryFolder, filename);
         var filePath = Path.Combine(categoryFolder, uniqueFilename);
 
-        // Save file
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
             await file.CopyToAsync(stream);
         }
 
-        // Get page count
         var pageCount = GetPdfPageCount(filePath);
 
-        // Create database record
         var pdfFile = new PdfFile
         {
             Filename = uniqueFilename,
             OriginalName = file.FileName,
             SongName = FormatTitleCase(metadata.SongName),
-            Artist = FormatTitleCase(metadata.Artist),
-            Category = categoryName,
-            LiturgicalTime = metadata.LiturgicalTimes?.FirstOrDefault(),
             MusicalKey = metadata.MusicalKey,
             YoutubeLink = metadata.YoutubeLink,
-            FilePath = $"organized/{categoryName}/{uniqueFilename}",
+            FilePath = $"organized/{workspaceSlug}/{categoryName}/{uniqueFilename}",
             FileSize = file.Length,
             FileHash = fileHash,
             PageCount = pageCount,
             Description = metadata.Description,
-            UploadDate = DateTime.UtcNow
+            UploadDate = DateTime.UtcNow,
+            WorkspaceId = workspaceId
         };
 
         _context.PdfFiles.Add(pdfFile);
-        await _context.SaveChangesAsync();
 
-        // Add category relationships
+        // Batch category and artist relationships before saving
         if (metadata.Categories != null)
         {
             foreach (var catName in metadata.Categories)
             {
-                var category = await _context.Categories.FirstOrDefaultAsync(c => c.Name == catName);
+                var category = await _context.Categories.FirstOrDefaultAsync(c => c.Name == catName && c.WorkspaceId == workspaceId);
                 if (category == null)
                 {
-                    category = new Category { Name = catName };
+                    category = new Category { Name = catName, WorkspaceId = workspaceId };
                     _context.Categories.Add(category);
-                    await _context.SaveChangesAsync();
                 }
-                
-                _context.FileCategories.Add(new FileCategory { FileId = pdfFile.Id, CategoryId = category.Id });
+                pdfFile.FileCategories.Add(new FileCategory { Category = category });
             }
         }
 
-        // Add liturgical time relationships
-        if (metadata.LiturgicalTimes != null)
+        if (!string.IsNullOrWhiteSpace(metadata.Artist))
         {
-            foreach (var ltName in metadata.LiturgicalTimes)
+            var artistName = FormatTitleCase(metadata.Artist)!;
+            var artist = await _context.Artists.FirstOrDefaultAsync(a => a.Name == artistName);
+            if (artist == null)
             {
-                var lt = await _context.LiturgicalTimes.FirstOrDefaultAsync(l => l.Name == ltName);
-                if (lt == null)
-                {
-                    lt = new LiturgicalTime { Name = ltName };
-                    _context.LiturgicalTimes.Add(lt);
-                    await _context.SaveChangesAsync();
-                }
-                
-                _context.FileLiturgicalTimes.Add(new FileLiturgicalTime { FileId = pdfFile.Id, LiturgicalTimeId = lt.Id });
+                artist = new Artist { Name = artistName };
+                _context.Artists.Add(artist);
             }
+            pdfFile.FileArtists.Add(new FileArtist { Artist = artist });
         }
 
         await _context.SaveChangesAsync();
@@ -341,7 +325,7 @@ public class FileService : IFileService
         return string.Join(" ", formattedWords);
     }
 
-    private static string GetUniqueFilename(string filename, string directory)
+    public string GetUniqueFilename(string directory, string filename)
     {
         if (!File.Exists(Path.Combine(directory, filename)))
             return filename;

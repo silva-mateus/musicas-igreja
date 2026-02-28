@@ -27,26 +27,21 @@ public class AdminController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Verify that all PDF filenames follow the expected pattern: "SongName - Key - Artist.pdf"
-    /// </summary>
     [HttpGet("verify-pdfs")]
     public async Task<ActionResult> VerifyPdfs()
     {
         if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.AccessAdmin))
             return StatusCode(403, new { error = "Sem permissão" });
 
-        var files = await _context.PdfFiles.ToListAsync();
-        var mismatchedFiles = new List<object>();
+        var files = await _context.PdfFiles
+            .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
+            .ToListAsync();
 
+        var mismatchedFiles = new List<object>();
         foreach (var file in files)
         {
-            var expectedFilename = _fileService.GenerateFilename(
-                file.SongName,
-                file.Artist,
-                file.OriginalName,
-                file.MusicalKey
-            );
+            var artistName = file.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault();
+            var expectedFilename = _fileService.GenerateFilename(file.SongName, artistName, file.OriginalName, file.MusicalKey);
 
             if (file.Filename != expectedFilename)
             {
@@ -56,7 +51,7 @@ public class AdminController : ControllerBase
                     current_filename = file.Filename,
                     expected_filename = expectedFilename,
                     song_name = file.SongName ?? "",
-                    artist = file.Artist ?? "",
+                    artist = artistName ?? "",
                     musical_key = file.MusicalKey ?? "",
                     file_path = file.FilePath
                 });
@@ -71,9 +66,6 @@ public class AdminController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Fix PDF filenames to follow the expected pattern
-    /// </summary>
     [HttpPost("fix-pdf-names")]
     public async Task<ActionResult> FixPdfNames([FromBody] FixPdfNamesRequest request)
     {
@@ -90,32 +82,25 @@ public class AdminController : ControllerBase
         {
             try
             {
-                var file = await _context.PdfFiles.FindAsync(fileId);
+                var file = await _context.PdfFiles
+                    .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
+                    .FirstOrDefaultAsync(f => f.Id == fileId);
                 if (file == null) continue;
 
-                var expectedFilename = _fileService.GenerateFilename(
-                    file.SongName,
-                    file.Artist,
-                    file.OriginalName,
-                    file.MusicalKey
-                );
-
+                var artistName = file.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault();
+                var expectedFilename = _fileService.GenerateFilename(file.SongName, artistName, file.OriginalName, file.MusicalKey);
                 if (file.Filename == expectedFilename) continue;
 
-                // Get current and new absolute paths
                 var currentPath = _fileService.GetAbsolutePath(file.FilePath);
-                var directory = Path.GetDirectoryName(currentPath);
-                var newPath = Path.Combine(directory ?? "", expectedFilename);
+                var directory = Path.GetDirectoryName(currentPath) ?? "";
+                var uniqueFilename = _fileService.GetUniqueFilename(directory, expectedFilename);
+                var newPath = Path.Combine(directory, uniqueFilename);
 
-                // Rename the physical file
                 if (System.IO.File.Exists(currentPath))
                 {
                     System.IO.File.Move(currentPath, newPath);
-
-                    // Update the database record
-                    file.Filename = expectedFilename;
+                    file.Filename = uniqueFilename;
                     file.FilePath = _fileService.NormalizeToRelativePath(newPath);
-
                     fixedCount++;
                 }
                 else
@@ -139,54 +124,27 @@ public class AdminController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Discover artists, categories, and liturgical times present in files but not registered
-    /// </summary>
     [HttpGet("discover-entities")]
     public async Task<ActionResult> DiscoverEntities()
     {
         if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.AccessAdmin))
             return StatusCode(403, new { error = "Sem permissão" });
 
-        // Get registered entities
         var registeredArtists = await _context.Artists.Select(a => a.Name).ToListAsync();
         var registeredCategories = await _context.Categories.Select(c => c.Name).ToListAsync();
-        var registeredLiturgicalTimes = await _context.LiturgicalTimes.Select(l => l.Name).ToListAsync();
 
-        // Get all files
-        var files = await _context.PdfFiles.ToListAsync();
+        var fileArtists = await _context.FileArtists
+            .Select(fa => fa.Artist.Name).Distinct().ToListAsync();
+        var fileCategories = await _context.FileCategories
+            .Select(fc => fc.Category.Name).Distinct().ToListAsync();
 
-        // Discover entities from files
-        var fileArtists = files
-            .Where(f => !string.IsNullOrWhiteSpace(f.Artist))
-            .Select(f => f.Artist!)
-            .Distinct()
-            .ToList();
-
-        var fileCategories = files
-            .Where(f => !string.IsNullOrWhiteSpace(f.Category))
-            .Select(f => f.Category)
-            .Distinct()
-            .ToList();
-
-        var fileLiturgicalTimes = files
-            .Where(f => !string.IsNullOrWhiteSpace(f.LiturgicalTime))
-            .Select(f => f.LiturgicalTime!)
-            .Distinct()
-            .ToList();
-
-        // Get musical keys (not stored in a separate table, just for reference)
-        var musicalKeys = files
-            .Where(f => !string.IsNullOrWhiteSpace(f.MusicalKey))
-            .Select(f => f.MusicalKey!)
-            .Distinct()
-            .OrderBy(k => k)
-            .ToList();
-
-        // Find unregistered entities
         var unregisteredArtists = fileArtists.Except(registeredArtists, StringComparer.OrdinalIgnoreCase).OrderBy(a => a).ToList();
         var unregisteredCategories = fileCategories.Except(registeredCategories, StringComparer.OrdinalIgnoreCase).OrderBy(c => c).ToList();
-        var unregisteredLiturgicalTimes = fileLiturgicalTimes.Except(registeredLiturgicalTimes, StringComparer.OrdinalIgnoreCase).OrderBy(l => l).ToList();
+        var musicalKeys = await _context.PdfFiles
+            .Where(f => !string.IsNullOrEmpty(f.MusicalKey))
+            .Select(f => f.MusicalKey!)
+            .Distinct().OrderBy(k => k).ToListAsync();
+        var totalFiles = await _context.PdfFiles.CountAsync();
 
         return Ok(new
         {
@@ -197,28 +155,22 @@ public class AdminController : ControllerBase
                 {
                     artists = unregisteredArtists,
                     categories = unregisteredCategories,
-                    liturgical_times = unregisteredLiturgicalTimes,
                     musical_keys = musicalKeys
                 },
                 registered = new
                 {
                     artists = registeredArtists.OrderBy(a => a).ToList(),
-                    categories = registeredCategories.OrderBy(c => c).ToList(),
-                    liturgical_times = registeredLiturgicalTimes.OrderBy(l => l).ToList(),
-                    musical_keys = musicalKeys
+                    categories = registeredCategories.OrderBy(c => c).ToList()
                 },
                 stats = new
                 {
-                    total_files = files.Count,
-                    files_processed = files.Count
+                    total_files = totalFiles,
+                    files_processed = totalFiles
                 }
             }
         });
     }
 
-    /// <summary>
-    /// Register discovered entities
-    /// </summary>
     [HttpPost("register-discovered-entities")]
     public async Task<ActionResult> RegisterDiscoveredEntities([FromBody] RegisterEntitiesRequest request)
     {
@@ -227,68 +179,35 @@ public class AdminController : ControllerBase
 
         var addedArtists = 0;
         var addedCategories = 0;
-        var addedLiturgicalTimes = 0;
 
-        // Register artists
         if (request.Artists != null)
         {
-            foreach (var artistName in request.Artists)
+            foreach (var name in request.Artists.Where(n => !string.IsNullOrWhiteSpace(n)))
             {
-                if (string.IsNullOrWhiteSpace(artistName)) continue;
-
-                var exists = await _context.Artists.AnyAsync(a => a.Name.ToLower() == artistName.ToLower());
-                if (!exists)
+                if (!await _context.Artists.AnyAsync(a => a.Name.ToLower() == name.ToLower()))
                 {
-                    _context.Artists.Add(new Artist { Name = artistName });
+                    _context.Artists.Add(new Artist { Name = name });
                     addedArtists++;
                 }
             }
         }
 
-        // Register categories
         if (request.Categories != null)
         {
-            foreach (var categoryName in request.Categories)
+            foreach (var name in request.Categories.Where(n => !string.IsNullOrWhiteSpace(n)))
             {
-                if (string.IsNullOrWhiteSpace(categoryName)) continue;
-
-                var exists = await _context.Categories.AnyAsync(c => c.Name.ToLower() == categoryName.ToLower());
-                if (!exists)
+                if (!await _context.Categories.AnyAsync(c => c.Name.ToLower() == name.ToLower()))
                 {
-                    _context.Categories.Add(new Category { Name = categoryName });
+                    _context.Categories.Add(new Category { Name = name, WorkspaceId = 1 });
                     addedCategories++;
                 }
             }
         }
 
-        // Register liturgical times
-        if (request.LiturgicalTimes != null)
-        {
-            foreach (var timeName in request.LiturgicalTimes)
-            {
-                if (string.IsNullOrWhiteSpace(timeName)) continue;
-
-                var exists = await _context.LiturgicalTimes.AnyAsync(l => l.Name.ToLower() == timeName.ToLower());
-                if (!exists)
-                {
-                    _context.LiturgicalTimes.Add(new LiturgicalTime { Name = timeName });
-                    addedLiturgicalTimes++;
-                }
-            }
-        }
-
         await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            success = true,
-            message = $"Registrados: {addedArtists} artistas, {addedCategories} categorias, {addedLiturgicalTimes} tempos litúrgicos"
-        });
+        return Ok(new { success = true, message = $"Registrados: {addedArtists} artistas, {addedCategories} categorias" });
     }
 
-    /// <summary>
-    /// Cleanup empty or duplicate entities
-    /// </summary>
     [HttpPost("cleanup-entities")]
     public async Task<ActionResult> CleanupEntities()
     {
@@ -297,75 +216,75 @@ public class AdminController : ControllerBase
 
         var removedArtists = 0;
         var removedCategories = 0;
-        var removedLiturgicalTimes = 0;
 
-        // Remove duplicate or empty artists
-        var artistGroups = await _context.Artists
+        // --- Artists: remove duplicates (migrate relationships) then empty ---
+        var allArtists = await _context.Artists.ToListAsync();
+        var artistDupGroups = allArtists
+            .Where(a => !string.IsNullOrWhiteSpace(a.Name))
             .GroupBy(a => a.Name.ToLower())
-            .Where(g => g.Count() > 1)
-            .ToListAsync();
+            .Where(g => g.Count() > 1);
 
-        foreach (var group in artistGroups)
+        foreach (var group in artistDupGroups)
         {
-            var duplicates = group.Skip(1).ToList();
-            _context.Artists.RemoveRange(duplicates);
-            removedArtists += duplicates.Count;
+            var kept = group.First();
+            foreach (var dup in group.Skip(1))
+            {
+                var orphanedLinks = await _context.FileArtists.Where(fa => fa.ArtistId == dup.Id).ToListAsync();
+                foreach (var link in orphanedLinks)
+                {
+                    if (!await _context.FileArtists.AnyAsync(fa => fa.FileId == link.FileId && fa.ArtistId == kept.Id))
+                        _context.FileArtists.Add(new FileArtist { FileId = link.FileId, ArtistId = kept.Id });
+                }
+                _context.FileArtists.RemoveRange(orphanedLinks);
+                _context.Artists.Remove(dup);
+                removedArtists++;
+            }
         }
 
-        // Remove empty artists
-        var emptyArtists = await _context.Artists
-            .Where(a => string.IsNullOrWhiteSpace(a.Name))
-            .ToListAsync();
-        _context.Artists.RemoveRange(emptyArtists);
-        removedArtists += emptyArtists.Count;
+        var emptyArtists = allArtists.Where(a => string.IsNullOrWhiteSpace(a.Name)).ToList();
+        foreach (var empty in emptyArtists)
+        {
+            var links = await _context.FileArtists.Where(fa => fa.ArtistId == empty.Id).ToListAsync();
+            _context.FileArtists.RemoveRange(links);
+            _context.Artists.Remove(empty);
+            removedArtists++;
+        }
 
-        // Remove duplicate or empty categories
-        var categoryGroups = await _context.Categories
+        // --- Categories: remove duplicates (migrate relationships) then empty ---
+        var allCategories = await _context.Categories.ToListAsync();
+        var catDupGroups = allCategories
+            .Where(c => !string.IsNullOrWhiteSpace(c.Name))
             .GroupBy(c => c.Name.ToLower())
-            .Where(g => g.Count() > 1)
-            .ToListAsync();
+            .Where(g => g.Count() > 1);
 
-        foreach (var group in categoryGroups)
+        foreach (var group in catDupGroups)
         {
-            var duplicates = group.Skip(1).ToList();
-            _context.Categories.RemoveRange(duplicates);
-            removedCategories += duplicates.Count;
+            var kept = group.First();
+            foreach (var dup in group.Skip(1))
+            {
+                var orphanedLinks = await _context.FileCategories.Where(fc => fc.CategoryId == dup.Id).ToListAsync();
+                foreach (var link in orphanedLinks)
+                {
+                    if (!await _context.FileCategories.AnyAsync(fc => fc.FileId == link.FileId && fc.CategoryId == kept.Id))
+                        _context.FileCategories.Add(new FileCategory { FileId = link.FileId, CategoryId = kept.Id });
+                }
+                _context.FileCategories.RemoveRange(orphanedLinks);
+                _context.Categories.Remove(dup);
+                removedCategories++;
+            }
         }
 
-        // Remove empty categories
-        var emptyCategories = await _context.Categories
-            .Where(c => string.IsNullOrWhiteSpace(c.Name))
-            .ToListAsync();
-        _context.Categories.RemoveRange(emptyCategories);
-        removedCategories += emptyCategories.Count;
-
-        // Remove duplicate or empty liturgical times
-        var timeGroups = await _context.LiturgicalTimes
-            .GroupBy(l => l.Name.ToLower())
-            .Where(g => g.Count() > 1)
-            .ToListAsync();
-
-        foreach (var group in timeGroups)
+        var emptyCategories = allCategories.Where(c => string.IsNullOrWhiteSpace(c.Name)).ToList();
+        foreach (var empty in emptyCategories)
         {
-            var duplicates = group.Skip(1).ToList();
-            _context.LiturgicalTimes.RemoveRange(duplicates);
-            removedLiturgicalTimes += duplicates.Count;
+            var links = await _context.FileCategories.Where(fc => fc.CategoryId == empty.Id).ToListAsync();
+            _context.FileCategories.RemoveRange(links);
+            _context.Categories.Remove(empty);
+            removedCategories++;
         }
-
-        // Remove empty liturgical times
-        var emptyTimes = await _context.LiturgicalTimes
-            .Where(l => string.IsNullOrWhiteSpace(l.Name))
-            .ToListAsync();
-        _context.LiturgicalTimes.RemoveRange(emptyTimes);
-        removedLiturgicalTimes += emptyTimes.Count;
 
         await _context.SaveChangesAsync();
 
-        return Ok(new
-        {
-            success = true,
-            message = $"Removidos: {removedArtists} artistas, {removedCategories} categorias, {removedLiturgicalTimes} tempos litúrgicos"
-        });
+        return Ok(new { success = true, message = $"Removidos: {removedArtists} artistas, {removedCategories} categorias" });
     }
 }
-

@@ -255,7 +255,7 @@ export const PAGE_INSTRUCTIONS = {
                         <div className="bg-muted/50 rounded p-2 space-y-1">
                             <p><strong>Nome da lista</strong> — Clique para ver detalhes</p>
                             <p><strong>✏ Editar</strong> — Adicionar/remover músicas, reordenar</p>
-                            <p><strong>📄 Gerar PDF</strong> — Cria documento com todas as partituras</p>
+                            <p><strong>📄 Gerar PDF</strong> — Cria documento com todas as cifras</p>
                             <p><strong>🗑 Excluir</strong> — Remove a lista (requer confirmação)</p>
                         </div>
                     </div>

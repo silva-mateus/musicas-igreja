@@ -24,7 +24,7 @@ export default function HomePage() {
         <MainLayout>
             <div className="container mx-auto px-4 py-8">
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold mb-4">🎵 Sistema de Músicas da Igreja</h1>
+                    <h1 className="text-4xl font-bold mb-4">🎵 Cifras Networkmat</h1>
                     <p className="text-muted-foreground mb-8">Carregando...</p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

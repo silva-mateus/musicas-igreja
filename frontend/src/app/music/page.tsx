@@ -11,18 +11,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@core/components/ui/ca
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@core/components/ui/tabs'
 import { PageHeader } from '@/components/ui/page-header'
 import { useMusic, musicKeys } from '@/hooks/use-music'
-import { request } from '@/lib/api'
+import { request, getActiveWorkspaceId } from '@/lib/api'
 import type { SearchFilters, PaginationParams } from '@/types'
 import { Music, Upload, RefreshCw } from 'lucide-react'
 import { useAuth } from '@core/contexts/auth-context'
+import { useWorkspace } from '@/contexts/workspace-context'
 import Link from 'next/link'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 import { useQuery } from '@tanstack/react-query'
 
-type TabValue = 'all' | 'by-artist' | 'by-category' | 'by-liturgical-time'
+type TabValue = 'all' | 'by-artist' | 'by-category'
 
 export default function MusicPage() {
     const { hasPermission } = useAuth()
+    const { activeWorkspace } = useWorkspace()
     const canUpload = hasPermission('music:upload')
     const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState<TabValue>('all')
@@ -45,24 +47,18 @@ export default function MusicPage() {
     } = useMusic(filters, pagination)
 
     // Grouped data queries
+    const wsId = activeWorkspace?.id ?? getActiveWorkspaceId()
     const byArtistQuery = useQuery({
-        queryKey: ['music', 'grouped', 'by-artist'],
-        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-artist'),
+        queryKey: ['music', 'grouped', 'by-artist', wsId],
+        queryFn: () => request<{ groups: any[] }>(`/files/grouped/by-artist?workspace_id=${wsId}`),
         enabled: activeTab === 'by-artist',
         staleTime: 5 * 60 * 1000,
     })
 
     const byCategoryQuery = useQuery({
-        queryKey: ['music', 'grouped', 'by-category'],
-        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-category'),
+        queryKey: ['music', 'grouped', 'by-category', wsId],
+        queryFn: () => request<{ groups: any[] }>(`/files/grouped/by-category?workspace_id=${wsId}`),
         enabled: activeTab === 'by-category',
-        staleTime: 5 * 60 * 1000,
-    })
-
-    const byLiturgicalTimeQuery = useQuery({
-        queryKey: ['music', 'grouped', 'by-liturgical-time'],
-        queryFn: () => request<{ groups: any[] }>('/files/grouped/by-liturgical-time'),
-        enabled: activeTab === 'by-liturgical-time',
         staleTime: 5 * 60 * 1000,
     })
 
@@ -140,9 +136,6 @@ export default function MusicPage() {
                         </TabsTrigger>
                         <TabsTrigger value="by-category" className="text-xs sm:text-sm">
                             <span className="hidden sm:inline">Por&nbsp;</span>Categoria
-                        </TabsTrigger>
-                        <TabsTrigger value="by-liturgical-time" className="text-xs sm:text-sm">
-                            <span className="hidden sm:inline">Por&nbsp;</span>Tempo
                         </TabsTrigger>
                     </TabsList>
 
@@ -222,26 +215,6 @@ export default function MusicPage() {
                         </Card>
                     </TabsContent>
 
-                    {/* By Liturgical Time Tab */}
-                    <TabsContent value="by-liturgical-time">
-                        <Card>
-                            <CardHeader className="py-4">
-                                <CardTitle className="text-base">
-                                    Músicas por Tempo Litúrgico
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <MusicGroupedView
-                                    groupType="liturgical-time"
-                                    groups={byLiturgicalTimeQuery.data?.groups || []}
-                                    isLoading={byLiturgicalTimeQuery.isLoading}
-                                    error={byLiturgicalTimeQuery.error?.message || null}
-                                    onRefresh={() => byLiturgicalTimeQuery.refetch()}
-                                    filters={filters}
-                                />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
                 </Tabs>
             </div>
         </MainLayout>

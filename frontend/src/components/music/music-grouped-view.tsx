@@ -41,21 +41,19 @@ interface GroupedFile {
     musical_key?: string | null
     category?: string
     categories?: string[]
-    liturgical_time?: string
-    liturgical_times?: string[]
+    custom_filters?: Record<string, { group_name: string; values: string[] }>
     youtube_link?: string | null
 }
 
 interface MusicGroup {
     artist?: string
     category?: string
-    liturgical_time?: string
     count: number
     files: GroupedFile[]
 }
 
 interface MusicGroupedViewProps {
-    groupType: 'artist' | 'category' | 'liturgical-time'
+    groupType: 'artist' | 'category'
     groups: MusicGroup[]
     isLoading: boolean
     error: string | null
@@ -107,13 +105,13 @@ export function MusicGroupedView({
                     if (!hasCategory) return false
                 }
 
-                // Liturgical time filter
-                if (filters.liturgical_time) {
-                    const times = Array.isArray(filters.liturgical_time) ? filters.liturgical_time : [filters.liturgical_time]
-                    const hasTime = times.some(time =>
-                        file.liturgical_times?.includes(time) || file.liturgical_time === time
-                    )
-                    if (!hasTime) return false
+                // Custom filters check
+                if (filters.custom_filters) {
+                    for (const [groupSlug, filterValues] of Object.entries(filters.custom_filters)) {
+                        const fileFilterValues = file.custom_filters?.[groupSlug]?.values || []
+                        const hasMatch = (filterValues as string[]).some(fv => fileFilterValues.includes(fv))
+                        if (!hasMatch) return false
+                    }
                 }
 
                 // Artist filter
@@ -172,7 +170,7 @@ export function MusicGroupedView({
     }
 
     const getGroupName = (group: MusicGroup): string => {
-        return group.artist || group.category || group.liturgical_time || 'Sem Nome'
+        return group.artist || group.category || 'Sem Nome'
     }
 
     const getGroupIcon = () => {
@@ -181,8 +179,6 @@ export function MusicGroupedView({
                 return <User className="h-4 w-4" />
             case 'category':
                 return <FolderOpen className="h-4 w-4" />
-            case 'liturgical-time':
-                return <Clock className="h-4 w-4" />
         }
     }
 
@@ -192,8 +188,6 @@ export function MusicGroupedView({
                 return 'artistas'
             case 'category':
                 return 'categorias'
-            case 'liturgical-time':
-                return 'tempos litúrgicos'
         }
     }
 
@@ -332,12 +326,12 @@ export function MusicGroupedView({
                                                                     </div>
                                                                 )}
                                                                 
-                                                                {/* Liturgical times (if not grouped by liturgical time) */}
-                                                                {groupType !== 'liturgical-time' && (file.liturgical_times?.length || file.liturgical_time) && (
+                                                                {/* Custom filters */}
+                                                                {file.custom_filters && Object.keys(file.custom_filters).length > 0 && (
                                                                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                                                         <Clock className="h-3 w-3" />
                                                                         <span>
-                                                                            {file.liturgical_times?.join(', ') || file.liturgical_time}
+                                                                            {Object.values(file.custom_filters).flatMap(g => g.values).join(', ')}
                                                                         </span>
                                                                     </div>
                                                                 )}

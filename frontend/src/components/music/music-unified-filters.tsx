@@ -8,7 +8,7 @@ import { Badge } from '@core/components/ui/badge'
 import { Card, CardContent } from '@core/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { MultiSelect } from '@/components/ui/multi-select'
-import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError } from '@/lib/api'
+import { dashboardApi, categoriesApi, customFiltersApi, handleApiError, getActiveWorkspaceId } from '@/lib/api'
 import type { SearchFilters, FilterOption } from '@/types'
 import { Search, X, Filter, ChevronDown, RotateCcw, ArrowUpDown, Music2, Hash, Youtube } from 'lucide-react'
 import { debounce } from '@/lib/utils'
@@ -30,7 +30,7 @@ interface MusicUnifiedFiltersProps {
 interface FilterOptions {
     artists: FilterOption[]
     categories: FilterOption[]
-    liturgicalTimes: FilterOption[]
+    customFilterGroups: Array<{ id: number; name: string; slug: string; values: FilterOption[] }>
     musicalKeys: string[]
 }
 
@@ -56,14 +56,14 @@ export function MusicUnifiedFilters({
     const [options, setOptions] = useState<FilterOptions>({
         artists: [],
         categories: [],
-        liturgicalTimes: [],
+        customFilterGroups: [],
         musicalKeys: MUSICAL_KEYS
     })
 
     // Load filter options on mount and when filters change
     useEffect(() => {
         loadFilterOptions()
-    }, [filters.category, filters.liturgical_time, filters.artist, filters.musical_key])
+    }, [filters.category, filters.artist, filters.musical_key])
 
     // Sync search term with filters
     useEffect(() => {
@@ -77,15 +77,12 @@ export function MusicUnifiedFilters({
                 const categories = Array.isArray(filters.category) ? filters.category : [filters.category]
                 categories.forEach(cat => params.append('category', cat))
             }
-            if (filters.liturgical_time) {
-                const times = Array.isArray(filters.liturgical_time) ? filters.liturgical_time : [filters.liturgical_time]
-                times.forEach(time => params.append('liturgical_time', time))
-            }
             if (filters.artist) {
                 const artists = Array.isArray(filters.artist) ? filters.artist : [filters.artist]
                 artists.forEach(artist => params.append('artist', artist))
             }
             if (filters.musical_key) params.append('musical_key', filters.musical_key)
+            params.append('workspace_id', String(getActiveWorkspaceId()))
 
             const response = await fetch(`/api/filters/suggestions?${params.toString()}`)
             const data = await response.json()
@@ -98,7 +95,12 @@ export function MusicUnifiedFilters({
             setOptions({
                 artists: toFilterOptions(data.artists),
                 categories: toFilterOptions(data.categories),
-                liturgicalTimes: toFilterOptions(data.liturgical_times),
+                customFilterGroups: (data.custom_filter_groups || []).map((g: any) => ({
+                    id: g.id,
+                    name: g.name,
+                    slug: g.slug,
+                    values: (g.values || []).map((v: any) => ({ slug: v.slug, label: v.name })),
+                })),
                 musicalKeys: Array.isArray(data.musical_keys) && data.musical_keys.length > 0 ? data.musical_keys : MUSICAL_KEYS
             })
         } catch (error) {
@@ -106,7 +108,7 @@ export function MusicUnifiedFilters({
             setOptions({
                 artists: [],
                 categories: [],
-                liturgicalTimes: [],
+                customFilterGroups: [],
                 musicalKeys: MUSICAL_KEYS
             })
         }
@@ -165,15 +167,20 @@ export function MusicUnifiedFilters({
         onFiltersChange({})
     }
 
-    const activeFilterCount = Object.keys(filters).filter(k => {
+    const activeFilterCount = Object.keys(filters).reduce((count, k) => {
         const val = filters[k as keyof SearchFilters]
-        if (Array.isArray(val)) return val.length > 0
-        return val !== undefined && val !== null && val !== ''
-    }).length
+        if (val === undefined || val === null || val === '') return count
+        if (k === 'custom_filters' && typeof val === 'object' && !Array.isArray(val)) {
+            return count + Object.values(val as Record<string, string[]>).reduce((sum, arr) => sum + arr.length, 0)
+        }
+        if (Array.isArray(val)) return val.length > 0 ? count + val.length : count
+        return count + 1
+    }, 0)
 
     const hasActiveFilters = activeFilterCount > 0
 
-    const allOptions = [...options.categories, ...options.liturgicalTimes, ...options.artists]
+    const allFilterValues = options.customFilterGroups.flatMap(g => g.values)
+    const allOptions = [...options.categories, ...allFilterValues, ...options.artists]
     const slugToLabel = (slug: string): string => {
         const opt = allOptions.find(o => o.slug === slug)
         return opt?.label ?? slug
@@ -184,16 +191,20 @@ export function MusicUnifiedFilters({
             title: 'Busca',
             artist: 'Artista',
             category: 'Categoria',
-            liturgical_time: 'Tempo',
             musical_key: 'Tom',
             has_youtube: value ? 'Com YouTube' : 'Sem YouTube'
         }
         
         if (key === 'has_youtube') return labels[key]
-        if (key === 'category' || key === 'liturgical_time' || key === 'artist') {
+        if (key === 'category' || key === 'artist') {
             return `${labels[key] || key}: ${slugToLabel(value)}`
         }
         return `${labels[key] || key}: ${value}`
+    }
+
+    const getCustomFilterGroupName = (slug: string): string => {
+        const group = options.customFilterGroups.find(g => g.slug === slug)
+        return group?.name ?? slug
     }
 
     return (
@@ -325,14 +336,25 @@ export function MusicUnifiedFilters({
                                          />
                                      </div>
 
-                                    {/* Liturgical Time */}
-                                     <MultiSelect
-                                         options={options.liturgicalTimes.map(o => ({ value: o.slug, label: o.label }))}
-                                         value={Array.isArray(filters.liturgical_time) ? filters.liturgical_time : filters.liturgical_time ? [filters.liturgical_time] : []}
-                                         onChange={(values) => handleFilterChange('liturgical_time', values)}
-                                         placeholder="Tempo Litúrgico"
-                                         className="w-full"
-                                     />
+                                    {/* Dynamic Custom Filter Groups */}
+                                    {options.customFilterGroups.map(group => (
+                                         <MultiSelect
+                                             key={group.slug}
+                                             options={group.values.map(v => ({ value: v.slug, label: v.label }))}
+                                             value={filters.custom_filters?.[group.slug] || []}
+                                             onChange={(values) => {
+                                                 const newCustomFilters = { ...(filters.custom_filters || {}) }
+                                                 if (values.length > 0) {
+                                                     newCustomFilters[group.slug] = values
+                                                 } else {
+                                                     delete newCustomFilters[group.slug]
+                                                 }
+                                                 handleFilterChange('custom_filters', Object.keys(newCustomFilters).length > 0 ? newCustomFilters : undefined)
+                                             }}
+                                             placeholder={group.name}
+                                             className="w-full"
+                                         />
+                                    ))}
 
                                     {/* Musical Key */}
                                      <Select 
@@ -381,6 +403,28 @@ export function MusicUnifiedFilters({
                         <span className="text-sm text-muted-foreground">Filtros:</span>
                         {Object.entries(filters).flatMap(([key, value]) => {
                             if (value === undefined || value === null || value === '') return []
+
+                            if (key === 'custom_filters' && typeof value === 'object' && !Array.isArray(value)) {
+                                return Object.entries(value as Record<string, string[]>).flatMap(([groupSlug, vals]) =>
+                                    vals.map((v) => (
+                                        <Badge
+                                            key={`cf:${groupSlug}:${v}`}
+                                            variant="secondary"
+                                            className="gap-1 cursor-pointer hover:bg-destructive/20"
+                                            onClick={() => {
+                                                const newCf = { ...(filters.custom_filters || {}) }
+                                                newCf[groupSlug] = newCf[groupSlug]?.filter(x => x !== v) || []
+                                                if (newCf[groupSlug].length === 0) delete newCf[groupSlug]
+                                                handleFilterChange('custom_filters', Object.keys(newCf).length > 0 ? newCf : undefined)
+                                            }}
+                                        >
+                                            {getCustomFilterGroupName(groupSlug)}: {slugToLabel(v)}
+                                            <X className="h-3 w-3" />
+                                        </Badge>
+                                    ))
+                                )
+                            }
+
                             if (Array.isArray(value)) {
                                 return value.map((item) => (
                                     <Badge 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.Services;
+using MusicasIgreja.Api.Services.Interfaces;
 using Core.Auth.Extensions;
 using Core.FileManagement.Extensions;
 using Core.Infrastructure.Extensions;
@@ -9,7 +10,7 @@ using Core.Infrastructure.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database (MySQL via Core.Infrastructure)
+// Database (PostgreSQL via Core.Infrastructure)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
 builder.Services.AddCoreDatabase<AppDbContext>(connectionString);
 
@@ -39,6 +40,13 @@ builder.Services.AddCoreSse();
 
 // Application services
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IMusicService, MusicService>();
+builder.Services.AddScoped<IListService, ListService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IArtistService, ArtistService>();
+builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ICustomFilterService, CustomFilterService>();
 builder.Services.AddScoped<IMigrationService, MigrationService>();
 builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 builder.Services.AddScoped<IAlertConfigurationService, AlertConfigurationService>();

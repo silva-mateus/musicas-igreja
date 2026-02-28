@@ -60,7 +60,6 @@ export function MusicSearch({ onSearch, initialFilters = {} }: MusicSearchProps)
             title: 'Título',
             artist: 'Artista',
             category: 'Categoria',
-            liturgical_time: 'Tempo Litúrgico',
             musical_key: 'Tonalidade',
             has_youtube: 'Com YouTube'
         }

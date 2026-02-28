@@ -1,11 +1,10 @@
+using Core.Auth.Helpers;
+using Core.Auth.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MusicasIgreja.Api;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
-using MusicasIgreja.Api.Models;
-using MusicasIgreja.Api.Services;
-using PdfSharpCore.Pdf;
-using PdfSharpCore.Pdf.IO;
+using MusicasIgreja.Api.Services.Interfaces;
 
 namespace MusicasIgreja.Api.Controllers;
 
@@ -13,391 +12,134 @@ namespace MusicasIgreja.Api.Controllers;
 [Route("api/merge_lists")]
 public class MergeListsController : ControllerBase
 {
-    private readonly AppDbContext _context;
-    private readonly IFileService _fileService;
-    private readonly ILogger<MergeListsController> _logger;
+    private readonly IListService _listService;
+    private readonly ICoreAuthService _authService;
 
-    public MergeListsController(AppDbContext context, IFileService fileService, ILogger<MergeListsController> logger)
+    public MergeListsController(IListService listService, ICoreAuthService authService)
     {
-        _context = context;
-        _fileService = fileService;
-        _logger = logger;
+        _listService = listService;
+        _authService = authService;
     }
 
     [HttpGet]
     public async Task<ActionResult<List<MergeListSummaryDto>>> GetLists(
+        [FromQuery] int workspace_id = 1,
         [FromQuery] string? search = null,
         [FromQuery] string? sort_by = "updated_date",
         [FromQuery] string? sort_order = "desc")
     {
-        var query = _context.MergeLists
-            .Include(l => l.Items)
-            .AsQueryable();
-
-        // Apply search filter
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(l => l.Name.Contains(search));
-        }
-
-        // Apply sorting
-        query = (sort_by?.ToLower(), sort_order?.ToLower()) switch
-        {
-            ("name", "asc") => query.OrderBy(l => l.Name),
-            ("name", "desc") => query.OrderByDescending(l => l.Name),
-            ("created_date", "asc") => query.OrderBy(l => l.CreatedDate),
-            ("created_date", "desc") => query.OrderByDescending(l => l.CreatedDate),
-            ("file_count", "asc") => query.OrderBy(l => l.Items.Count),
-            ("file_count", "desc") => query.OrderByDescending(l => l.Items.Count),
-            ("updated_date", "asc") => query.OrderBy(l => l.UpdatedDate),
-            _ => query.OrderByDescending(l => l.UpdatedDate) // Default: newest first
-        };
-
-        var lists = await query
-            .Select(l => new MergeListSummaryDto(
-                l.Id,
-                l.Name,
-                l.Observations,
-                l.CreatedDate,
-                l.UpdatedDate,
-                l.Items.Count
-            ))
-            .ToListAsync();
-
+        var lists = await _listService.GetListsAsync(workspace_id, search, sort_by, sort_order);
         return Ok(lists);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<object>> GetList(int id)
     {
-        var list = await _context.MergeLists
-            .Include(l => l.Items)
-                .ThenInclude(i => i.PdfFile)
-                    .ThenInclude(p => p.FileCategories)
-                        .ThenInclude(fc => fc.Category)
-            .Include(l => l.Items)
-                .ThenInclude(i => i.PdfFile)
-                    .ThenInclude(p => p.FileLiturgicalTimes)
-                        .ThenInclude(flt => flt.LiturgicalTime)
-            .FirstOrDefaultAsync(l => l.Id == id);
-
-        if (list == null)
+        var dto = await _listService.GetListByIdAsync(id);
+        if (dto == null)
             return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        var dto = new MergeListDetailDto(
-            list.Id,
-            list.Name,
-            list.Observations,
-            list.CreatedDate,
-            list.UpdatedDate,
-            list.Items.OrderBy(i => i.OrderPosition).Select(i => new MergeListItemDto(
-                i.Id,
-                i.OrderPosition,
-                new MergeListFileDto(
-                    i.PdfFile.Id,
-                    i.PdfFile.Filename,
-                    i.PdfFile.SongName,
-                    i.PdfFile.Artist,
-                    i.PdfFile.FileCategories.FirstOrDefault()?.Category?.Name ?? i.PdfFile.Category,
-                    i.PdfFile.FileLiturgicalTimes.FirstOrDefault()?.LiturgicalTime?.Name ?? i.PdfFile.LiturgicalTime,
-                    i.PdfFile.MusicalKey,
-                    i.PdfFile.YoutubeLink
-                )
-            )).ToList()
-        );
-
         return Ok(new { success = true, list = dto });
     }
 
     [HttpPost]
-    public async Task<ActionResult<object>> CreateList([FromBody] CreateMergeListDto dto)
+    public async Task<ActionResult<object>> CreateList([FromBody] CreateMergeListDto dto, [FromQuery] int workspace_id = 1)
     {
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
+
         if (string.IsNullOrWhiteSpace(dto.Name))
             return BadRequest(new { success = false, error = "Nome é obrigatório" });
 
-        var list = new MergeList
-        {
-            Name = dto.Name,
-            Observations = dto.Observations
-        };
-
-        _context.MergeLists.Add(list);
-        await _context.SaveChangesAsync();
-
-        // Add items if provided
-        if (dto.FileIds != null && dto.FileIds.Count > 0)
-        {
-            var position = 0;
-            foreach (var fileId in dto.FileIds)
-            {
-                var file = await _context.PdfFiles.FindAsync(fileId);
-                if (file != null)
-                {
-                    _context.MergeListItems.Add(new MergeListItem
-                    {
-                        MergeListId = list.Id,
-                        PdfFileId = fileId,
-                        OrderPosition = position++
-                    });
-                }
-            }
-            await _context.SaveChangesAsync();
-        }
-
-        return StatusCode(201, new { success = true, list_id = list.Id, message = "Lista criada com sucesso" });
+        var listId = await _listService.CreateListAsync(workspace_id, dto);
+        return StatusCode(201, new { success = true, list_id = listId, message = "Lista criada com sucesso" });
     }
 
     [HttpPut("{id}")]
     public async Task<ActionResult<object>> UpdateList(int id, [FromBody] UpdateMergeListDto dto)
     {
-        var list = await _context.MergeLists.FindAsync(id);
-        if (list == null)
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        var success = await _listService.UpdateListAsync(id, dto);
+        if (!success)
             return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        if (dto.Name != null) list.Name = dto.Name;
-        if (dto.Observations != null) list.Observations = dto.Observations;
-        list.UpdatedDate = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
         return Ok(new { success = true });
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult<object>> DeleteList(int id)
     {
-        var list = await _context.MergeLists.FindAsync(id);
-        if (list == null)
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        var success = await _listService.DeleteListAsync(id);
+        if (!success)
             return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        _context.MergeLists.Remove(list);
-        await _context.SaveChangesAsync();
-
         return Ok(new { success = true });
     }
 
     [HttpPost("{id}/items")]
     public async Task<ActionResult<object>> AddItems(int id, [FromBody] AddItemsDto dto)
     {
-        var list = await _context.MergeLists
-            .Include(l => l.Items)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
 
-        if (list == null)
-            return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        var maxPosition = list.Items.Any() ? list.Items.Max(i => i.OrderPosition) : -1;
-        var newItems = new List<MergeListItem>();
-
-        foreach (var fileId in dto.FileIds)
-        {
-            var file = await _context.PdfFiles.FindAsync(fileId);
-            if (file != null)
-            {
-                var newItem = new MergeListItem
-                {
-                    MergeListId = id,
-                    PdfFileId = fileId,
-                    OrderPosition = ++maxPosition
-                };
-                _context.MergeListItems.Add(newItem);
-                newItems.Add(newItem);
-            }
-        }
-
-        list.UpdatedDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        return Ok(new { 
-            success = true, 
-            added = newItems.Count, 
-            new_item_ids = newItems.Select(i => i.Id).ToList() 
-        });
+        var newItemIds = await _listService.AddItemsAsync(id, dto.FileIds);
+        return Ok(new { success = true, added = newItemIds.Count, new_item_ids = newItemIds });
     }
 
     [HttpPost("{id}/reorder")]
     public async Task<ActionResult<object>> ReorderItems(int id, [FromBody] ReorderItemsDto dto)
     {
-        var list = await _context.MergeLists
-            .Include(l => l.Items)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
 
-        if (list == null)
+        var success = await _listService.ReorderItemsAsync(id, dto.ItemOrder);
+        if (!success)
             return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        for (int i = 0; i < dto.ItemOrder.Count; i++)
-        {
-            var item = list.Items.FirstOrDefault(it => it.Id == dto.ItemOrder[i]);
-            if (item != null)
-            {
-                item.OrderPosition = i;
-            }
-        }
-
-        list.UpdatedDate = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
         return Ok(new { success = true });
     }
 
     [HttpPost("{id}/duplicate")]
     public async Task<ActionResult<object>> DuplicateList(int id, [FromBody] CreateMergeListDto dto)
     {
-        var originalList = await _context.MergeLists
-            .Include(l => l.Items)
-            .FirstOrDefaultAsync(l => l.Id == id);
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.ManageLists))
+            return StatusCode(403, new { error = "Sem permissão" });
 
-        if (originalList == null)
+        var newId = await _listService.DuplicateListAsync(id, dto.Name);
+        if (newId < 0)
             return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        var newList = new MergeList
-        {
-            Name = dto.Name ?? $"{originalList.Name} (cópia)",
-            Observations = originalList.Observations
-        };
-
-        _context.MergeLists.Add(newList);
-        await _context.SaveChangesAsync();
-
-        foreach (var item in originalList.Items.OrderBy(i => i.OrderPosition))
-        {
-            _context.MergeListItems.Add(new MergeListItem
-            {
-                MergeListId = newList.Id,
-                PdfFileId = item.PdfFileId,
-                OrderPosition = item.OrderPosition
-            });
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            success = true,
-            new_list_id = newList.Id,
-            items_copied = originalList.Items.Count,
-            message = "Lista duplicada com sucesso"
-        });
+        return Ok(new { success = true, new_list_id = newId, message = "Lista duplicada com sucesso" });
     }
 
     [HttpGet("{id}/report")]
     public async Task<ActionResult<object>> GenerateReport(int id)
     {
-        var list = await _context.MergeLists
-            .Include(l => l.Items)
-                .ThenInclude(i => i.PdfFile)
-            .FirstOrDefaultAsync(l => l.Id == id);
-
-        if (list == null)
-            return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        if (!list.Items.Any())
-            return Ok(new { success = true, report = "", message = "Lista vazia" });
-
-        var lines = list.Items.OrderBy(i => i.OrderPosition).Select(item =>
-        {
-            var parts = new List<string>();
-            if (!string.IsNullOrEmpty(item.PdfFile.SongName))
-                parts.Add(item.PdfFile.SongName);
-            else
-                parts.Add(item.PdfFile.Filename?.Replace(".pdf", "") ?? "Sem título");
-
-            if (!string.IsNullOrEmpty(item.PdfFile.Artist))
-                parts.Add(item.PdfFile.Artist);
-
-            if (!string.IsNullOrEmpty(item.PdfFile.YoutubeLink))
-                parts.Add(item.PdfFile.YoutubeLink);
-
-            return string.Join(" - ", parts);
-        });
-
-        return Ok(new { success = true, report = string.Join("\n", lines) });
+        var report = await _listService.GenerateReportAsync(id);
+        if (report == null)
+            return NotFound(new { success = false, error = "Lista não encontrada ou vazia" });
+        return Ok(new { success = true, report });
     }
 
     [HttpGet("{id}/export")]
     public async Task<IActionResult> ExportList(int id)
     {
-        var list = await _context.MergeLists
-            .Include(l => l.Items)
-                .ThenInclude(i => i.PdfFile)
-            .FirstOrDefaultAsync(l => l.Id == id);
-
-        if (list == null)
-            return NotFound(new { success = false, error = "Lista não encontrada" });
-
-        if (!list.Items.Any())
-            return BadRequest(new { success = false, error = "Lista vazia" });
-
-        // Get all PDF files in order
-        var orderedItems = list.Items.OrderBy(i => i.OrderPosition).ToList();
-        
-        // Validate all files exist
-        var filePaths = new List<string>();
-        foreach (var item in orderedItems)
-        {
-            var absolutePath = _fileService.GetAbsolutePath(item.PdfFile.FilePath);
-            if (!System.IO.File.Exists(absolutePath))
-            {
-                _logger.LogWarning("Arquivo não encontrado: {Path} (ID: {Id})", absolutePath, item.PdfFile.Id);
-                continue; // Skip missing files instead of failing
-            }
-            filePaths.Add(absolutePath);
-        }
-
-        if (!filePaths.Any())
-            return NotFound(new { success = false, error = "Nenhum arquivo PDF encontrado" });
-
-        // If only one file, return it directly
-        if (filePaths.Count == 1)
-        {
-            var stream = new FileStream(filePaths[0], FileMode.Open, FileAccess.Read);
-            return File(stream, "application/pdf", $"{list.Name}.pdf");
-        }
-
-        try
-        {
-            // Merge PDFs using PdfSharpCore
-            using var outputDocument = new PdfDocument();
-            outputDocument.Info.Title = list.Name;
-            outputDocument.Info.Author = "Músicas Igreja";
-
-            foreach (var filePath in filePaths)
-            {
-                try
-                {
-                    using var inputDocument = PdfReader.Open(filePath, PdfDocumentOpenMode.Import);
-                    
-                    // Copy all pages from the input document to the output
-                    for (int i = 0; i < inputDocument.PageCount; i++)
-                    {
-                        var page = inputDocument.Pages[i];
-                        outputDocument.AddPage(page);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Erro ao processar PDF: {Path}", filePath);
-                    // Continue with other files
-                }
-            }
-
-            if (outputDocument.PageCount == 0)
-                return BadRequest(new { success = false, error = "Não foi possível processar os PDFs" });
-
-            // Save to memory stream and return
-            var memoryStream = new MemoryStream();
-            outputDocument.Save(memoryStream, false);
-            memoryStream.Position = 0;
-
-            _logger.LogInformation("PDF mesclado com sucesso: {ListName}, {PageCount} páginas", list.Name, outputDocument.PageCount);
-
-            return File(memoryStream, "application/pdf", $"{list.Name}.pdf");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Erro ao mesclar PDFs para lista {ListId}", id);
-            return StatusCode(500, new { success = false, error = "Erro ao mesclar PDFs" });
-        }
+        var (stream, listName) = await _listService.ExportListAsync(id);
+        if (stream == null)
+            return NotFound(new { success = false, error = "Lista não encontrada ou sem arquivos" });
+        return File(stream, "application/pdf", $"{listName}.pdf");
     }
 }
 
@@ -421,14 +163,10 @@ public class MergeListItemsController : ControllerBase
 
         var list = await _context.MergeLists.FindAsync(item.MergeListId);
         if (list != null)
-        {
             list.UpdatedDate = DateTime.UtcNow;
-        }
 
         _context.MergeListItems.Remove(item);
         await _context.SaveChangesAsync();
-
         return Ok(new { success = true });
     }
 }
-

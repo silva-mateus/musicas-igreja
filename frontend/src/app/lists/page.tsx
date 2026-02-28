@@ -17,12 +17,15 @@ import { List, Plus, Search, RefreshCw, ArrowUpDown } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@core/components/ui/select'
 import { useToast } from '@core/hooks/use-toast'
 import { useAuth } from '@core/contexts/auth-context'
+import { useWorkspace } from '@/contexts/workspace-context'
+import { getActiveWorkspaceId } from '@/lib/api'
 import { debounce } from '@/lib/utils'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 export default function ListsPage() {
     const { toast } = useToast()
     const { hasPermission } = useAuth()
+    const { activeWorkspace } = useWorkspace()
     const canEdit = hasPermission('music:edit_metadata') || hasPermission('lists:manage')
     const queryClient = useQueryClient()
 
@@ -32,10 +35,12 @@ export default function ListsPage() {
     const [sortBy, setSortBy] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_date', order: 'desc' })
 
     // Fetch lists using TanStack Query
+    const wsId = activeWorkspace?.id ?? getActiveWorkspaceId()
     const { data: listsResponse, isLoading, error, refetch } = useQuery({
-        queryKey: [...listsKeys.lists(), { search: searchTerm, sortBy, page }],
+        queryKey: [...listsKeys.lists(), { search: searchTerm, sortBy, page, wsId }],
         queryFn: async () => {
             const params = new URLSearchParams()
+            params.append('workspace_id', String(wsId))
             if (searchTerm) params.append('search', searchTerm)
             if (sortBy.field) params.append('sort_by', sortBy.field)
             if (sortBy.order) params.append('sort_order', sortBy.order)

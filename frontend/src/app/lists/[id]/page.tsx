@@ -456,8 +456,14 @@ export default function ListDetailsPage() {
                                                     ) : '-'}
                                                 </td>
                                                 <td className="py-3 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">
-                                                    {item.music?.liturgical_time ? (
-                                                        <Badge variant="outline" className="text-xs">{item.music.liturgical_time}</Badge>
+                                                    {item.music?.custom_filters && Object.keys(item.music.custom_filters).length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {Object.values(item.music.custom_filters).flatMap((vals: any, gIdx: number) =>
+                                                                (Array.isArray(vals) ? vals : vals.values || []).map((v: string, idx: number) => (
+                                                                    <Badge key={`${gIdx}-${idx}`} variant="outline" className="text-xs">{v}</Badge>
+                                                                ))
+                                                            )}
+                                                        </div>
                                                     ) : '-'}
                                                 </td>
                                                 <td className="py-3 px-2 text-center">

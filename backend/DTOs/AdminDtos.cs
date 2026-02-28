@@ -15,9 +15,6 @@ public class RegisterEntitiesRequest
 
     [JsonPropertyName("categories")]
     public List<string>? Categories { get; set; }
-
-    [JsonPropertyName("liturgical_times")]
-    public List<string>? LiturgicalTimes { get; set; }
 }
 
 public class CheckDuplicateResponse

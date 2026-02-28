@@ -8,6 +8,8 @@ public class MergeList
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedDate { get; set; } = DateTime.UtcNow;
 
+    public int WorkspaceId { get; set; }
+    public Workspace Workspace { get; set; } = null!;
+
     public ICollection<MergeListItem> Items { get; set; } = new List<MergeListItem>();
 }
-

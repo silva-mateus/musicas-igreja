@@ -37,7 +37,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
         {
             title: 'Categorias',
             value: stats.total_categories,
-            subtitle: `${stats.total_liturgical_times} tempos litúrgicos`,
+            subtitle: `${stats.total_filter_groups ?? 0} grupos de filtro`,
             icon: BarChart3,
         },
         {

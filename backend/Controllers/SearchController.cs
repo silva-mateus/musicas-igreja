@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
 using MusicasIgreja.Api.Helpers;
+using MusicasIgreja.Api.Services;
 
 namespace MusicasIgreja.Api.Controllers;
 
@@ -11,33 +12,30 @@ namespace MusicasIgreja.Api.Controllers;
 public class SearchController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IFileService _fileService;
     private readonly ILogger<SearchController> _logger;
 
-    public SearchController(AppDbContext context, ILogger<SearchController> logger)
+    public SearchController(AppDbContext context, IFileService fileService, ILogger<SearchController> logger)
     {
         _context = context;
+        _fileService = fileService;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Search suggestions with fuzzy matching (accent-insensitive).
-    /// Returns up to 10 suggestions matching the query.
-    /// </summary>
     [HttpGet("search_suggestions")]
     public async Task<ActionResult<SearchSuggestionsResponse>> GetSearchSuggestions([FromQuery] string q = "")
     {
         if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
-        {
             return Ok(new SearchSuggestionsResponse { Suggestions = new List<SearchSuggestion>() });
-        }
 
         var allFiles = await _context.PdfFiles
+            .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
             .Select(f => new
             {
                 f.Id,
                 f.Filename,
                 f.SongName,
-                f.Artist,
+                Artist = f.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault(),
                 f.MusicalKey
             })
             .ToListAsync();
@@ -46,31 +44,16 @@ public class SearchController : ControllerBase
 
         foreach (var file in allFiles)
         {
-            var priority = 0;
-
-            // Check song name (highest priority)
-            var songPriority = TextHelper.GetMatchPriority(file.SongName, q);
-            if (songPriority > 0)
+            var priority = TextHelper.GetMatchPriority(file.SongName, q);
+            if (priority == 0)
             {
-                priority = songPriority;
+                priority = TextHelper.GetMatchPriority(file.Artist, q);
+                if (priority > 0) priority += 2;
             }
-            // Check artist (second priority)
-            else
+            if (priority == 0)
             {
-                var artistPriority = TextHelper.GetMatchPriority(file.Artist, q);
-                if (artistPriority > 0)
-                {
-                    priority = artistPriority + 2; // Lower priority than song name
-                }
-                // Check filename (lowest priority)
-                else
-                {
-                    var filenamePriority = TextHelper.GetMatchPriority(file.Filename, q);
-                    if (filenamePriority > 0)
-                    {
-                        priority = filenamePriority + 4;
-                    }
-                }
+                priority = TextHelper.GetMatchPriority(file.Filename, q);
+                if (priority > 0) priority += 4;
             }
 
             if (priority > 0)
@@ -86,39 +69,21 @@ public class SearchController : ControllerBase
             }
         }
 
-        var suggestions = matches
-            .OrderBy(m => m.Priority)
-            .Take(10)
-            .Select(m => m.Suggestion)
-            .ToList();
-
+        var suggestions = matches.OrderBy(m => m.Priority).Take(10).Select(m => m.Suggestion).ToList();
         return Ok(new SearchSuggestionsResponse { Suggestions = suggestions });
     }
 
-    /// <summary>
-    /// Search artists with autocomplete (accent-insensitive).
-    /// </summary>
     [HttpGet("search_artists")]
     public async Task<ActionResult<ArtistSearchResponse>> SearchArtists([FromQuery] string q = "")
     {
         if (string.IsNullOrWhiteSpace(q))
-        {
             return Ok(new ArtistSearchResponse { Artists = new List<string>() });
-        }
 
-        var allArtists = await _context.Artists
-            .Select(a => a.Name)
-            .ToListAsync();
-
+        var allArtists = await _context.Artists.Select(a => a.Name).ToListAsync();
         var matches = allArtists
-            .Select(artist => new
-            {
-                Name = artist,
-                Priority = TextHelper.GetMatchPriority(artist, q)
-            })
+            .Select(artist => new { Name = artist, Priority = TextHelper.GetMatchPriority(artist, q) })
             .Where(m => m.Priority > 0)
-            .OrderBy(m => m.Priority)
-            .ThenBy(m => m.Name)
+            .OrderBy(m => m.Priority).ThenBy(m => m.Name)
             .Take(20)
             .Select(m => m.Name)
             .ToList();
@@ -126,36 +91,27 @@ public class SearchController : ControllerBase
         return Ok(new ArtistSearchResponse { Artists = matches });
     }
 
-    /// <summary>
-    /// Check if a file is a duplicate based on its hash (pre-upload check).
-    /// </summary>
     [HttpPost("check_duplicate")]
-    [RequestSizeLimit(52_428_800)] // 50MB
+    [RequestSizeLimit(52_428_800)]
     public async Task<ActionResult<CheckDuplicateResponse>> CheckDuplicate(IFormFile file)
     {
         if (file == null || file.Length == 0)
-        {
             return BadRequest(new { success = false, error = "Nenhum arquivo enviado" });
-        }
 
         if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
-        {
             return BadRequest(new { success = false, error = "Arquivo deve ser PDF" });
-        }
 
         try
         {
-            // Compute hash from stream
             string fileHash;
             using (var stream = file.OpenReadStream())
-            using (var md5 = System.Security.Cryptography.MD5.Create())
             {
-                var hashBytes = md5.ComputeHash(stream);
-                fileHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+                fileHash = _fileService.ComputeFileHash(stream);
             }
 
-            // Check if file exists with this hash
             var existingFile = await _context.PdfFiles
+                .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+                .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
                 .FirstOrDefaultAsync(f => f.FileHash == fileHash);
 
             if (existingFile != null)
@@ -168,8 +124,8 @@ public class SearchController : ControllerBase
                         Id = existingFile.Id,
                         Filename = existingFile.Filename,
                         SongName = existingFile.SongName,
-                        Artist = existingFile.Artist,
-                        Category = existingFile.Category,
+                        Artist = existingFile.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault(),
+                        Category = existingFile.FileCategories.Select(fc => fc.Category.Name).FirstOrDefault(),
                         UploadDate = existingFile.UploadDate
                     }
                 });

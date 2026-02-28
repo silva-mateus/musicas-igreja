@@ -20,12 +20,46 @@ export interface LoginRequest {
     password: string
 }
 
+// Workspace types
+export interface Workspace {
+    id: number
+    name: string
+    slug: string
+    description?: string
+    icon?: string
+    color?: string
+    is_active: boolean
+    sort_order: number
+    created_date: string
+    music_count: number
+    category_count: number
+    list_count: number
+    filter_group_count: number
+}
+
+// Custom Filter types
+export interface CustomFilterGroup {
+    id: number
+    name: string
+    slug: string
+    sort_order: number
+    values: CustomFilterValue[]
+}
+
+export interface CustomFilterValue {
+    id: number
+    name: string
+    slug: string
+    sort_order: number
+    file_count: number
+}
+
 // Dashboard types
 export interface DashboardStats {
     total_musics: number
     total_lists: number
     total_categories: number
-    total_liturgical_times: number
+    total_filter_groups: number
     total_artists: number
     total_file_size_mb: number
     total_pages: number
@@ -48,10 +82,9 @@ export interface MusicFile {
     filename: string
     title?: string
     artist?: string
-    category?: string // Primary category (for backward compatibility)
-    liturgical_time?: string // Primary liturgical time (for backward compatibility)
-    categories?: string[] // All categories
-    liturgical_times?: string[] // All liturgical times
+    category?: string
+    categories?: string[]
+    custom_filters?: Record<string, { group_name: string; values: string[] }>
     musical_key?: string
     file_size: number
     pages?: number
@@ -92,7 +125,7 @@ export interface SearchFilters {
     title?: string
     artist?: string | string[]
     category?: string | string[]
-    liturgical_time?: string | string[]
+    custom_filters?: Record<string, string[]>
     musical_key?: string
     has_youtube?: boolean
 }

@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { dashboardApi, categoriesApi, liturgicalTimesApi } from '@/lib/api'
+import { dashboardApi, categoriesApi, customFiltersApi } from '@/lib/api'
 
-// Query keys for cache management
 export const dashboardKeys = {
     all: ['dashboard'] as const,
     stats: () => [...dashboardKeys.all, 'stats'] as const,
@@ -14,56 +13,50 @@ export const dashboardKeys = {
 export const filtersKeys = {
     all: ['filters'] as const,
     categories: () => [...filtersKeys.all, 'categories'] as const,
-    liturgicalTimes: () => [...filtersKeys.all, 'liturgicalTimes'] as const,
+    customFilterGroups: () => [...filtersKeys.all, 'customFilterGroups'] as const,
 }
 
-// Hook for fetching dashboard stats
 export function useDashboardStats() {
     return useQuery({
         queryKey: dashboardKeys.stats(),
         queryFn: () => dashboardApi.getStats(),
-        staleTime: 2 * 60 * 1000, // 2 minutes
+        staleTime: 2 * 60 * 1000,
     })
 }
 
-// Hook for fetching top artists
 export function useTopArtists() {
     return useQuery({
         queryKey: dashboardKeys.topArtists(),
         queryFn: () => dashboardApi.getTopArtists(),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-// Hook for fetching top songs by category
 export function useTopSongsByCategory(category: string) {
     return useQuery({
         queryKey: dashboardKeys.topSongsByCategory(category),
         queryFn: () => dashboardApi.getTopSongsByCategory(category),
         enabled: !!category,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-// Hook for fetching uploads timeline
 export function useUploadsTimeline() {
     return useQuery({
         queryKey: dashboardKeys.uploadsTimeline(),
         queryFn: () => dashboardApi.getUploadsTimeline(),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-// Hook for fetching artists list
 export function useArtists() {
     return useQuery({
         queryKey: dashboardKeys.artists(),
         queryFn: () => dashboardApi.getArtists(),
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-// Hook for fetching categories
 export function useCategories() {
     return useQuery({
         queryKey: filtersKeys.categories(),
@@ -71,18 +64,17 @@ export function useCategories() {
             const result = await categoriesApi.getCategories()
             return result.data
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }
 
-// Hook for fetching liturgical times
-export function useLiturgicalTimes() {
+export function useCustomFilterGroups() {
     return useQuery({
-        queryKey: filtersKeys.liturgicalTimes(),
+        queryKey: filtersKeys.customFilterGroups(),
         queryFn: async () => {
-            const result = await liturgicalTimesApi.getLiturgicalTimes()
-            return result.data
+            const result = await customFiltersApi.getGroups()
+            return result.groups
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     })
 }

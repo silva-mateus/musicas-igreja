@@ -10,5 +10,8 @@ public class Category : ISlugEntity
     public string? Description { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
+    public int WorkspaceId { get; set; }
+    public Workspace Workspace { get; set; } = null!;
+
     public ICollection<FileCategory> FileCategories { get; set; } = new List<FileCategory>();
 }

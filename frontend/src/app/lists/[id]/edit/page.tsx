@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@core/
 import { Popover, PopoverContent, PopoverTrigger } from '@core/components/ui/popover'
 import { ScrollArea } from '@core/components/ui/scroll-area'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { listsApi, musicApi, handleApiError } from '@/lib/api'
+import { listsApi, musicApi, handleApiError, getActiveWorkspaceId } from '@/lib/api'
 import type { MusicList, MusicFile } from '@/types'
 import {
     List,
@@ -52,7 +52,6 @@ import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructio
 
 interface FilterSuggestions {
     categories: string[]
-    liturgical_times: string[]
     artists: string[]
     musical_keys: string[]
 }
@@ -89,20 +88,16 @@ export default function EditListPage() {
     // Search & filters
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-    const [selectedLiturgicalTimes, setSelectedLiturgicalTimes] = useState<string[]>([])
     const [selectedArtists, setSelectedArtists] = useState<string[]>([])
     const [searchResults, setSearchResults] = useState<MusicFile[]>([])
     const [isSearching, setIsSearching] = useState(false)
     const [suggestions, setSuggestions] = useState<FilterSuggestions>({
         categories: [],
-        liturgical_times: [],
         artists: [],
         musical_keys: []
     })
-    // Filtered options based on current search results
     const [filteredOptions, setFilteredOptions] = useState<FilterSuggestions>({
         categories: [],
-        liturgical_times: [],
         artists: [],
         musical_keys: []
     })
@@ -124,7 +119,7 @@ export default function EditListPage() {
 
     const loadSuggestions = async () => {
         try {
-            const response = await fetch('/api/filters/suggestions')
+            const response = await fetch(`/api/filters/suggestions?workspace_id=${getActiveWorkspaceId()}`)
             const data = await response.json()
             setSuggestions(data)
         } catch (error) {
@@ -145,10 +140,6 @@ export default function EditListPage() {
                 filters.category = selectedCategories
             }
 
-            if (selectedLiturgicalTimes.length > 0) {
-                filters.liturgical_time = selectedLiturgicalTimes
-            }
-
             if (selectedArtists.length > 0) {
                 filters.artist = selectedArtists
             }
@@ -167,44 +158,30 @@ export default function EditListPage() {
 
     // Update available filter options based on search results
     const updateFilteredOptions = (results: MusicFile[]) => {
-        const hasActiveFilters = selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0
+        const hasActiveFilters = selectedCategories.length > 0 || selectedArtists.length > 0
 
         if (!hasActiveFilters) {
-            // No filters active, show all options
             setFilteredOptions(suggestions)
             return
         }
 
-        // Extract unique values from results
         const categories = new Set<string>()
-        const liturgicalTimes = new Set<string>()
         const artists = new Set<string>()
 
         results.forEach(music => {
-            // Categories
             if (music.categories && music.categories.length > 0) {
                 music.categories.forEach(cat => cat && categories.add(cat))
             } else if (music.category) {
                 categories.add(music.category)
             }
 
-            // Liturgical times
-            if (music.liturgical_times && music.liturgical_times.length > 0) {
-                music.liturgical_times.forEach(time => time && liturgicalTimes.add(time))
-            } else if (music.liturgical_time) {
-                liturgicalTimes.add(music.liturgical_time)
-            }
-
-            // Artists
             if (music.artist) {
                 artists.add(music.artist)
             }
         })
 
-        // Keep selected values + available values from results
         setFilteredOptions({
             categories: Array.from(new Set([...selectedCategories, ...Array.from(categories)])).filter(c => suggestions.categories.includes(c)),
-            liturgical_times: Array.from(new Set([...selectedLiturgicalTimes, ...Array.from(liturgicalTimes)])).filter(t => suggestions.liturgical_times.includes(t)),
             artists: Array.from(new Set([...selectedArtists, ...Array.from(artists)])).filter(a => suggestions.artists.includes(a)),
             musical_keys: suggestions.musical_keys
         })
@@ -227,7 +204,7 @@ export default function EditListPage() {
             searchMusic()
         }, 300)
         return () => clearTimeout(timeoutId)
-    }, [searchTerm, selectedCategories, selectedLiturgicalTimes, selectedArtists])
+    }, [searchTerm, selectedCategories, selectedArtists])
 
     const handleSave = async () => {
         if (!list || !name.trim()) return
@@ -680,8 +657,14 @@ export default function EditListPage() {
                                                                                 ) : '-'}
                                                                             </td>
                                                                             <td className="py-2 px-2 hidden lg:table-cell min-w-[140px] max-w-[220px]">
-                                                                                {item.music?.liturgical_time ? (
-                                                                                    <Badge variant="outline" className="text-xs">{item.music.liturgical_time}</Badge>
+                                                                                {item.music?.custom_filters && Object.keys(item.music.custom_filters).length > 0 ? (
+                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                        {Object.values(item.music.custom_filters).flatMap((vals: any, gIdx: number) =>
+                                                                                            (Array.isArray(vals) ? vals : vals.values || []).map((v: string, idx: number) => (
+                                                                                                <Badge key={`${gIdx}-${idx}`} variant="outline" className="text-xs">{v}</Badge>
+                                                                                            ))
+                                                                                        )}
+                                                                                    </div>
                                                                                 ) : '-'}
                                                                             </td>
                                                                             <td className="py-2 px-1 text-center">
@@ -844,7 +827,7 @@ export default function EditListPage() {
                                             </div>
                                             <ScrollArea className="h-[200px]">
                                                 <div className="p-2 space-y-1">
-                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
+                                                    {(selectedCategories.length > 0 || selectedArtists.length > 0 
                                                         ? filteredOptions.categories 
                                                         : suggestions.categories
                                                     ).filter(c => c && c.trim()).map((category) => (
@@ -905,7 +888,7 @@ export default function EditListPage() {
                                             </div>
                                             <ScrollArea className="h-[200px]">
                                                 <div className="p-2 space-y-1">
-                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
+                                                    {(selectedCategories.length > 0 || selectedArtists.length > 0 
                                                         ? filteredOptions.artists 
                                                         : suggestions.artists
                                                     ).filter(a => a && a.trim()).map((artist) => (
@@ -933,67 +916,6 @@ export default function EditListPage() {
                                         </PopoverContent>
                                     </Popover>
 
-                                    {/* Dropdown de Tempos Litúrgicos */}
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="justify-between min-w-[180px]">
-                                                <span className="flex items-center gap-2">
-                                                    <Filter className="h-4 w-4" />
-                                                    T. Litúrgicos
-                                                </span>
-                                                {selectedLiturgicalTimes.length > 0 && (
-                                                    <Badge variant="secondary" className="ml-2 h-5 px-1.5">
-                                                        {selectedLiturgicalTimes.length}
-                                                    </Badge>
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-56 p-0" align="start">
-                                            <div className="p-2 border-b">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-sm font-medium">Tempos Litúrgicos</span>
-                                                    {selectedLiturgicalTimes.length > 0 && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-6 px-2 text-xs"
-                                                            onClick={() => setSelectedLiturgicalTimes([])}
-                                                        >
-                                                            Limpar
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <ScrollArea className="h-[200px]">
-                                                <div className="p-2 space-y-1">
-                                                    {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0 
-                                                        ? filteredOptions.liturgical_times 
-                                                        : suggestions.liturgical_times
-                                                    ).filter(t => t && t.trim()).map((time) => (
-                                                        <div
-                                                            key={time}
-                                                            className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
-                                                            onClick={() => {
-                                                                if (selectedLiturgicalTimes.includes(time)) {
-                                                                    setSelectedLiturgicalTimes(selectedLiturgicalTimes.filter(t => t !== time))
-                                                                } else {
-                                                                    setSelectedLiturgicalTimes([...selectedLiturgicalTimes, time])
-                                                                }
-                                                            }}
-                                                        >
-                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedLiturgicalTimes.includes(time) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
-                                                                {selectedLiturgicalTimes.includes(time) && (
-                                                                    <Check className="h-3 w-3 text-primary-foreground" />
-                                                                )}
-                                                            </div>
-                                                            <span className="text-sm">{time}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </PopoverContent>
-                                    </Popover>
-
                                     {/* Indicador de busca */}
                                     {isSearching && (
                                         <div className="flex items-center">
@@ -1003,7 +925,7 @@ export default function EditListPage() {
                                 </div>
 
                                 {/* Filtros ativos */}
-                                {(selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0 || selectedArtists.length > 0) && (
+                                {(selectedCategories.length > 0 || selectedArtists.length > 0) && (
                                     <div className="flex flex-wrap gap-2">
                                         {selectedCategories.map((cat) => (
                                             <Badge key={cat} variant="secondary" className="gap-1 pr-1">
@@ -1032,26 +954,12 @@ export default function EditListPage() {
                                                 </Button>
                                             </Badge>
                                         ))}
-                                        {selectedLiturgicalTimes.map((time) => (
-                                            <Badge key={time} variant="outline" className="gap-1 pr-1">
-                                                {time}
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-4 w-4 ml-1 hover:bg-transparent"
-                                                    onClick={() => setSelectedLiturgicalTimes(selectedLiturgicalTimes.filter(t => t !== time))}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            </Badge>
-                                        ))}
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             className="h-6 px-2 text-xs text-muted-foreground"
                                             onClick={() => {
                                                 setSelectedCategories([])
-                                                setSelectedLiturgicalTimes([])
                                                 setSelectedArtists([])
                                             }}
                                         >
@@ -1070,7 +978,7 @@ export default function EditListPage() {
                                                             <th className="text-left py-2 px-2">Música</th>
                                                             <th className="text-left py-2 px-2 hidden md:table-cell">Artista</th>
                                                             <th className="text-left py-2 px-2 hidden lg:table-cell">Categoria</th>
-                                                            <th className="text-left py-2 px-2 hidden lg:table-cell">T. Litúrgico</th>
+                                                            <th className="text-left py-2 px-2 hidden lg:table-cell">Filtros</th>
                                                             <th className="text-center py-2 px-1 w-14">Tom</th>
                                                             <th className="text-right py-2 px-1 w-32">Ações</th>
                                                         </tr>
@@ -1091,8 +999,14 @@ export default function EditListPage() {
                                                                     ) : '-'}
                                                                 </td>
                                                                 <td className="py-2 px-2 hidden lg:table-cell">
-                                                                    {music.liturgical_time ? (
-                                                                        <Badge variant="outline" className="text-xs">{music.liturgical_time}</Badge>
+                                                                    {music.custom_filters && Object.keys(music.custom_filters).length > 0 ? (
+                                                                        <div className="flex flex-wrap gap-1">
+                                                                            {Object.entries(music.custom_filters).flatMap(([slug, group]) =>
+                                                                                group.values.map((v, idx) => (
+                                                                                    <Badge key={`${slug}-${idx}`} variant="outline" className="text-xs">{v}</Badge>
+                                                                                ))
+                                                                            )}
+                                                                        </div>
                                                                     ) : '-'}
                                                                 </td>
                                                                 <td className="py-2 px-1 text-center">
@@ -1151,7 +1065,7 @@ export default function EditListPage() {
                                             <div className="text-center py-8 text-muted-foreground">
                                                 <Music2 className="h-8 w-8 mx-auto mb-2" />
                                                 <p>
-                                                    {searchTerm || selectedCategories.length > 0 || selectedLiturgicalTimes.length > 0
+                                                    {searchTerm || selectedCategories.length > 0
                                                         ? 'Nenhuma música encontrada com os filtros aplicados'
                                                         : 'Use os filtros para buscar músicas'
                                                     }

@@ -8,11 +8,12 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@core/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@core/components/ui/dropdown-menu'
-import { Music, BarChart3, Upload, List, Settings, Menu, Search, FileMusic, FolderOpen, LogOut, LogIn, Users, User, ChevronDown, ChevronRight, Shield, Bell, AlertCircle, AlertTriangle, Info, Settings2 } from 'lucide-react'
+import { Music, BarChart3, Upload, List, Settings, Menu, Search, FileMusic, FolderOpen, LogOut, LogIn, Users, User, ChevronDown, ChevronRight, Shield, Bell, AlertCircle, AlertTriangle, Info, Settings2, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@core/contexts/auth-context'
 import { LoginModal } from '@/components/auth/login-modal'
 import { ProfileModal } from '@/components/auth/profile-modal'
+import { WorkspaceSwitcher } from '@/components/layout/workspace-switcher'
 import { useServerEvents } from '@core/hooks/use-server-events'
 import type { SystemEvent } from '@/types'
 
@@ -28,7 +29,7 @@ interface NavigationItem {
 }
 
 const navigation: NavigationItem[] = [
-    { title: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+    { title: 'Dashboard', href: '/dashboard', icon: BarChart3, requiresAuth: true },
     { title: 'Músicas', href: '/music', icon: Music },
     { title: 'Listas', href: '/lists', icon: List },
     { title: 'Upload', href: '/upload', icon: Upload, requiresUpload: true },
@@ -41,6 +42,7 @@ const navigation: NavigationItem[] = [
             { title: 'Gerenciar Entidades', href: '/settings/manage', icon: FolderOpen, requiresEdit: true },
             { title: 'Monitoramento', href: '/settings/monitoring', icon: Bell, requiresAdmin: true },
             { title: 'Config. de Alertas', href: '/settings/alert-configs', icon: Settings, requiresAdmin: true },
+            { title: 'Workspaces', href: '/settings/workspaces', icon: Layers, requiresAdmin: true },
             { title: 'Usuários', href: '/settings/users', icon: Users, requiresAdmin: true },
             { title: 'Roles', href: '/settings/roles', icon: Shield, requiresAdmin: true },
             { title: 'Sistema', href: '/settings/system', icon: Settings, requiresAdmin: true },
@@ -165,8 +167,11 @@ export function MainLayout({ children }: MainLayoutProps) {
             <div className="flex h-16 items-center border-b border-border px-4 sm:px-6">
                 <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
                     <FileMusic className="h-6 w-6 text-primary" />
-                    <span className="text-lg">Músicas Igreja</span>
+                    <span className="text-lg">Cifras Networkmat</span>
                 </Link>
+            </div>
+            <div className="border-b border-border px-2 py-2">
+                <WorkspaceSwitcher />
             </div>
             <nav className="flex-1 space-y-1 px-3 py-4">
                 {filteredNavigation.map((item) => {

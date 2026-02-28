@@ -47,13 +47,11 @@ interface DiscoveryResult {
     discovered: {
         artists: string[]
         categories: string[]
-        liturgical_times: string[]
         musical_keys: string[]
     }
     registered: {
         artists: string[]
         categories: string[]
-        liturgical_times: string[]
         musical_keys: string[]
     }
     stats: {
@@ -80,11 +78,9 @@ export default function SystemSettingsPage() {
     const [selectedEntities, setSelectedEntities] = useState<{
         artists: string[]
         categories: string[]
-        liturgical_times: string[]
     }>({
         artists: [],
-        categories: [],
-        liturgical_times: []
+        categories: []
     })
 
     const handleVerifyPdfs = async () => {
@@ -176,11 +172,10 @@ export default function SystemSettingsPage() {
                 setSelectedEntities({
                     artists: data.data.discovered.artists,
                     categories: data.data.discovered.categories,
-                    liturgical_times: data.data.discovered.liturgical_times
                 })
                 toast({
                     title: "Descoberta concluída",
-                    description: `Encontrados ${data.data.discovered.artists.length} artistas, ${data.data.discovered.categories.length} categorias e ${data.data.discovered.liturgical_times.length} tempos litúrgicos não cadastrados.`,
+                    description: `Encontrados ${data.data.discovered.artists.length} artistas e ${data.data.discovered.categories.length} categorias não cadastrados.`,
                 })
             } else {
                 throw new Error(data.error || 'Erro na descoberta')
@@ -435,7 +430,7 @@ export default function SystemSettingsPage() {
                             Descoberta de Entidades
                         </CardTitle>
                         <CardDescription>
-                            Descubra e cadastre automaticamente artistas, categorias e tempos litúrgicos presentes nos arquivos
+                            Descubra e cadastre automaticamente artistas e categorias presentes nos arquivos
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -500,8 +495,7 @@ export default function SystemSettingsPage() {
                                     </div>
 
                                     {(discoveryResult.discovered.artists.length > 0 ||
-                                        discoveryResult.discovered.categories.length > 0 ||
-                                        discoveryResult.discovered.liturgical_times.length > 0) && (
+                                        discoveryResult.discovered.categories.length > 0) && (
                                             <Button
                                                 onClick={handleRegisterEntities}
                                                 disabled={isRegistering || Object.values(selectedEntities).every(arr => arr.length === 0)}
@@ -591,47 +585,9 @@ export default function SystemSettingsPage() {
                                     </div>
                                 )}
 
-                                {/* Liturgical Times Section */}
-                                {discoveryResult.discovered.liturgical_times.length > 0 && (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <Label className="flex items-center gap-2">
-                                                <Music className="h-4 w-4" />
-                                                Tempos Litúrgicos Descobertos ({discoveryResult.discovered.liturgical_times.length})
-                                            </Label>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleSelectAllEntities('liturgical_times')}
-                                            >
-                                                {selectedEntities.liturgical_times.length === discoveryResult.discovered.liturgical_times.length
-                                                    ? 'Desselecionar todos'
-                                                    : 'Selecionar todos'}
-                                            </Button>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-                                            {discoveryResult.discovered.liturgical_times.map((time) => (
-                                                <div
-                                                    key={time}
-                                                    className="flex items-center gap-2 p-2 border rounded hover:bg-muted/50"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedEntities.liturgical_times.includes(time)}
-                                                        onChange={() => handleEntitySelect('liturgical_times', time)}
-                                                        className="rounded"
-                                                    />
-                                                    <span className="text-sm truncate">{time}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
                                 {/* Summary */}
                                 {(discoveryResult.discovered.artists.length === 0 &&
-                                    discoveryResult.discovered.categories.length === 0 &&
-                                    discoveryResult.discovered.liturgical_times.length === 0) && (
+                                    discoveryResult.discovered.categories.length === 0) && (
                                         <div className="text-center py-4 text-muted-foreground">
                                             <CheckCircle className="h-8 w-8 mx-auto mb-2" />
                                             <p>Todas as entidades já estão cadastradas!</p>
@@ -656,7 +612,7 @@ export default function SystemSettingsPage() {
                                 <span className="font-medium">Versão:</span> 3.0.0
                             </div>
                             <div>
-                                <span className="font-medium">Banco de Dados:</span> MySQL
+                                <span className="font-medium">Banco de Dados:</span> PostgreSQL
                             </div>
                             <div>
                                 <span className="font-medium">Estrutura:</span> /organized

@@ -196,17 +196,13 @@ export default function MusicDetailsPage() {
                                     </Badge>
                                 ) : null}
 
-                                {music.liturgical_times && music.liturgical_times.length > 0 ? (
-                                    music.liturgical_times.map((time, idx) => (
-                                        <Badge key={idx} variant="outline" className="text-xs sm:text-sm">
-                                            <Calendar className="h-3 w-3 mr-1 shrink-0" />{time}
+                                {music.custom_filters && Object.entries(music.custom_filters).map(([slug, group]) =>
+                                    group.values.map((val, idx) => (
+                                        <Badge key={`${slug}-${idx}`} variant="outline" className="text-xs sm:text-sm">
+                                            <Calendar className="h-3 w-3 mr-1 shrink-0" />{val}
                                         </Badge>
                                     ))
-                                ) : music.liturgical_time ? (
-                                    <Badge variant="outline" className="text-xs sm:text-sm">
-                                        <Calendar className="h-3 w-3 mr-1 shrink-0" />{music.liturgical_time}
-                                    </Badge>
-                                ) : null}
+                                )}
 
                                 {music.musical_key && (
                                     <Badge variant="outline" className="text-xs sm:text-sm">

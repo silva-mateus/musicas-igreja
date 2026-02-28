@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 import { MainLayout } from '@/components/layout/main-layout'
 import { Button } from '@core/components/ui/button'
@@ -11,20 +11,18 @@ import { dashboardApi, handleApiError } from '@/lib/api'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { DashboardCharts } from '@/components/dashboard/charts'
 import { QuickActions } from '@/components/dashboard/quick-actions'
+import { useWorkspace } from '@/contexts/workspace-context'
 import type { DashboardStats } from '@/types'
 import { BarChart3, RefreshCw } from 'lucide-react'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 
 export default function DashboardPage() {
+    const { activeWorkspace } = useWorkspace()
     const [stats, setStats] = useState<DashboardStats | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState('')
 
-    useEffect(() => {
-        loadStats()
-    }, [])
-
-    const loadStats = async () => {
+    const loadStats = useCallback(async () => {
         try {
             setIsLoading(true)
             setError('')
@@ -35,7 +33,11 @@ export default function DashboardPage() {
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        loadStats()
+    }, [activeWorkspace?.id, loadStats])
 
     if (isLoading) {
         return (
@@ -59,7 +61,7 @@ export default function DashboardPage() {
                 <PageHeader
                     icon={BarChart3}
                     title="Dashboard"
-                    description="Visão geral do sistema de músicas da igreja"
+                    description="Visão geral das suas cifras e partituras"
                 >
                     <div className="flex items-center gap-2">
                         <InstructionsModal

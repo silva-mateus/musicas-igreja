@@ -13,8 +13,8 @@ public class DashboardStatsDto
     [JsonPropertyName("total_categories")]
     public int TotalCategories { get; set; }
     
-    [JsonPropertyName("total_liturgical_times")]
-    public int TotalLiturgicalTimes { get; set; }
+    [JsonPropertyName("total_filter_groups")]
+    public int TotalFilterGroups { get; set; }
     
     [JsonPropertyName("total_artists")]
     public int TotalArtists { get; set; }
@@ -56,17 +56,58 @@ public class MostPopularCategoryDto
     public int Count { get; set; }
 }
 
-public record CategoryDto(
-    int Id,
-    string Name,
-    string? Description
-);
+public class WorkspaceDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string? Icon { get; set; }
+    public string? Color { get; set; }
+    public bool IsActive { get; set; }
+    public int SortOrder { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public int MusicCount { get; set; }
+    public int CategoryCount { get; set; }
+    public int ListCount { get; set; }
+    public int FilterGroupCount { get; set; }
+}
 
-public record LiturgicalTimeDto(
-    int Id,
-    string Name,
-    string? Description
-);
+public record CreateWorkspaceDto
+{
+    public string Name { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public string? Icon { get; init; }
+    public string? Color { get; init; }
+}
+
+public record UpdateWorkspaceDto
+{
+    public string? Name { get; init; }
+    public string? Description { get; init; }
+    public string? Icon { get; init; }
+    public string? Color { get; init; }
+    public bool? IsActive { get; init; }
+    public int? SortOrder { get; init; }
+}
+
+public class CustomFilterGroupDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public List<CustomFilterValueDto> Values { get; set; } = new();
+}
+
+public class CustomFilterValueDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+    public int FileCount { get; set; }
+}
 
 public record ArtistDto(
     int Id,

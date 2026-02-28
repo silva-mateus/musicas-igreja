@@ -7,8 +7,8 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-    title: 'Sistema de Músicas da Igreja',
-    description: 'Gerenciamento de partituras e listas musicais',
+    title: 'Cifras Networkmat',
+    description: 'Gerenciamento de cifras, partituras e listas musicais',
     icons: {
         icon: [
             { url: '/favicon.ico', type: 'image/x-icon' },
@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="pt-BR" className="dark">
-            <body className={`${inter.className} dark`}>
+            <body className={`${inter.className} dark`} suppressHydrationWarning>
                 <ClientWrapper>
                     <div className="min-h-screen bg-background text-foreground">
                         {children}

@@ -12,6 +12,7 @@ import { FileText, Edit3, Check, X, Plus, AlertTriangle, Loader2, Copy, CheckCir
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@core/components/ui/tooltip'
 import { useToast } from '@core/hooks/use-toast'
 import { formatFileSize } from '@/lib/utils'
+import { getActiveWorkspaceId } from '@/lib/api'
 import { MultiSelect } from '@/components/ui/multi-select'
 
 interface FileMetadata {
@@ -19,15 +20,13 @@ interface FileMetadata {
     title: string
     artist: string
     new_artist?: string
-    category: string // Legacy single category
-    liturgical_time: string // Legacy single liturgical time
-    categories: string[] // Multiple categories
-    liturgical_times: string[] // Multiple liturgical times
+    category: string
+    categories: string[]
+    custom_filters: Record<string, string[]>
     musical_key: string
     youtube_link: string
     observations: string
     new_categories?: string[]
-    new_liturgical_times?: string[]
     duplicateStatus?: 'checking' | 'unique' | 'duplicate' | 'error'
     duplicateMessage?: string
 }
@@ -38,9 +37,16 @@ interface UploadMetadataEditorProps {
     onRemoveFile: (index: number) => void
 }
 
+interface CustomFilterGroupOption {
+    id: number
+    name: string
+    slug: string
+    values: Array<{ name: string; slug: string }>
+}
+
 interface FilterSuggestions {
     categories: string[]
-    liturgical_times: string[]
+    customFilterGroups: CustomFilterGroupOption[]
     artists: string[]
     musical_keys: string[]
 }
@@ -56,24 +62,21 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
     const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
     const [suggestions, setSuggestions] = useState<FilterSuggestions>({
         categories: [],
-        liturgical_times: [],
+        customFilterGroups: [],
         artists: [],
         musical_keys: DEFAULT_MUSICAL_KEYS
     })
     const [newCategoryInputs, setNewCategoryInputs] = useState<{ [key: number]: string }>({})
-    const [newLiturgicalInputs, setNewLiturgicalInputs] = useState<{ [key: number]: string }>({})
     const [showNewCategoryInput, setShowNewCategoryInput] = useState<Set<number>>(new Set())
-    const [showNewLiturgicalInput, setShowNewLiturgicalInput] = useState<Set<number>>(new Set())
 
-    // Estado para "Aplicar a Todos" - valores pendentes (não aplicados imediatamente)
     const [batchValues, setBatchValues] = useState<{
         categories: string[]
-        liturgical_times: string[]
+        custom_filters: Record<string, string[]>
         artist: string
         musical_key: string
     }>({
         categories: [],
-        liturgical_times: [],
+        custom_filters: {},
         artist: '',
         musical_key: ''
     })
@@ -82,11 +85,16 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
     useEffect(() => {
         const loadSuggestions = async () => {
             try {
-                const response = await fetch('/api/filters/suggestions')
+                const response = await fetch(`/api/filters/suggestions?workspace_id=${getActiveWorkspaceId()}`)
                 const data = await response.json()
                 setSuggestions({
                     categories: data.categories || [],
-                    liturgical_times: data.liturgical_times || [],
+                    customFilterGroups: (data.custom_filter_groups || []).map((g: any) => ({
+                        id: g.id,
+                        name: g.name,
+                        slug: g.slug,
+                        values: (g.values || []).map((v: any) => ({ name: v.name, slug: v.slug })),
+                    })),
                     artists: data.artists || [],
                     musical_keys: data.musical_keys || DEFAULT_MUSICAL_KEYS
                 })
@@ -123,14 +131,12 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                     artist: '',
                     new_artist: '',
                     category: '',
-                    liturgical_time: '',
                     musical_key: '',
                     youtube_link: '',
                     observations: '',
                     categories: [],
-                    liturgical_times: [],
+                    custom_filters: {},
                     new_categories: [],
-                    new_liturgical_times: [],
                     duplicateStatus: 'checking' as const,
                     duplicateMessage: ''
                 }
@@ -143,9 +149,7 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         if (files.length === 0) {
             setExpandedItems(new Set())
             setNewCategoryInputs({})
-            setNewLiturgicalInputs({})
             setShowNewCategoryInput(new Set())
-            setShowNewLiturgicalInput(new Set())
         }
     }, [files])
 
@@ -238,36 +242,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         })
     }
 
-    const addNewLiturgicalTime = (index: number) => {
-        const newTime = newLiturgicalInputs[index]?.trim()
-        if (!newTime || suggestions.liturgical_times.includes(newTime)) return
-
-        // Adicionar à lista de sugestões localmente
-        setSuggestions(prev => ({
-            ...prev,
-            liturgical_times: [...prev.liturgical_times, newTime].sort()
-        }))
-
-        // Adicionar à lista de tempos litúrgicos do item
-        setMetadata(prev => prev.map((item, i) =>
-            i === index
-                ? {
-                    ...item,
-                    liturgical_times: [...item.liturgical_times, newTime],
-                    new_liturgical_times: [...(item.new_liturgical_times || []), newTime]
-                }
-                : item
-        ))
-
-        // Limpar input e esconder
-        setNewLiturgicalInputs(prev => ({ ...prev, [index]: '' }))
-        setShowNewLiturgicalInput(prev => {
-            const newSet = new Set(prev)
-            newSet.delete(index)
-            return newSet
-        })
-    }
-
     const toggleExpanded = (index: number) => {
         setExpandedItems(prev => {
             const newSet = new Set(prev)
@@ -304,9 +278,13 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                 updated.categories = Array.from(new Set([...item.categories, ...batchValues.categories]))
             }
             
-            // Adicionar tempos litúrgicos (merge, não substituir)
-            if (batchValues.liturgical_times.length > 0) {
-                updated.liturgical_times = Array.from(new Set([...item.liturgical_times, ...batchValues.liturgical_times]))
+            // Merge custom filters
+            if (Object.keys(batchValues.custom_filters).length > 0) {
+                const merged = { ...item.custom_filters }
+                for (const [groupSlug, values] of Object.entries(batchValues.custom_filters)) {
+                    merged[groupSlug] = Array.from(new Set([...(merged[groupSlug] || []), ...values]))
+                }
+                updated.custom_filters = merged
             }
             
             // Artista (substituir apenas se definido)
@@ -323,9 +301,10 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         }))
         
         // Feedback visual
+        const totalFilterValues = Object.values(batchValues.custom_filters).reduce((sum, v) => sum + v.length, 0)
         const appliedCount = [
             batchValues.categories.length > 0 ? `${batchValues.categories.length} categoria(s)` : null,
-            batchValues.liturgical_times.length > 0 ? `${batchValues.liturgical_times.length} tempo(s)` : null,
+            totalFilterValues > 0 ? `${totalFilterValues} filtro(s)` : null,
             batchValues.artist ? 'artista' : null,
             batchValues.musical_key ? 'tom' : null
         ].filter(Boolean).join(', ')
@@ -338,15 +317,14 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         // Limpar valores após aplicar
         setBatchValues({
             categories: [],
-            liturgical_times: [],
+            custom_filters: {},
             artist: '',
             musical_key: ''
         })
     }
 
-    // Verificar se há algo para aplicar
     const hasBatchValues = batchValues.categories.length > 0 || 
-                           batchValues.liturgical_times.length > 0 || 
+                           Object.values(batchValues.custom_filters).some(v => v.length > 0) || 
                            batchValues.artist.trim() !== '' || 
                            batchValues.musical_key !== ''
 
@@ -356,16 +334,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
             setSuggestions(prev => ({
                 ...prev,
                 categories: [...prev.categories, newCategory].sort()
-            }))
-        }
-    }
-
-    // Criar novo tempo litúrgico nas sugestões
-    const handleCreateLiturgicalTime = (newTime: string) => {
-        if (!suggestions.liturgical_times.includes(newTime)) {
-            setSuggestions(prev => ({
-                ...prev,
-                liturgical_times: [...prev.liturgical_times, newTime].sort()
             }))
         }
     }
@@ -399,7 +367,7 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                     size="sm"
                                     onClick={() => setBatchValues({
                                         categories: [],
-                                        liturgical_times: [],
+                                        custom_filters: {},
                                         artist: '',
                                         musical_key: ''
                                     })}
@@ -446,24 +414,32 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                 placeholder="Selecionar categorias..."
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-1 text-xs">
-                                Tempos Litúrgicos
-                                {batchValues.liturgical_times.length > 0 && (
-                                    <Badge variant="default" className="text-xs ml-1 bg-primary/80">
-                                        +{batchValues.liturgical_times.length}
-                                    </Badge>
-                                )}
-                            </Label>
-                            <MultiSelect
-                                options={suggestions.liturgical_times.filter(t => t && t.trim())}
-                                value={batchValues.liturgical_times}
-                                onChange={(values) => setBatchValues(prev => ({ ...prev, liturgical_times: values }))}
-                                onCreateNew={handleCreateLiturgicalTime}
-                                createLabel="Criar tempo"
-                                placeholder="Selecionar tempos..."
-                            />
-                        </div>
+                        {suggestions.customFilterGroups.map(group => (
+                            <div key={group.slug} className="space-y-2">
+                                <Label className="flex items-center gap-1 text-xs">
+                                    {group.name}
+                                    {(batchValues.custom_filters[group.slug]?.length || 0) > 0 && (
+                                        <Badge variant="default" className="text-xs ml-1 bg-primary/80">
+                                            +{batchValues.custom_filters[group.slug].length}
+                                        </Badge>
+                                    )}
+                                </Label>
+                                <MultiSelect
+                                    options={group.values.map(v => v.name)}
+                                    value={batchValues.custom_filters[group.slug] || []}
+                                    onChange={(values) => setBatchValues(prev => {
+                                        const newFilters = { ...prev.custom_filters }
+                                        if (values.length > 0) {
+                                            newFilters[group.slug] = values
+                                        } else {
+                                            delete newFilters[group.slug]
+                                        }
+                                        return { ...prev, custom_filters: newFilters }
+                                    })}
+                                    placeholder={`Selecionar ${group.name.toLowerCase()}...`}
+                                />
+                            </div>
+                        ))}
                         <div className="space-y-2">
                             <Label className="flex items-center gap-1 text-xs">
                                 Artista
@@ -525,11 +501,13 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                         📁 {cat}
                                     </Badge>
                                 ))}
-                                {batchValues.liturgical_times.map(time => (
-                                    <Badge key={time} variant="outline" className="text-xs">
-                                        📅 {time}
-                                    </Badge>
-                                ))}
+                                {Object.entries(batchValues.custom_filters).flatMap(([slug, values]) =>
+                                    values.map(val => (
+                                        <Badge key={`${slug}-${val}`} variant="outline" className="text-xs">
+                                            🏷️ {val}
+                                        </Badge>
+                                    ))
+                                )}
                                 {batchValues.artist && (
                                     <Badge variant="outline" className="text-xs">
                                         👤 {batchValues.artist}
@@ -752,71 +730,26 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                         )}
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`liturgical_time-${index}`}>Tempos Litúrgicos</Label>
-                                        <div className="flex gap-2">
+                                    {suggestions.customFilterGroups.map(group => (
+                                        <div key={group.slug} className="space-y-2">
+                                            <Label>{group.name}</Label>
                                             <MultiSelect
-                                                options={suggestions.liturgical_times}
-                                                value={item.liturgical_times}
-                                                onChange={(value) => updateMetadata(index, 'liturgical_times', value)}
-                                                placeholder="Selecionar tempos litúrgicos"
+                                                options={group.values.map(v => v.name)}
+                                                value={item.custom_filters[group.slug] || []}
+                                                onChange={(values) => {
+                                                    const newFilters = { ...item.custom_filters }
+                                                    if (values.length > 0) {
+                                                        newFilters[group.slug] = values
+                                                    } else {
+                                                        delete newFilters[group.slug]
+                                                    }
+                                                    updateMetadata(index, 'custom_filters' as any, newFilters as any)
+                                                }}
+                                                placeholder={`Selecionar ${group.name.toLowerCase()}`}
                                                 className="flex-1"
                                             />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setShowNewLiturgicalInput(prev => {
-                                                        const newSet = new Set(prev)
-                                                        newSet.add(index)
-                                                        return newSet
-                                                    })
-                                                }}
-                                                className="px-2"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
                                         </div>
-                                        {showNewLiturgicalInput.has(index) && (
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="Novo tempo litúrgico"
-                                                    value={newLiturgicalInputs[index] || ''}
-                                                    onChange={(e) => setNewLiturgicalInputs(prev => ({ ...prev, [index]: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault()
-                                                            addNewLiturgicalTime(index)
-                                                        }
-                                                    }}
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    onClick={() => addNewLiturgicalTime(index)}
-                                                    disabled={!newLiturgicalInputs[index]?.trim()}
-                                                >
-                                                    <Check className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setShowNewLiturgicalInput(prev => {
-                                                            const newSet = new Set(prev)
-                                                            newSet.delete(index)
-                                                            return newSet
-                                                        })
-                                                        setNewLiturgicalInputs(prev => ({ ...prev, [index]: '' }))
-                                                    }}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    ))}
 
                                     <div className="space-y-2">
                                         <Label htmlFor={`musical_key-${index}`}>Tonalidade</Label>

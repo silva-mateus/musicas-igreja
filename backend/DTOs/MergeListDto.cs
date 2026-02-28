@@ -30,7 +30,7 @@ public record MergeListFileDto(
     string? SongName,
     string? Artist,
     string? Category,
-    string? LiturgicalTime,
+    Dictionary<string, List<string>> CustomFilters,
     string? MusicalKey,
     string? YoutubeLink
 );
@@ -57,4 +57,3 @@ public record ReorderItemsDto
 {
     public List<int> ItemOrder { get; init; } = new();
 }
-

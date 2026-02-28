@@ -20,7 +20,6 @@ import { useAuth } from '@core/contexts/auth-context'
 import { request, handleApiError } from '@/lib/api'
 import {
     FolderOpen,
-    Clock,
     User,
     Plus,
     Trash2,
@@ -50,7 +49,7 @@ interface EntitySection {
 
 interface DeleteDialogState {
     open: boolean
-    type: 'category' | 'liturgical_time' | 'artist'
+    type: 'category' | 'artist'
     item: EntityItem | null
 }
 
@@ -61,29 +60,24 @@ export default function ManagePage() {
     const canDelete = hasPermission('music:delete')
 
     const [categories, setCategories] = useState<EntitySection>({ items: [], isLoading: false, error: null })
-    const [liturgicalTimes, setLiturgicalTimes] = useState<EntitySection>({ items: [], isLoading: false, error: null })
     const [artists, setArtists] = useState<EntitySection>({ items: [], isLoading: false, error: null })
 
-    // Add dialog
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    const [addingType, setAddingType] = useState<'category' | 'liturgical_time' | 'artist'>('category')
+    const [addingType, setAddingType] = useState<'category' | 'artist'>('category')
     const [newItemName, setNewItemName] = useState('')
     const [isAdding, setIsAdding] = useState(false)
 
-    // Edit dialog
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
     const [editingItem, setEditingItem] = useState<EntityItem | null>(null)
-    const [editingType, setEditingType] = useState<'category' | 'liturgical_time' | 'artist'>('category')
+    const [editingType, setEditingType] = useState<'category' | 'artist'>('category')
     const [editedName, setEditedName] = useState('')
     const [isEditing, setIsEditing] = useState(false)
 
-    // Delete dialog (replaces confirm())
     const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({ open: false, type: 'category', item: null })
     const [isDeleting, setIsDeleting] = useState(false)
 
-    // Merge dialog
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false)
-    const [mergeType, setMergeType] = useState<'category' | 'liturgical_time' | 'artist'>('category')
+    const [mergeType, setMergeType] = useState<'category' | 'artist'>('category')
     const [mergeSource, setMergeSource] = useState<EntityItem | null>(null)
     const [mergeTargetId, setMergeTargetId] = useState<string>('')
     const [isMerging, setIsMerging] = useState(false)
@@ -95,16 +89,6 @@ export default function ManagePage() {
             setCategories({ items: data.categories || [], isLoading: false, error: null })
         } catch (error) {
             setCategories({ items: [], isLoading: false, error: handleApiError(error) })
-        }
-    }, [])
-
-    const loadLiturgicalTimes = useCallback(async () => {
-        try {
-            setLiturgicalTimes(prev => ({ ...prev, isLoading: true, error: null }))
-            const data = await request<any>('/liturgical_times/with-details')
-            setLiturgicalTimes({ items: data.liturgical_times || [], isLoading: false, error: null })
-        } catch (error) {
-            setLiturgicalTimes({ items: [], isLoading: false, error: handleApiError(error) })
         }
     }, [])
 
@@ -129,9 +113,8 @@ export default function ManagePage() {
 
     useEffect(() => {
         loadCategories()
-        loadLiturgicalTimes()
         loadArtists()
-    }, [loadCategories, loadLiturgicalTimes, loadArtists])
+    }, [loadCategories, loadArtists])
 
     const handleAdd = async () => {
         if (!newItemName.trim()) {
@@ -148,7 +131,6 @@ export default function ManagePage() {
         try {
             const endpoints: Record<string, string> = {
                 category: '/categories',
-                liturgical_time: '/liturgical_times',
                 artist: '/artists'
             }
 
@@ -166,7 +148,6 @@ export default function ManagePage() {
             setNewItemName('')
 
             if (addingType === 'category') loadCategories()
-            else if (addingType === 'liturgical_time') loadLiturgicalTimes()
             else loadArtists()
         } catch (error: any) {
             toast({
@@ -187,7 +168,6 @@ export default function ManagePage() {
         try {
             const endpoints: Record<string, string> = {
                 category: `/categories/${editingItem.id}`,
-                liturgical_time: `/liturgical_times/${editingItem.id}`,
                 artist: `/artists/${editingItem.id}`
             }
 
@@ -206,7 +186,6 @@ export default function ManagePage() {
             setEditedName('')
 
             if (editingType === 'category') loadCategories()
-            else if (editingType === 'liturgical_time') loadLiturgicalTimes()
             else loadArtists()
         } catch (error: any) {
             toast({
@@ -227,7 +206,6 @@ export default function ManagePage() {
         try {
             const endpoints: Record<string, string> = {
                 category: `/categories/${mergeSource.id}/merge/${mergeTargetId}`,
-                liturgical_time: `/liturgical_times/${mergeSource.id}/merge/${mergeTargetId}`,
                 artist: `/artists/${mergeSource.id}/merge/${mergeTargetId}`
             }
 
@@ -243,7 +221,6 @@ export default function ManagePage() {
             setMergeTargetId('')
 
             if (mergeType === 'category') loadCategories()
-            else if (mergeType === 'liturgical_time') loadLiturgicalTimes()
             else loadArtists()
         } catch (error: any) {
             toast({
@@ -264,7 +241,6 @@ export default function ManagePage() {
         try {
             const endpoints: Record<string, string> = {
                 category: `/categories/${deleteDialog.item.id}`,
-                liturgical_time: `/liturgical_times/${deleteDialog.item.id}`,
                 artist: `/artists/${deleteDialog.item.id}`
             }
             await request<any>(endpoints[deleteDialog.type], { method: 'DELETE' })
@@ -277,7 +253,6 @@ export default function ManagePage() {
             setDeleteDialog({ open: false, type: 'category', item: null })
 
             if (deleteDialog.type === 'category') loadCategories()
-            else if (deleteDialog.type === 'liturgical_time') loadLiturgicalTimes()
             else loadArtists()
         } catch (error: any) {
             toast({
@@ -290,34 +265,33 @@ export default function ManagePage() {
         }
     }
 
-    const openAddDialog = (type: 'category' | 'liturgical_time' | 'artist') => {
+    const openAddDialog = (type: 'category' | 'artist') => {
         setAddingType(type)
         setNewItemName('')
         setIsAddDialogOpen(true)
     }
 
-    const openEditDialog = (item: EntityItem, type: 'category' | 'liturgical_time' | 'artist') => {
+    const openEditDialog = (item: EntityItem, type: 'category' | 'artist') => {
         setEditingItem(item)
         setEditingType(type)
         setEditedName(item.name)
         setIsEditDialogOpen(true)
     }
 
-    const openMergeDialog = (item: EntityItem, type: 'category' | 'liturgical_time' | 'artist') => {
+    const openMergeDialog = (item: EntityItem, type: 'category' | 'artist') => {
         setMergeSource(item)
         setMergeType(type)
         setMergeTargetId('')
         setIsMergeDialogOpen(true)
     }
 
-    const openDeleteDialog = (item: EntityItem, type: 'category' | 'liturgical_time' | 'artist') => {
+    const openDeleteDialog = (item: EntityItem, type: 'category' | 'artist') => {
         setDeleteDialog({ open: true, type, item })
     }
 
-    const getEntityTypeLabel = (type: 'category' | 'liturgical_time' | 'artist') => {
+    const getEntityTypeLabel = (type: 'category' | 'artist') => {
         const labels = {
             category: 'Categoria',
-            liturgical_time: 'Tempo Litúrgico',
             artist: 'Artista'
         }
         return labels[type]
@@ -331,9 +305,6 @@ export default function ManagePage() {
             case 'category':
                 items = categories.items
                 break
-            case 'liturgical_time':
-                items = liturgicalTimes.items
-                break
             case 'artist':
                 items = artists.items
                 break
@@ -343,7 +314,7 @@ export default function ManagePage() {
 
     const renderEntityList = (
         section: EntitySection,
-        type: 'category' | 'liturgical_time' | 'artist',
+        type: 'category' | 'artist',
         icon: React.ReactNode,
         onRefresh: () => void
     ) => {
@@ -452,7 +423,7 @@ export default function ManagePage() {
                 <PageHeader
                     icon={Settings}
                     title="Gerenciar Entidades"
-                    description="Edite, consolide e gerencie categorias, tempos litúrgicos e artistas"
+                    description="Edite, consolide e gerencie categorias e artistas"
                 >
                     <InstructionsModal
                         title={PAGE_INSTRUCTIONS.settings.title}
@@ -467,7 +438,7 @@ export default function ManagePage() {
                         <div className="flex gap-2 text-sm text-muted-foreground">
                             <AlertTriangle className="h-5 w-5 shrink-0 text-primary" />
                             <p>
-                                Cada música pode ter <strong>múltiplas categorias</strong>, <strong>múltiplos tempos litúrgicos</strong> e <strong>múltiplos artistas</strong> associados. 
+                                Cada música pode ter <strong>múltiplas categorias</strong> e <strong>múltiplos artistas</strong> associados. 
                                 Ao consolidar dois itens, todas as músicas do item de origem serão transferidas para o item de destino.
                             </p>
                         </div>
@@ -475,14 +446,10 @@ export default function ManagePage() {
                 </Card>
 
                 <Tabs defaultValue="categories">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="categories" className="gap-1">
                             <FolderOpen className="h-4 w-4 hidden sm:block" />
                             Categorias
-                        </TabsTrigger>
-                        <TabsTrigger value="liturgical-times" className="gap-1">
-                            <Clock className="h-4 w-4 hidden sm:block" />
-                            <span className="hidden sm:inline">Tempos </span>Litúrgicos
                         </TabsTrigger>
                         <TabsTrigger value="artists" className="gap-1">
                             <User className="h-4 w-4 hidden sm:block" />
@@ -520,41 +487,6 @@ export default function ManagePage() {
                                     'category',
                                     <FolderOpen className="h-4 w-4 text-muted-foreground" />,
                                     loadCategories
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="liturgical-times">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Clock className="h-5 w-5" />
-                                            Tempos Litúrgicos
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Gerencie os tempos litúrgicos
-                                        </CardDescription>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="icon" onClick={loadLiturgicalTimes}>
-                                            <RefreshCw className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="sm" onClick={() => openAddDialog('liturgical_time')}>
-                                            <Plus className="h-4 w-4 mr-1" />
-                                            Adicionar
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {renderEntityList(
-                                    liturgicalTimes,
-                                    'liturgical_time',
-                                    <Clock className="h-4 w-4 text-muted-foreground" />,
-                                    loadLiturgicalTimes
                                 )}
                             </CardContent>
                         </Card>

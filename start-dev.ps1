@@ -16,7 +16,7 @@ param(
     -SwaggerPath         "/swagger" `
     -HealthPath          "/api/health" `
     -DockerMode          "external" `
-    -DockerContainerName "homelab-mysql" `
+    -DockerContainerName "homelab-postgres" `
     -SkipDocker:$SkipDocker `
     -BackendOnly:$BackendOnly `
     -FrontendOnly:$FrontendOnly

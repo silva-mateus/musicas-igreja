@@ -202,16 +202,13 @@ export function MusicTable({
                                                 )
                                             }
 
-                                            {music.liturgical_times && music.liturgical_times.length > 0
-                                                ? music.liturgical_times.map((time, idx) => (
-                                                    <Badge key={idx} variant="outline" className="text-xs">
-                                                        {time}
+                                            {music.custom_filters && Object.entries(music.custom_filters).map(([slug, group]) =>
+                                                group.values.map((val, idx) => (
+                                                    <Badge key={`${slug}-${idx}`} variant="outline" className="text-xs">
+                                                        {val}
                                                     </Badge>
                                                 ))
-                                                : music.liturgical_time && (
-                                                    <Badge variant="outline" className="text-xs">{music.liturgical_time}</Badge>
-                                                )
-                                            }
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -248,16 +245,16 @@ export function MusicTable({
                                 )}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell min-w-[140px] max-w-[220px]">
-                                {music.liturgical_times && music.liturgical_times.length > 0 ? (
+                                {music.custom_filters && Object.keys(music.custom_filters).length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
-                                        {music.liturgical_times.map((time, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs">
-                                                {time}
-                                            </Badge>
-                                        ))}
+                                        {Object.entries(music.custom_filters).flatMap(([slug, group]) =>
+                                            group.values.map((val, idx) => (
+                                                <Badge key={`${slug}-${idx}`} variant="outline" className="text-xs">
+                                                    {val}
+                                                </Badge>
+                                            ))
+                                        )}
                                     </div>
-                                ) : music.liturgical_time ? (
-                                    <Badge variant="outline">{music.liturgical_time}</Badge>
                                 ) : (
                                     <span className="text-muted-foreground">-</span>
                                 )}

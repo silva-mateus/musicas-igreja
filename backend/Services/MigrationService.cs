@@ -116,9 +116,9 @@ public class MigrationService : IMigrationService
         {
             await _context.Database.ExecuteSqlRawAsync(@"
                 CREATE TABLE IF NOT EXISTS __migration_history (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     script_name VARCHAR(255) NOT NULL UNIQUE,
-                    executed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             ");
         }

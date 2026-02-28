@@ -6,7 +6,7 @@ import { Input } from '@core/components/ui/input'
 import { Label } from '@core/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@core/components/ui/select'
 import { Badge } from '@core/components/ui/badge'
-import { dashboardApi, categoriesApi, liturgicalTimesApi, handleApiError } from '@/lib/api'
+import { dashboardApi, categoriesApi, customFiltersApi, handleApiError } from '@/lib/api'
 import type { SearchFilters } from '@/types'
 import { Filter, RotateCcw, X } from 'lucide-react'
 
@@ -15,10 +15,17 @@ interface MusicFiltersProps {
     onFiltersChange: (filters: SearchFilters) => void
 }
 
+interface CustomFilterGroupOption {
+    id: number
+    name: string
+    slug: string
+    values: Array<{ name: string; slug: string }>
+}
+
 interface Suggestions {
     artists: string[]
     categories: string[]
-    liturgical_times: string[]
+    customFilterGroups: CustomFilterGroupOption[]
     musical_keys: string[]
 }
 
@@ -27,7 +34,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
     const [suggestions, setSuggestions] = useState<Suggestions>({
         artists: [],
         categories: [],
-        liturgical_times: [],
+        customFilterGroups: [],
         musical_keys: ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm'],
     })
     const [isLoading, setIsLoading] = useState(false)
@@ -45,7 +52,7 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
         try {
             setIsLoading(true)
             // Buscar artistas, categorias e tempos reais
-            const [artistsResult, catsResult, timesResult] = await Promise.all([
+            const [artistsResult, catsResult, filterGroupsResult] = await Promise.all([
                 dashboardApi.getArtists().catch((err) => {
                     console.error('Erro ao carregar artistas:', err)
                     return []
@@ -54,22 +61,21 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                     console.error('Erro ao carregar categorias:', err)
                     return { data: [] }
                 }),
-                liturgicalTimesApi.getLiturgicalTimes().catch((err) => {
-                    console.error('Erro ao carregar tempos litúrgicos:', err)
-                    return { data: [] }
+                customFiltersApi.getGroups().catch((err) => {
+                    console.error('Erro ao carregar grupos de filtro:', err)
+                    return []
                 }),
             ])
             
-            // Extrair arrays de forma segura
             const artists = Array.isArray(artistsResult) ? artistsResult : []
             const categories = Array.isArray(catsResult?.data) ? catsResult.data : (Array.isArray(catsResult) ? catsResult : [])
-            const liturgicalTimes = Array.isArray(timesResult?.data) ? timesResult.data : (Array.isArray(timesResult) ? timesResult : [])
+            const filterGroups = Array.isArray(filterGroupsResult) ? filterGroupsResult : []
             
             setSuggestions(prev => ({
                 ...prev,
                 artists,
                 categories,
-                liturgical_times: liturgicalTimes,
+                customFilterGroups: filterGroups,
             }))
         } catch (error) {
             console.error('Erro ao carregar sugestões:', handleApiError(error))
@@ -181,35 +187,50 @@ export function MusicFilters({ filters, onFiltersChange }: MusicFiltersProps) {
                     </Select>
                 </div>
 
-                {/* Liturgical Time Filter */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between min-h-[24px]">
-                        <Label htmlFor="liturgical_time">Tempo Litúrgico {isLoading && <span className="text-xs text-muted-foreground">(carregando...)</span>}</Label>
-                        {localFilters.liturgical_time && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => clearFilter('liturgical_time')} className="h-6 w-6 p-0">
-                                <X className="h-3 w-3" />
-                            </Button>
-                        )}
-                    </div>
-                    <Select value={(Array.isArray(localFilters.liturgical_time) ? localFilters.liturgical_time[0] : localFilters.liturgical_time) || ''} onValueChange={(value) => handleFilterChange('liturgical_time', value)}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={isLoading ? "Carregando..." : "Selecionar tempo"} />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="max-h-[300px]">
-                            {isLoading ? (
-                                <div className="py-2 px-3 text-sm text-muted-foreground">Carregando tempos litúrgicos...</div>
-                            ) : suggestions.liturgical_times.length === 0 ? (
-                                <div className="py-2 px-3 text-sm text-muted-foreground">Nenhum tempo litúrgico encontrado</div>
-                            ) : (
-                                suggestions.liturgical_times.map((time) => (
-                                    <SelectItem key={time} value={time}>
-                                        {time}
-                                    </SelectItem>
-                                ))
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
+                {/* Dynamic Custom Filter Groups */}
+                {suggestions.customFilterGroups.map(group => {
+                    const selectedValue = localFilters.custom_filters?.[group.slug]?.[0] || ''
+                    return (
+                        <div key={group.slug} className="space-y-2">
+                            <div className="flex items-center justify-between min-h-[24px]">
+                                <Label>{group.name} {isLoading && <span className="text-xs text-muted-foreground">(carregando...)</span>}</Label>
+                                {selectedValue && (
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => {
+                                        const newCustomFilters = { ...(localFilters.custom_filters || {}) }
+                                        delete newCustomFilters[group.slug]
+                                        handleFilterChange('custom_filters' as keyof SearchFilters, Object.keys(newCustomFilters).length > 0 ? newCustomFilters as any : undefined as any)
+                                    }} className="h-6 w-6 p-0">
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                )}
+                            </div>
+                            <Select value={selectedValue} onValueChange={(value) => {
+                                const newCustomFilters = { ...(localFilters.custom_filters || {}) }
+                                if (value) {
+                                    newCustomFilters[group.slug] = [value]
+                                } else {
+                                    delete newCustomFilters[group.slug]
+                                }
+                                handleFilterChange('custom_filters' as keyof SearchFilters, Object.keys(newCustomFilters).length > 0 ? newCustomFilters as any : undefined as any)
+                            }}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={`Selecionar ${group.name.toLowerCase()}`} />
+                                </SelectTrigger>
+                                <SelectContent position="popper" className="max-h-[300px]">
+                                    {group.values.length === 0 ? (
+                                        <div className="py-2 px-3 text-sm text-muted-foreground">Nenhum valor encontrado</div>
+                                    ) : (
+                                        group.values.map((val) => (
+                                            <SelectItem key={val.slug} value={val.slug}>
+                                                {val.name}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )
+                })}
 
                 {/* Musical Key Filter */}
                 <div className="space-y-2">
