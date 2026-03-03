@@ -1,0 +1,71 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - deploy/**
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-musicas-igreja
+  cancel-in-progress: false
+
+jobs:
+  test-backend:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore backend dependencies
+        working-directory: backend
+        run: dotnet restore
+
+      - name: Restore test dependencies
+        working-directory: backend.tests
+        run: dotnet restore
+
+      - name: Build backend
+        working-directory: backend
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Build tests
+        working-directory: backend.tests
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run Unit Tests
+        working-directory: backend.tests
+        run: dotnet test --no-build --verbosity normal --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deploy-test-results
+          path: backend.tests/TestResults
+
+  deploy-backend:
+    name: Deploy Backend
+    needs: test-backend
+    uses: silva-mateus/homelab-infra/.github/workflows/reusable-deploy.yml@main
+    with:
+      service_name: musicas-igreja
+      dockerfile_path: ./backend/Dockerfile
+      context: ./backend
+    secrets: inherit
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: test-backend
+    uses: silva-mateus/homelab-infra/.github/workflows/reusable-deploy.yml@main
+    with:
+      service_name: musicas-igreja-frontend
+      dockerfile_path: ./frontend/Dockerfile
+      context: ./frontend
+    secrets: inherit
