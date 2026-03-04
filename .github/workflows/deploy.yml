@@ -11,6 +11,10 @@ concurrency:
   group: deploy-musicas-igreja
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test-backend:
     name: Run Backend Tests
