@@ -52,11 +52,11 @@ const nextConfig = {
     // Output standalone para Docker
     output: 'standalone',
 
+    // Monorepo: root de tracing inclui ../core usado via @core alias
+    outputFileTracingRoot: path.join(__dirname, '..'),
+
     // Ensure trailing slashes for consistent routing
     trailingSlash: false,
-
-    // Generate all static routes at build time
-    generateBuildId: () => 'musicas-igreja-build',
 
     // Garantir alias '@' -> 'src' no webpack
     webpack: (config) => {
