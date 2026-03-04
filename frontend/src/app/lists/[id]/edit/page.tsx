@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@core/components/ui/pop
 import { ScrollArea } from '@core/components/ui/scroll-area'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { listsApi, musicApi, handleApiError, getActiveWorkspaceId } from '@/lib/api'
-import type { MusicList, MusicFile } from '@/types'
+import type { MusicList, MusicFile, CustomFilterGroup } from '@/types'
 import {
     List,
     Save,
@@ -43,7 +43,8 @@ import {
     Loader2,
     Filter,
     Check,
-    User
+    User,
+    Tag
 } from 'lucide-react'
 import { useToast } from '@core/hooks/use-toast'
 import { useAuth } from '@core/contexts/auth-context'
@@ -51,9 +52,14 @@ import Link from 'next/link'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
+interface FilterOptionItem {
+    slug: string
+    label: string
+}
+
 interface FilterSuggestions {
-    categories: string[]
-    artists: string[]
+    categories: FilterOptionItem[]
+    artists: FilterOptionItem[]
     musical_keys: string[]
 }
 
@@ -90,8 +96,10 @@ export default function EditListPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedCategories, setSelectedCategories] = useState<string[]>([])
     const [selectedArtists, setSelectedArtists] = useState<string[]>([])
+    const [selectedCustomFilters, setSelectedCustomFilters] = useState<Record<string, string[]>>({})
     const [searchResults, setSearchResults] = useState<MusicFile[]>([])
     const [isSearching, setIsSearching] = useState(false)
+    const [customFilterGroups, setCustomFilterGroups] = useState<CustomFilterGroup[]>([])
     const [suggestions, setSuggestions] = useState<FilterSuggestions>({
         categories: [],
         artists: [],
@@ -123,14 +131,39 @@ export default function EditListPage() {
             const response = await fetch(`/api/filters/suggestions?workspace_id=${getActiveWorkspaceId()}`)
             const data = await response.json()
             setSuggestions({
-                categories: (data.categories || []).map((c: any) => typeof c === 'string' ? c : c.label || c.name || '').filter(Boolean),
-                artists: (data.artists || []).map((a: any) => typeof a === 'string' ? a : a.label || a.name || '').filter(Boolean),
+                categories: (data.categories || []).map((c: any) => ({
+                    slug: typeof c === 'string' ? c : c.slug || '',
+                    label: typeof c === 'string' ? c : c.label || c.name || ''
+                })).filter((c: FilterOptionItem) => c.slug && c.label),
+                artists: (data.artists || []).map((a: any) => ({
+                    slug: typeof a === 'string' ? a : a.slug || '',
+                    label: typeof a === 'string' ? a : a.label || a.name || ''
+                })).filter((a: FilterOptionItem) => a.slug && a.label),
                 musical_keys: data.musical_keys || []
             })
+            setCustomFilterGroups(
+                (data.custom_filter_groups || []).map((g: any) => ({
+                    id: g.id,
+                    name: g.name,
+                    slug: g.slug,
+                    sort_order: g.sort_order ?? 0,
+                    show_as_tab: g.show_as_tab ?? false,
+                    values: (g.values || []).map((v: any) => ({
+                        id: v.id,
+                        name: v.name,
+                        slug: v.slug,
+                        sort_order: v.sort_order ?? 0,
+                        file_count: v.file_count ?? 0,
+                    })),
+                }))
+            )
         } catch (error) {
             console.error('Erro ao carregar sugestões:', error)
         }
     }
+
+    const getLabelBySlug = (slug: string, options: FilterOptionItem[]) =>
+        options.find(o => o.slug === slug)?.label || slug
 
     const searchMusic = async () => {
         try {
@@ -149,10 +182,15 @@ export default function EditListPage() {
                 filters.artist = selectedArtists
             }
 
+            const activeCustomFilters = Object.entries(selectedCustomFilters)
+                .filter(([, values]) => values.length > 0)
+            if (activeCustomFilters.length > 0) {
+                filters.custom_filters = Object.fromEntries(activeCustomFilters)
+            }
+
             const response = await musicApi.search(filters, { page: 1, limit: 50 })
             setSearchResults(response.data)
 
-            // Update filtered options based on results
             updateFilteredOptions(response.data)
         } catch (error) {
             console.error('Erro ao buscar músicas:', error)
@@ -161,7 +199,6 @@ export default function EditListPage() {
         }
     }
 
-    // Update available filter options based on search results
     const updateFilteredOptions = (results: MusicFile[]) => {
         const hasActiveFilters = selectedCategories.length > 0 || selectedArtists.length > 0
 
@@ -170,24 +207,28 @@ export default function EditListPage() {
             return
         }
 
-        const categories = new Set<string>()
-        const artists = new Set<string>()
+        const resultCatLabels = new Set<string>()
+        const resultArtistLabels = new Set<string>()
 
         results.forEach(music => {
             if (music.categories && music.categories.length > 0) {
-                music.categories.forEach(cat => cat && categories.add(cat))
+                music.categories.forEach(cat => cat && resultCatLabels.add(cat))
             } else if (music.category) {
-                categories.add(music.category)
+                resultCatLabels.add(music.category)
             }
-
             if (music.artist) {
-                artists.add(music.artist)
+                resultArtistLabels.add(music.artist)
             }
         })
 
+        const selectedCatSet = new Set(selectedCategories)
+        const selectedArtSet = new Set(selectedArtists)
+
         setFilteredOptions({
-            categories: Array.from(new Set([...selectedCategories, ...Array.from(categories)])).filter(c => suggestions.categories.includes(c)),
-            artists: Array.from(new Set([...selectedArtists, ...Array.from(artists)])).filter(a => suggestions.artists.includes(a)),
+            categories: suggestions.categories.filter(c =>
+                selectedCatSet.has(c.slug) || resultCatLabels.has(c.label)),
+            artists: suggestions.artists.filter(a =>
+                selectedArtSet.has(a.slug) || resultArtistLabels.has(a.label)),
             musical_keys: suggestions.musical_keys
         })
     }
@@ -209,7 +250,7 @@ export default function EditListPage() {
             searchMusic()
         }, 300)
         return () => clearTimeout(timeoutId)
-    }, [searchTerm, selectedCategories, selectedArtists])
+    }, [searchTerm, selectedCategories, selectedArtists, selectedCustomFilters])
 
     const handleSave = async () => {
         if (!list || !name.trim()) return
@@ -831,24 +872,24 @@ export default function EditListPage() {
                                                     {(selectedCategories.length > 0 || selectedArtists.length > 0 
                                                         ? filteredOptions.categories 
                                                         : suggestions.categories
-                                                    ).filter(c => c && c.trim()).map((category) => (
+                                                    ).filter(c => c.slug && c.label.trim()).map((category) => (
                                                         <div
-                                                            key={category}
+                                                            key={category.slug}
                                                             className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
                                                             onClick={() => {
-                                                                if (selectedCategories.includes(category)) {
-                                                                    setSelectedCategories(selectedCategories.filter(c => c !== category))
+                                                                if (selectedCategories.includes(category.slug)) {
+                                                                    setSelectedCategories(selectedCategories.filter(c => c !== category.slug))
                                                                 } else {
-                                                                    setSelectedCategories([...selectedCategories, category])
+                                                                    setSelectedCategories([...selectedCategories, category.slug])
                                                                 }
                                                             }}
                                                         >
-                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedCategories.includes(category) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
-                                                                {selectedCategories.includes(category) && (
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedCategories.includes(category.slug) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                {selectedCategories.includes(category.slug) && (
                                                                     <Check className="h-3 w-3 text-primary-foreground" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-sm">{category}</span>
+                                                            <span className="text-sm">{category.label}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -894,30 +935,101 @@ export default function EditListPage() {
                                                     {(selectedCategories.length > 0 || selectedArtists.length > 0 
                                                         ? filteredOptions.artists 
                                                         : suggestions.artists
-                                                    ).filter(a => a && a.trim()).map((artist) => (
+                                                    ).filter(a => a.slug && a.label.trim()).map((artist) => (
                                                         <div
-                                                            key={artist}
+                                                            key={artist.slug}
                                                             className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
                                                             onClick={() => {
-                                                                if (selectedArtists.includes(artist)) {
-                                                                    setSelectedArtists(selectedArtists.filter(a => a !== artist))
+                                                                if (selectedArtists.includes(artist.slug)) {
+                                                                    setSelectedArtists(selectedArtists.filter(a => a !== artist.slug))
                                                                 } else {
-                                                                    setSelectedArtists([...selectedArtists, artist])
+                                                                    setSelectedArtists([...selectedArtists, artist.slug])
                                                                 }
                                                             }}
                                                         >
-                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedArtists.includes(artist) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
-                                                                {selectedArtists.includes(artist) && (
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center ${selectedArtists.includes(artist.slug) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                {selectedArtists.includes(artist.slug) && (
                                                                     <Check className="h-3 w-3 text-primary-foreground" />
                                                                 )}
                                                             </div>
-                                                            <span className="text-sm truncate">{artist}</span>
+                                                            <span className="text-sm truncate">{artist.label}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </ScrollArea>
                                         </PopoverContent>
                                     </Popover>
+
+                                    {/* Dropdowns de Filtros Customizados */}
+                                    {customFilterGroups.map((group) => {
+                                        const selected = selectedCustomFilters[group.slug] || []
+                                        return (
+                                            <Popover key={group.slug}>
+                                                <PopoverTrigger asChild>
+                                                    <Button variant="outline" className="justify-between min-w-[140px]">
+                                                        <span className="flex items-center gap-2">
+                                                            <Tag className="h-4 w-4" />
+                                                            {group.name}
+                                                        </span>
+                                                        {selected.length > 0 && (
+                                                            <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                                                                {selected.length}
+                                                            </Badge>
+                                                        )}
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-56 p-0" align="start">
+                                                    <div className="p-2 border-b">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-sm font-medium">{group.name}</span>
+                                                            {selected.length > 0 && (
+                                                                <SimpleTooltip label="Limpar seleção">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 px-2 text-xs"
+                                                                        onClick={() => setSelectedCustomFilters(prev => {
+                                                                            const next = { ...prev }
+                                                                            delete next[group.slug]
+                                                                            return next
+                                                                        })}
+                                                                    >
+                                                                        Limpar
+                                                                    </Button>
+                                                                </SimpleTooltip>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <ScrollArea className="h-[200px]">
+                                                        <div className="p-2 space-y-1">
+                                                            {group.values.map((value) => (
+                                                                <div
+                                                                    key={value.slug}
+                                                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                                                                    onClick={() => {
+                                                                        setSelectedCustomFilters(prev => {
+                                                                            const current = prev[group.slug] || []
+                                                                            const updated = current.includes(value.slug)
+                                                                                ? current.filter(s => s !== value.slug)
+                                                                                : [...current, value.slug]
+                                                                            return { ...prev, [group.slug]: updated }
+                                                                        })
+                                                                    }}
+                                                                >
+                                                                    <div className={`h-4 w-4 rounded border flex items-center justify-center ${selected.includes(value.slug) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                                        {selected.includes(value.slug) && (
+                                                                            <Check className="h-3 w-3 text-primary-foreground" />
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-sm truncate">{value.name}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </ScrollArea>
+                                                </PopoverContent>
+                                            </Popover>
+                                        )
+                                    })}
 
                                     {/* Indicador de busca */}
                                     {isSearching && (
@@ -928,39 +1040,64 @@ export default function EditListPage() {
                                 </div>
 
                                 {/* Filtros ativos */}
-                                {(selectedCategories.length > 0 || selectedArtists.length > 0) && (
+                                {(selectedCategories.length > 0 || selectedArtists.length > 0 || Object.values(selectedCustomFilters).some(v => v.length > 0)) && (
                                     <div className="flex flex-wrap gap-2">
-                                        {selectedCategories.map((cat) => (
-                                            <Badge key={cat} variant="secondary" className="gap-1 pr-1">
-                                                {cat}
+                                        {selectedCategories.map((catSlug) => (
+                                            <Badge key={catSlug} variant="secondary" className="gap-1 pr-1">
+                                                {getLabelBySlug(catSlug, suggestions.categories)}
                                                 <SimpleTooltip label="Remover filtro">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-4 w-4 ml-1 hover:bg-transparent"
-                                                        onClick={() => setSelectedCategories(selectedCategories.filter(c => c !== cat))}
+                                                        onClick={() => setSelectedCategories(selectedCategories.filter(c => c !== catSlug))}
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </Button>
                                                 </SimpleTooltip>
                                             </Badge>
                                         ))}
-                                        {selectedArtists.map((artist) => (
-                                            <Badge key={artist} variant="default" className="gap-1 pr-1">
+                                        {selectedArtists.map((artistSlug) => (
+                                            <Badge key={artistSlug} variant="default" className="gap-1 pr-1">
                                                 <User className="h-3 w-3" />
-                                                {artist}
+                                                {getLabelBySlug(artistSlug, suggestions.artists)}
                                                 <SimpleTooltip label="Remover filtro">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-4 w-4 ml-1 hover:bg-transparent"
-                                                        onClick={() => setSelectedArtists(selectedArtists.filter(a => a !== artist))}
+                                                        onClick={() => setSelectedArtists(selectedArtists.filter(a => a !== artistSlug))}
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </Button>
                                                 </SimpleTooltip>
                                             </Badge>
                                         ))}
+                                        {Object.entries(selectedCustomFilters).flatMap(([groupSlug, valueSlugs]) => {
+                                            const group = customFilterGroups.find(g => g.slug === groupSlug)
+                                            return valueSlugs.map(valueSlug => {
+                                                const valueName = group?.values.find(v => v.slug === valueSlug)?.name || valueSlug
+                                                return (
+                                                    <Badge key={`${groupSlug}-${valueSlug}`} variant="outline" className="gap-1 pr-1">
+                                                        <Tag className="h-3 w-3" />
+                                                        {valueName}
+                                                        <SimpleTooltip label="Remover filtro">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-4 w-4 ml-1 hover:bg-transparent"
+                                                                onClick={() => setSelectedCustomFilters(prev => ({
+                                                                    ...prev,
+                                                                    [groupSlug]: (prev[groupSlug] || []).filter(s => s !== valueSlug)
+                                                                }))}
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </SimpleTooltip>
+                                                    </Badge>
+                                                )
+                                            })
+                                        })}
                                         <SimpleTooltip label="Limpar todos os filtros">
                                             <Button
                                                 variant="ghost"
@@ -969,6 +1106,7 @@ export default function EditListPage() {
                                                 onClick={() => {
                                                     setSelectedCategories([])
                                                     setSelectedArtists([])
+                                                    setSelectedCustomFilters({})
                                                 }}
                                             >
                                                 Limpar todos
@@ -1072,7 +1210,7 @@ export default function EditListPage() {
                                             <div className="text-center py-8 text-muted-foreground">
                                                 <Music2 className="h-8 w-8 mx-auto mb-2" />
                                                 <p>
-                                                    {searchTerm || selectedCategories.length > 0
+                                                    {searchTerm || selectedCategories.length > 0 || selectedArtists.length > 0 || Object.values(selectedCustomFilters).some(v => v.length > 0)
                                                         ? 'Nenhuma música encontrada com os filtros aplicados'
                                                         : 'Use os filtros para buscar músicas'
                                                     }
