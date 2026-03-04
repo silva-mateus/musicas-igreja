@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Backup Script - Musicas Igreja (MySQL version)
-# Backs up the MySQL database and organized PDFs
+# Backup Script - Musicas Igreja (PostgreSQL version)
+# Backs up the PostgreSQL database and organized PDFs
 #
 # Crontab (daily at 3am):
 #   0 3 * * * /opt/homelab/scripts/musicas-igreja/backup.sh >> /var/log/musicas-backup.log 2>&1
@@ -18,12 +18,11 @@ set -e
 BACKUP_DIR="${BACKUP_DIR:-/home/thi_s/backups/musicas-igreja}"
 MAX_BACKUPS="${MAX_BACKUPS:-30}"
 
-MYSQL_CONTAINER="${MYSQL_CONTAINER:-mysql}"
+PG_CONTAINER="${PG_CONTAINER:-postgres}"
 API_CONTAINER="${API_CONTAINER:-musicas-igreja-api}"
 
-DB_NAME="musicas_igreja"
-DB_USER="musicas_user"
-DB_PASSWORD="${DB_PASSWORD:-}"
+DB_NAME="${DB_NAME:-musicas_igreja}"
+DB_USER="${DB_USER:-musicas_user}"
 
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 DATE_TAG=$(date +"%Y%m%d")
@@ -46,8 +45,8 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$"; then
-    log_err "MySQL container '${MYSQL_CONTAINER}' is not running"
+if ! docker ps --format '{{.Names}}' | grep -q "^${PG_CONTAINER}$"; then
+    log_err "PostgreSQL container '${PG_CONTAINER}' is not running"
     exit 1
 fi
 
@@ -66,14 +65,9 @@ trap "rm -rf $TEMP_DIR" EXIT
 # 1. DATABASE DUMP
 # ============================================
 
-log_info "Dumping MySQL database '${DB_NAME}'..."
+log_info "Dumping PostgreSQL database '${DB_NAME}'..."
 
-DUMP_CMD="mysqldump -u${DB_USER} ${DB_NAME} --single-transaction --routines --triggers"
-if [ -n "$DB_PASSWORD" ]; then
-    DUMP_CMD="mysqldump -u${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --single-transaction --routines --triggers"
-fi
-
-docker exec "$MYSQL_CONTAINER" sh -c "$DUMP_CMD" > "$TEMP_DIR/database.sql" 2>/dev/null
+docker exec "$PG_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" --no-owner --no-privileges > "$TEMP_DIR/database.sql" 2>/dev/null
 
 if [ -s "$TEMP_DIR/database.sql" ]; then
     DB_SIZE=$(du -h "$TEMP_DIR/database.sql" | awk '{print $1}')

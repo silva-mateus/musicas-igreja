@@ -1,6 +1,5 @@
-using System.Data;
 using Microsoft.Data.Sqlite;
-using MySqlConnector;
+using Npgsql;
 
 namespace MigrateSqlite;
 
@@ -10,21 +9,21 @@ class Program
     {
         if (args.Length < 2)
         {
-            Console.WriteLine("SQLite to MySQL Migration Tool");
-            Console.WriteLine("==============================");
+            Console.WriteLine("SQLite to PostgreSQL Migration Tool");
+            Console.WriteLine("====================================");
             Console.WriteLine();
-            Console.WriteLine("Usage: dotnet run -- <sqlite-path> <mysql-connection-string>");
+            Console.WriteLine("Usage: dotnet run -- <sqlite-path> <postgres-connection-string>");
             Console.WriteLine();
             Console.WriteLine("Example:");
-            Console.WriteLine("  dotnet run -- ./pdf_organizer.db \"Server=localhost;Port=3307;Database=musicas_igreja;User=musicas_user;Password=xxx;CharSet=utf8mb4\"");
+            Console.WriteLine("  dotnet run -- ./pdf_organizer.db \"Host=localhost;Port=5432;Database=musicas_igreja;Username=postgres;Password=xxx\"");
             Console.WriteLine();
-            Console.WriteLine("To extract the SQLite file from Docker:");
+            Console.WriteLine("To extract the SQLite file from the old Docker container:");
             Console.WriteLine("  docker cp musicas-igreja-app:/app/data/pdf_organizer.db ./pdf_organizer.db");
             return 1;
         }
 
         var sqlitePath = args[0];
-        var mysqlConnectionString = args[1];
+        var pgConnectionString = args[1];
 
         if (!File.Exists(sqlitePath))
         {
@@ -32,10 +31,10 @@ class Program
             return 1;
         }
 
-        Console.WriteLine("SQLite to MySQL Migration Tool");
-        Console.WriteLine("==============================");
+        Console.WriteLine("SQLite to PostgreSQL Migration Tool");
+        Console.WriteLine("====================================");
         Console.WriteLine($"  Source:  {sqlitePath}");
-        Console.WriteLine($"  Target:  MySQL ({ExtractHost(mysqlConnectionString)})");
+        Console.WriteLine($"  Target:  PostgreSQL ({ExtractHost(pgConnectionString)})");
         Console.WriteLine();
 
         try
@@ -43,54 +42,49 @@ class Program
             await using var sqliteConn = new SqliteConnection($"Data Source={sqlitePath};Mode=ReadOnly");
             await sqliteConn.OpenAsync();
 
-            await using var mysqlConn = new MySqlConnection(mysqlConnectionString);
-            await mysqlConn.OpenAsync();
+            await using var pgConn = new NpgsqlConnection(pgConnectionString);
+            await pgConn.OpenAsync();
 
             var summary = new Dictionary<string, (int read, int written)>();
 
-            // Order matters: parent tables first, then junction/child tables
-            summary["categories"] = await MigrateTableAsync(sqliteConn, mysqlConn, "categories",
-                "id, name, description, created_date");
+            summary["artists"] = await MigrateArtistsAsync(sqliteConn, pgConn);
 
-            summary["liturgical_times"] = await MigrateTableAsync(sqliteConn, mysqlConn, "liturgical_times",
-                "id, name, description, created_date");
+            summary["categories"] = await MigrateCategoriesAsync(sqliteConn, pgConn);
 
-            summary["artists"] = await MigrateTableAsync(sqliteConn, mysqlConn, "artists",
-                "id, name, description, created_date");
+            summary["pdf_files"] = await MigratePdfFilesAsync(sqliteConn, pgConn);
 
-            summary["pdf_files"] = await MigrateTableAsync(sqliteConn, mysqlConn, "pdf_files",
-                "id, filename, original_name, song_name, artist, category, liturgical_time, musical_key, youtube_link, file_path, file_size, upload_date, file_hash, page_count, description");
+            summary["merge_lists"] = await MigrateMergeListsAsync(sqliteConn, pgConn);
 
-            summary["merge_lists"] = await MigrateTableAsync(sqliteConn, mysqlConn, "merge_lists",
-                "id, name, observations, created_date, updated_date");
+            summary["merge_list_items"] = await MigrateTableAsync(sqliteConn, pgConn, "merge_list_items",
+                ["id", "merge_list_id", "pdf_file_id", "order_position"]);
 
-            summary["merge_list_items"] = await MigrateTableAsync(sqliteConn, mysqlConn, "merge_list_items",
-                "id, merge_list_id, pdf_file_id, order_position");
+            summary["file_categories"] = await MigrateTableAsync(sqliteConn, pgConn, "file_categories",
+                ["id", "file_id", "category_id"]);
 
-            summary["file_categories"] = await MigrateTableAsync(sqliteConn, mysqlConn, "file_categories",
-                "id, file_id, category_id");
+            summary["file_artists"] = await MigrateTableAsync(sqliteConn, pgConn, "file_artists",
+                ["id", "file_id", "artist_id"]);
 
-            summary["file_liturgical_times"] = await MigrateTableAsync(sqliteConn, mysqlConn, "file_liturgical_times",
-                "id, file_id, liturgical_time_id");
+            summary["users → core_users"] = await MigrateUsersAsync(sqliteConn, pgConn);
 
-            summary["file_artists"] = await MigrateTableAsync(sqliteConn, mysqlConn, "file_artists",
-                "id, file_id, artist_id");
-
-            // Migrate users (old schema → core_users)
-            summary["users → core_users"] = await MigrateUsersAsync(sqliteConn, mysqlConn);
+            await ResetSequencesAsync(pgConn);
 
             Console.WriteLine();
-            Console.WriteLine("==============================");
+            Console.WriteLine("====================================");
             Console.WriteLine("  Migration Summary");
-            Console.WriteLine("==============================");
+            Console.WriteLine("====================================");
             foreach (var (table, (read, written)) in summary)
             {
                 var skipped = read - written;
                 var status = skipped > 0 ? $" ({skipped} already existed)" : "";
                 Console.WriteLine($"  {table,-25} {read,5} read -> {written,5} inserted{status}");
             }
-            Console.WriteLine("==============================");
+            Console.WriteLine("====================================");
             Console.WriteLine("  Migration completed successfully!");
+            Console.WriteLine();
+            Console.WriteLine("  Next steps:");
+            Console.WriteLine("    1. Copy organized PDFs into the API container:");
+            Console.WriteLine("       docker cp ./organized/. musicas-igreja-api:/app/organized/");
+            Console.WriteLine("    2. Verify data: curl http://localhost:5000/api/health");
 
             return 0;
         }
@@ -103,36 +97,28 @@ class Program
     }
 
     static async Task<(int read, int written)> MigrateTableAsync(
-        SqliteConnection sqlite, MySqlConnection mysql,
-        string table, string columns)
+        SqliteConnection sqlite, NpgsqlConnection pg,
+        string table, string[] columns)
     {
         Console.Write($"  Migrating {table}...");
 
-        var columnList = columns.Split(',').Select(c => c.Trim()).ToArray();
-
-        // Check if table exists in SQLite
-        await using var checkCmd = sqlite.CreateCommand();
-        checkCmd.CommandText = $"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'";
-        var exists = await checkCmd.ExecuteScalarAsync();
-        if (exists == null)
+        if (!await SqliteTableExistsAsync(sqlite, table))
         {
             Console.WriteLine(" SKIPPED (table not found in SQLite)");
             return (0, 0);
         }
 
-        // Read all rows from SQLite
+        var columnsCsv = string.Join(", ", columns);
         await using var readCmd = sqlite.CreateCommand();
-        readCmd.CommandText = $"SELECT {columns} FROM {table}";
+        readCmd.CommandText = $"SELECT {columnsCsv} FROM {table}";
         await using var reader = await readCmd.ExecuteReaderAsync();
 
         var rows = new List<object?[]>();
         while (await reader.ReadAsync())
         {
-            var values = new object?[columnList.Length];
-            for (int i = 0; i < columnList.Length; i++)
-            {
+            var values = new object?[columns.Length];
+            for (int i = 0; i < columns.Length; i++)
                 values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
-            }
             rows.Add(values);
         }
 
@@ -142,57 +128,228 @@ class Program
             return (0, 0);
         }
 
-        // Insert into MySQL using INSERT IGNORE (idempotent)
-        var paramNames = columnList.Select((_, i) => $"@p{i}").ToArray();
-        var insertSql = $"INSERT IGNORE INTO {table} ({columns}) VALUES ({string.Join(", ", paramNames)})";
+        var paramNames = columns.Select((_, i) => $"@p{i}").ToArray();
+        var insertSql = $"INSERT INTO {table} ({columnsCsv}) VALUES ({string.Join(", ", paramNames)}) ON CONFLICT DO NOTHING";
 
         int written = 0;
         foreach (var row in rows)
         {
-            await using var insertCmd = mysql.CreateCommand();
-            insertCmd.CommandText = insertSql;
-
-            for (int i = 0; i < columnList.Length; i++)
-            {
-                insertCmd.Parameters.AddWithValue(paramNames[i], row[i] ?? DBNull.Value);
-            }
-
-            written += await insertCmd.ExecuteNonQueryAsync();
+            await using var cmd = new NpgsqlCommand(insertSql, pg);
+            for (int i = 0; i < columns.Length; i++)
+                cmd.Parameters.AddWithValue(paramNames[i], row[i] ?? DBNull.Value);
+            written += await cmd.ExecuteNonQueryAsync();
         }
 
         Console.WriteLine($" {rows.Count} read, {written} inserted");
         return (rows.Count, written);
     }
 
+    /// <summary>
+    /// Artists need slug generation (not present in old SQLite schema).
+    /// </summary>
+    static async Task<(int read, int written)> MigrateArtistsAsync(
+        SqliteConnection sqlite, NpgsqlConnection pg)
+    {
+        Console.Write("  Migrating artists...");
+
+        if (!await SqliteTableExistsAsync(sqlite, "artists"))
+        {
+            Console.WriteLine(" SKIPPED (table not found in SQLite)");
+            return (0, 0);
+        }
+
+        await using var readCmd = sqlite.CreateCommand();
+        readCmd.CommandText = "SELECT id, name, description, created_date FROM artists";
+        await using var reader = await readCmd.ExecuteReaderAsync();
+
+        int readCount = 0, written = 0;
+        while (await reader.ReadAsync())
+        {
+            readCount++;
+            var id = reader.GetInt32(0);
+            var name = reader.IsDBNull(1) ? "" : reader.GetString(1);
+            var description = reader.IsDBNull(2) ? null : reader.GetString(2);
+            var createdDate = reader.IsDBNull(3) ? DateTime.UtcNow : DateTime.Parse(reader.GetString(3));
+            var slug = GenerateSlug(name);
+
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO artists (id, name, slug, description, created_date) VALUES (@id, @name, @slug, @desc, @created) ON CONFLICT DO NOTHING", pg);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@name", name);
+            cmd.Parameters.AddWithValue("@slug", slug);
+            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@created", createdDate);
+            written += await cmd.ExecuteNonQueryAsync();
+        }
+
+        Console.WriteLine($" {readCount} read, {written} inserted");
+        return (readCount, written);
+    }
+
+    /// <summary>
+    /// Categories need slug + workspace_id (default 1). Old schema has no workspace.
+    /// </summary>
+    static async Task<(int read, int written)> MigrateCategoriesAsync(
+        SqliteConnection sqlite, NpgsqlConnection pg)
+    {
+        Console.Write("  Migrating categories...");
+
+        if (!await SqliteTableExistsAsync(sqlite, "categories"))
+        {
+            Console.WriteLine(" SKIPPED (table not found in SQLite)");
+            return (0, 0);
+        }
+
+        await using var readCmd = sqlite.CreateCommand();
+        readCmd.CommandText = "SELECT id, name, description, created_date FROM categories";
+        await using var reader = await readCmd.ExecuteReaderAsync();
+
+        int readCount = 0, written = 0;
+        while (await reader.ReadAsync())
+        {
+            readCount++;
+            var id = reader.GetInt32(0);
+            var name = reader.IsDBNull(1) ? "" : reader.GetString(1);
+            var description = reader.IsDBNull(2) ? null : reader.GetString(2);
+            var createdDate = reader.IsDBNull(3) ? DateTime.UtcNow : DateTime.Parse(reader.GetString(3));
+            var slug = GenerateSlug(name);
+
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO categories (id, name, slug, description, created_date, workspace_id) VALUES (@id, @name, @slug, @desc, @created, @ws) ON CONFLICT DO NOTHING", pg);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@name", name);
+            cmd.Parameters.AddWithValue("@slug", slug);
+            cmd.Parameters.AddWithValue("@desc", (object?)description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@created", createdDate);
+            cmd.Parameters.AddWithValue("@ws", 1);
+            written += await cmd.ExecuteNonQueryAsync();
+        }
+
+        Console.WriteLine($" {readCount} read, {written} inserted");
+        return (readCount, written);
+    }
+
+    /// <summary>
+    /// PdfFiles need workspace_id (default 1). Old schema stored artist/category as text columns.
+    /// </summary>
+    static async Task<(int read, int written)> MigratePdfFilesAsync(
+        SqliteConnection sqlite, NpgsqlConnection pg)
+    {
+        Console.Write("  Migrating pdf_files...");
+
+        if (!await SqliteTableExistsAsync(sqlite, "pdf_files"))
+        {
+            Console.WriteLine(" SKIPPED (table not found in SQLite)");
+            return (0, 0);
+        }
+
+        await using var readCmd = sqlite.CreateCommand();
+        readCmd.CommandText = "SELECT id, filename, original_name, song_name, musical_key, youtube_link, file_path, file_size, upload_date, file_hash, page_count, description FROM pdf_files";
+        await using var reader = await readCmd.ExecuteReaderAsync();
+
+        int readCount = 0, written = 0;
+        while (await reader.ReadAsync())
+        {
+            readCount++;
+            var values = new object?[12];
+            for (int i = 0; i < 12; i++)
+                values[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+
+            var uploadDate = values[8] is { } v8 ? DateTime.Parse(v8.ToString()!) : DateTime.UtcNow;
+
+            await using var cmd = new NpgsqlCommand(@"
+                INSERT INTO pdf_files (id, filename, original_name, song_name, musical_key, youtube_link, file_path, file_size, upload_date, file_hash, page_count, description, workspace_id)
+                VALUES (@id, @filename, @original, @song, @key, @youtube, @path, @size, @upload, @hash, @pages, @desc, @ws)
+                ON CONFLICT DO NOTHING", pg);
+
+            cmd.Parameters.AddWithValue("@id", Convert.ToInt32(values[0]!));
+            cmd.Parameters.AddWithValue("@filename", (object?)values[1]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@original", (object?)values[2]?.ToString() ?? "unknown.pdf");
+            cmd.Parameters.AddWithValue("@song", (object?)values[3]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@key", (object?)values[4]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@youtube", (object?)values[5]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@path", (object?)values[6]?.ToString() ?? "");
+            cmd.Parameters.AddWithValue("@size", values[7] != null ? Convert.ToInt64(values[7]) : DBNull.Value);
+            cmd.Parameters.AddWithValue("@upload", uploadDate);
+            cmd.Parameters.AddWithValue("@hash", (object?)values[9]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@pages", values[10] != null ? Convert.ToInt32(values[10]) : DBNull.Value);
+            cmd.Parameters.AddWithValue("@desc", (object?)values[11]?.ToString() ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ws", 1);
+
+            written += await cmd.ExecuteNonQueryAsync();
+        }
+
+        Console.WriteLine($" {readCount} read, {written} inserted");
+        return (readCount, written);
+    }
+
+    /// <summary>
+    /// MergeLists need workspace_id (default 1).
+    /// </summary>
+    static async Task<(int read, int written)> MigrateMergeListsAsync(
+        SqliteConnection sqlite, NpgsqlConnection pg)
+    {
+        Console.Write("  Migrating merge_lists...");
+
+        if (!await SqliteTableExistsAsync(sqlite, "merge_lists"))
+        {
+            Console.WriteLine(" SKIPPED (table not found in SQLite)");
+            return (0, 0);
+        }
+
+        await using var readCmd = sqlite.CreateCommand();
+        readCmd.CommandText = "SELECT id, name, observations, created_date, updated_date FROM merge_lists";
+        await using var reader = await readCmd.ExecuteReaderAsync();
+
+        int readCount = 0, written = 0;
+        while (await reader.ReadAsync())
+        {
+            readCount++;
+            var id = reader.GetInt32(0);
+            var name = reader.IsDBNull(1) ? "" : reader.GetString(1);
+            var observations = reader.IsDBNull(2) ? null : reader.GetString(2);
+            var createdDate = reader.IsDBNull(3) ? DateTime.UtcNow : DateTime.Parse(reader.GetString(3));
+            var updatedDate = reader.IsDBNull(4) ? (DateTime?)null : DateTime.Parse(reader.GetString(4));
+
+            await using var cmd = new NpgsqlCommand(
+                "INSERT INTO merge_lists (id, name, observations, created_date, updated_date, workspace_id) VALUES (@id, @name, @obs, @created, @updated, @ws) ON CONFLICT DO NOTHING", pg);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@name", name);
+            cmd.Parameters.AddWithValue("@obs", (object?)observations ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@created", createdDate);
+            cmd.Parameters.AddWithValue("@updated", (object?)updatedDate ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@ws", 1);
+            written += await cmd.ExecuteNonQueryAsync();
+        }
+
+        Console.WriteLine($" {readCount} read, {written} inserted");
+        return (readCount, written);
+    }
+
     static async Task<(int read, int written)> MigrateUsersAsync(
-        SqliteConnection sqlite, MySqlConnection mysql)
+        SqliteConnection sqlite, NpgsqlConnection pg)
     {
         Console.Write("  Migrating users → core_users...");
 
-        // Check if users table exists in SQLite
-        await using var checkCmd = sqlite.CreateCommand();
-        checkCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='users'";
-        if (await checkCmd.ExecuteScalarAsync() == null)
+        if (!await SqliteTableExistsAsync(sqlite, "users"))
         {
             Console.WriteLine(" SKIPPED (users table not found in SQLite)");
             return (0, 0);
         }
 
-        // Build old role_id → role_name map from SQLite
         var oldRoleNames = new Dictionary<int, string>();
+        if (await SqliteTableExistsAsync(sqlite, "roles"))
         {
-            await using var cmd = sqlite.CreateCommand();
-            cmd.CommandText = "SELECT id, name FROM roles";
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                oldRoleNames[reader.GetInt32(0)] = reader.GetString(1).ToLowerInvariant();
+            await using var roleCmd = sqlite.CreateCommand();
+            roleCmd.CommandText = "SELECT id, name FROM roles";
+            await using var roleReader = await roleCmd.ExecuteReaderAsync();
+            while (await roleReader.ReadAsync())
+                oldRoleNames[roleReader.GetInt32(0)] = roleReader.GetString(1).ToLowerInvariant();
         }
 
-        // Build role_name → new core_roles Id map from MySQL
         var newRoleIds = new Dictionary<string, int>();
         {
-            await using var cmd = mysql.CreateCommand();
-            cmd.CommandText = "SELECT Id, Name FROM core_roles";
+            await using var cmd = new NpgsqlCommand("SELECT \"Id\", \"Name\" FROM core_roles", pg);
             await using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
                 newRoleIds[reader.GetString(1).ToLowerInvariant()] = reader.GetInt32(0);
@@ -200,7 +357,6 @@ class Program
 
         var defaultRoleId = newRoleIds.GetValueOrDefault("viewer", 1);
 
-        // Read all users from SQLite into memory first
         var users = new List<Dictionary<string, object?>>();
         {
             await using var cmd = sqlite.CreateCommand();
@@ -221,30 +377,31 @@ class Program
             return (0, 0);
         }
 
-        // Insert each user into core_users
         int written = 0;
         foreach (var u in users)
         {
             var oldRoleId = u["role_id"] != null ? Convert.ToInt32(u["role_id"]) : 0;
             var oldRoleName = oldRoleNames.GetValueOrDefault(oldRoleId, "viewer");
             var newRoleId = newRoleIds.GetValueOrDefault(oldRoleName, defaultRoleId);
+            var createdAt = u["created_date"] != null ? DateTime.Parse(u["created_date"]!.ToString()!) : DateTime.UtcNow;
+            var lastLogin = u["last_login_date"] != null ? (DateTime?)DateTime.Parse(u["last_login_date"]!.ToString()!) : null;
 
-            await using var insertCmd = mysql.CreateCommand();
-            insertCmd.CommandText = @"INSERT IGNORE INTO core_users 
-                (Id, Username, FullName, PasswordHash, RoleId, IsActive, MustChangePassword, CreatedAt, LastLoginDate) 
-                VALUES (@id, @username, @fullName, @passwordHash, @roleId, @isActive, @mustChange, @createdAt, @lastLogin)";
+            await using var cmd = new NpgsqlCommand(@"
+                INSERT INTO core_users (""Id"", ""Username"", ""FullName"", ""PasswordHash"", ""RoleId"", ""IsActive"", ""MustChangePassword"", ""CreatedAt"", ""LastLoginDate"")
+                VALUES (@id, @username, @fullName, @passwordHash, @roleId, @isActive, @mustChange, @createdAt, @lastLogin)
+                ON CONFLICT DO NOTHING", pg);
 
-            insertCmd.Parameters.AddWithValue("@id", u["id"]!);
-            insertCmd.Parameters.AddWithValue("@username", u["username"]!);
-            insertCmd.Parameters.AddWithValue("@fullName", u["full_name"] ?? "");
-            insertCmd.Parameters.AddWithValue("@passwordHash", u["password_hash"]!);
-            insertCmd.Parameters.AddWithValue("@roleId", newRoleId);
-            insertCmd.Parameters.AddWithValue("@isActive", u["is_active"] != null ? Convert.ToInt32(u["is_active"]) : 1);
-            insertCmd.Parameters.AddWithValue("@mustChange", u["must_change_password"] != null ? Convert.ToInt32(u["must_change_password"]) : 0);
-            insertCmd.Parameters.AddWithValue("@createdAt", u["created_date"] ?? DateTime.UtcNow);
-            insertCmd.Parameters.AddWithValue("@lastLogin", u["last_login_date"] ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", Convert.ToInt32(u["id"]!));
+            cmd.Parameters.AddWithValue("@username", u["username"]!.ToString()!);
+            cmd.Parameters.AddWithValue("@fullName", u["full_name"]?.ToString() ?? "");
+            cmd.Parameters.AddWithValue("@passwordHash", u["password_hash"]!.ToString()!);
+            cmd.Parameters.AddWithValue("@roleId", newRoleId);
+            cmd.Parameters.AddWithValue("@isActive", u["is_active"] != null && Convert.ToInt32(u["is_active"]) == 1);
+            cmd.Parameters.AddWithValue("@mustChange", u["must_change_password"] != null && Convert.ToInt32(u["must_change_password"]) == 1);
+            cmd.Parameters.AddWithValue("@createdAt", createdAt);
+            cmd.Parameters.AddWithValue("@lastLogin", (object?)lastLogin ?? DBNull.Value);
 
-            written += await insertCmd.ExecuteNonQueryAsync();
+            written += await cmd.ExecuteNonQueryAsync();
         }
 
         Console.WriteLine($" {users.Count} read, {written} inserted");
@@ -261,6 +418,55 @@ class Program
         return (users.Count, written);
     }
 
+    /// <summary>
+    /// Reset PostgreSQL sequences to max(id)+1 so new inserts get correct IDs.
+    /// </summary>
+    static async Task ResetSequencesAsync(NpgsqlConnection pg)
+    {
+        Console.Write("  Resetting PostgreSQL sequences...");
+
+        var tables = new[] { "artists", "categories", "pdf_files", "merge_lists", "merge_list_items", "file_categories", "file_artists" };
+
+        foreach (var table in tables)
+        {
+            await using var cmd = new NpgsqlCommand(
+                $"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(MAX(id), 0) + 1, false) FROM {table}", pg);
+            try { await cmd.ExecuteScalarAsync(); }
+            catch { /* sequence might not exist for some tables */ }
+        }
+
+        // core_users uses PascalCase column
+        await using var usersCmd = new NpgsqlCommand(
+            "SELECT setval(pg_get_serial_sequence('core_users', 'Id'), COALESCE(MAX(\"Id\"), 0) + 1, false) FROM core_users", pg);
+        try { await usersCmd.ExecuteScalarAsync(); }
+        catch { /* ignore */ }
+
+        Console.WriteLine(" done");
+    }
+
+    static async Task<bool> SqliteTableExistsAsync(SqliteConnection sqlite, string table)
+    {
+        await using var cmd = sqlite.CreateCommand();
+        cmd.CommandText = $"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'";
+        return await cmd.ExecuteScalarAsync() != null;
+    }
+
+    static string GenerateSlug(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "unnamed";
+        var slug = text.ToLowerInvariant()
+            .Replace("á", "a").Replace("à", "a").Replace("ã", "a").Replace("â", "a")
+            .Replace("é", "e").Replace("ê", "e")
+            .Replace("í", "i")
+            .Replace("ó", "o").Replace("õ", "o").Replace("ô", "o")
+            .Replace("ú", "u").Replace("ü", "u")
+            .Replace("ç", "c");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[\s]+", "-");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"-+", "-");
+        return slug.Trim('-');
+    }
+
     static string ExtractHost(string connectionString)
     {
         try
@@ -270,10 +476,10 @@ class Program
                 .Where(p => p.Length == 2)
                 .ToDictionary(p => p[0].Trim(), p => p[1].Trim(), StringComparer.OrdinalIgnoreCase);
 
-            var server = parts.GetValueOrDefault("Server", "?");
-            var port = parts.GetValueOrDefault("Port", "3306");
+            var host = parts.GetValueOrDefault("Host", "?");
+            var port = parts.GetValueOrDefault("Port", "5432");
             var db = parts.GetValueOrDefault("Database", "?");
-            return $"{server}:{port}/{db}";
+            return $"{host}:{port}/{db}";
         }
         catch
         {
