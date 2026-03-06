@@ -373,7 +373,11 @@ public class MusicService : IMusicService
 
             var group = await _context.CustomFilterGroups
                 .FirstOrDefaultAsync(g => g.WorkspaceId == workspaceId && g.Slug == groupSlug);
-            if (group == null) continue;
+            if (group == null)
+            {
+                _logger.LogWarning("Custom filter group not found: slug={Slug}, workspaceId={WorkspaceId}", groupSlug, workspaceId);
+                continue;
+            }
 
             var distinctNames = valueNames.Distinct().ToList();
             var existingValues = await _context.CustomFilterValues

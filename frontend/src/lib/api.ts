@@ -148,6 +148,7 @@ export const musicApi = {
             artist?: string
             category?: string
             categories?: string[]
+            custom_filters?: Record<string, string[]>
             musical_key?: string
             youtube_link?: string
             observations?: string
@@ -179,6 +180,10 @@ export const musicApi = {
 
             if (meta?.new_categories?.length) {
                 meta.new_categories.forEach(cat => form.append('new_categories', cat))
+            }
+
+            if (meta?.custom_filters && Object.keys(meta.custom_filters).length > 0) {
+                form.append('custom_filters_json', JSON.stringify(meta.custom_filters))
             }
 
             try {

@@ -75,7 +75,8 @@ public class FilesController : ControllerBase
         [FromForm] string? youtube_link = null,
         [FromForm] string? description = null,
         [FromForm] List<string>? new_categories = null,
-        [FromForm] string? new_artist = null)
+        [FromForm] string? new_artist = null,
+        [FromForm] string? custom_filters_json = null)
     {
         if (!CoreAuthHelper.IsAuthenticated(HttpContext))
             return Unauthorized(new { error = "Não autenticado" });
@@ -107,11 +108,25 @@ public class FilesController : ControllerBase
                 .Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().ToList();
             var finalArtist = !string.IsNullOrWhiteSpace(new_artist) && string.IsNullOrWhiteSpace(artist) ? new_artist : artist;
 
+            Dictionary<string, List<string>>? customFilters = null;
+            if (!string.IsNullOrEmpty(custom_filters_json))
+            {
+                try
+                {
+                    customFilters = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, List<string>>>(custom_filters_json);
+                }
+                catch (System.Text.Json.JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse custom_filters_json: {Json}", custom_filters_json);
+                }
+            }
+
             var result = await _musicService.UploadMusicAsync(workspace_id, file, new FileUploadDto
             {
                 SongName = song_name,
                 Artist = finalArtist,
                 Categories = allCategories,
+                CustomFilters = customFilters,
                 MusicalKey = musical_key,
                 YoutubeLink = youtube_link,
                 Description = description
