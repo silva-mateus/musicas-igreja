@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, Suspense } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { MainLayout } from '@/components/layout/main-layout'
 import { MusicUnifiedFilters } from '@/components/music/music-unified-filters'
@@ -20,23 +20,108 @@ import Link from 'next/link'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { useQuery } from '@tanstack/react-query'
+import {
+    useUrlParams,
+    parseString,
+    parseNumber,
+    parseBoolean,
+    parseCommaSeparated,
+    serialiseCommaSeparated,
+    serialiseBoolean,
+} from '@/hooks/use-url-state'
 
-type TabValue = string
+const CF_PREFIX = 'cf_'
+
+function useFiltersFromUrl() {
+    const { searchParams, setParams } = useUrlParams()
+
+    const activeTab = parseString(searchParams, 'tab') ?? 'all'
+
+    const filters = useMemo<SearchFilters>(() => {
+        const f: SearchFilters = {}
+        const title = parseString(searchParams, 'title')
+        if (title) f.title = title
+        const artist = parseCommaSeparated(searchParams, 'artist')
+        if (artist) f.artist = artist
+        const category = parseCommaSeparated(searchParams, 'category')
+        if (category) f.category = category
+        const musicalKey = parseString(searchParams, 'key')
+        if (musicalKey) f.musical_key = musicalKey
+        const hasYoutube = parseBoolean(searchParams, 'youtube')
+        if (hasYoutube !== undefined) f.has_youtube = hasYoutube
+
+        const customFilters: Record<string, string[]> = {}
+        searchParams.forEach((value, key) => {
+            if (key.startsWith(CF_PREFIX) && value) {
+                const slug = key.slice(CF_PREFIX.length)
+                const arr = value.split(',').filter(Boolean)
+                if (arr.length > 0) customFilters[slug] = arr
+            }
+        })
+        if (Object.keys(customFilters).length > 0) f.custom_filters = customFilters
+
+        return f
+    }, [searchParams])
+
+    const pagination = useMemo<PaginationParams>(() => ({
+        page: parseNumber(searchParams, 'page') ?? 1,
+        limit: parseNumber(searchParams, 'limit') ?? 20,
+        sort_by: parseString(searchParams, 'sort_by') ?? 'upload_date',
+        sort_order: (parseString(searchParams, 'sort_order') as 'asc' | 'desc') ?? 'desc',
+    }), [searchParams])
+
+    const setActiveTab = (tab: string) => {
+        setParams({ tab: tab === 'all' ? undefined : tab })
+    }
+
+    const setFilters = (newFilters: SearchFilters) => {
+        const updates: Record<string, string | undefined> = {
+            title: newFilters.title || undefined,
+            artist: serialiseCommaSeparated(newFilters.artist),
+            category: serialiseCommaSeparated(newFilters.category),
+            key: newFilters.musical_key || undefined,
+            youtube: serialiseBoolean(newFilters.has_youtube),
+            page: undefined,
+        }
+
+        searchParams.forEach((_v, k) => {
+            if (k.startsWith(CF_PREFIX)) updates[k] = undefined
+        })
+        if (newFilters.custom_filters) {
+            for (const [slug, vals] of Object.entries(newFilters.custom_filters)) {
+                if (vals.length > 0) updates[`${CF_PREFIX}${slug}`] = vals.join(',')
+            }
+        }
+
+        setParams(updates)
+    }
+
+    const setPagination = (patch: Partial<PaginationParams>) => {
+        const updates: Record<string, string | undefined> = {}
+        if (patch.page !== undefined) updates.page = patch.page <= 1 ? undefined : String(patch.page)
+        if (patch.limit !== undefined) updates.limit = patch.limit === 20 ? undefined : String(patch.limit)
+        if (patch.sort_by !== undefined) updates.sort_by = patch.sort_by === 'upload_date' ? undefined : patch.sort_by
+        if (patch.sort_order !== undefined) updates.sort_order = patch.sort_order === 'desc' ? undefined : patch.sort_order
+        setParams(updates)
+    }
+
+    return { activeTab, setActiveTab, filters, setFilters, pagination, setPagination }
+}
 
 export default function MusicPage() {
+    return (
+        <Suspense>
+            <MusicPageContent />
+        </Suspense>
+    )
+}
+
+function MusicPageContent() {
     const { hasPermission } = useAuth()
     const { activeWorkspace } = useWorkspace()
     const canUpload = hasPermission('music:upload')
     const queryClient = useQueryClient()
-    const [activeTab, setActiveTab] = useState<TabValue>('all')
-    
-    const [filters, setFilters] = useState<SearchFilters>({})
-    const [pagination, setPagination] = useState<PaginationParams>({
-        page: 1,
-        limit: 20,
-        sort_by: 'upload_date',
-        sort_order: 'desc',
-    })
+    const { activeTab, setActiveTab, filters, setFilters, pagination, setPagination } = useFiltersFromUrl()
 
     const { 
         data: musics, 
@@ -75,15 +160,14 @@ export default function MusicPage() {
 
     const handleFiltersChange = (newFilters: SearchFilters) => {
         setFilters(newFilters)
-        setPagination((prev) => ({ ...prev, page: 1 }))
     }
 
     const handlePageChange = (page: number) => {
-        setPagination((prev) => ({ ...prev, page }))
+        setPagination({ page })
     }
 
     const handleSortChange = (sort_by: string, sort_order: 'asc' | 'desc') => {
-        setPagination((prev) => ({ ...prev, sort_by, sort_order, page: 1 }))
+        setPagination({ sort_by, sort_order, page: 1 })
     }
 
     const handleRefreshAll = () => {

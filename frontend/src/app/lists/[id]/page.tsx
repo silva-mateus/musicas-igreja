@@ -225,11 +225,9 @@ export default function ListDetailsPage() {
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="outline" size="sm" asChild className="self-start shrink-0">
-                                    <Link href="/lists">
-                                        <ArrowLeft className="h-4 w-4 mr-2" />
-                                        Voltar
-                                    </Link>
+                                <Button variant="outline" size="sm" className="self-start shrink-0" onClick={() => router.back()}>
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Voltar
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>

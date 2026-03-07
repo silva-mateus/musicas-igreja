@@ -149,11 +149,9 @@ export default function MusicDetailsPage() {
                 {/* Header + ações */}
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                        <Button variant="outline" size="sm" asChild className="self-start">
-                            <Link href="/music">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Voltar
-                            </Link>
+                        <Button variant="outline" size="sm" className="self-start" onClick={() => router.back()}>
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Voltar
                         </Button>
                         <div className="text-sm text-muted-foreground truncate">
                             <Link href="/music" className="hover:text-primary">Músicas</Link>

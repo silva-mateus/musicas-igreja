@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, Suspense } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { MainLayout } from '@/components/layout/main-layout'
@@ -22,18 +22,31 @@ import { getActiveWorkspaceId } from '@/lib/api'
 import { debounce } from '@/lib/utils'
 import { InstructionsModal, PAGE_INSTRUCTIONS } from '@/components/ui/instructions-modal'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { useUrlParams, parseString, parseNumber } from '@/hooks/use-url-state'
 
 export default function ListsPage() {
+    return (
+        <Suspense>
+            <ListsPageContent />
+        </Suspense>
+    )
+}
+
+function ListsPageContent() {
     const { toast } = useToast()
     const { hasPermission } = useAuth()
     const { activeWorkspace } = useWorkspace()
     const canEdit = hasPermission('music:edit_metadata') || hasPermission('lists:manage')
     const queryClient = useQueryClient()
+    const { searchParams, setParams } = useUrlParams()
 
-    const [searchTerm, setSearchTerm] = useState('')
+    const searchTerm = parseString(searchParams, 'search') ?? ''
+    const [inputValue, setInputValue] = useState(searchTerm)
     const [showCreateDialog, setShowCreateDialog] = useState(false)
-    const [page, setPage] = useState(1)
-    const [sortBy, setSortBy] = useState<{ field: string, order: 'asc' | 'desc' }>({ field: 'created_date', order: 'desc' })
+    const page = parseNumber(searchParams, 'page') ?? 1
+    const sortField = parseString(searchParams, 'sort_field') ?? 'created_date'
+    const sortOrder = (parseString(searchParams, 'sort_order') as 'asc' | 'desc') ?? 'desc'
+    const sortBy = { field: sortField, order: sortOrder }
 
     // Fetch lists using TanStack Query
     const wsId = activeWorkspace?.id ?? getActiveWorkspaceId()
@@ -72,12 +85,19 @@ export default function ListsPage() {
 
     const lists = listsResponse || { data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } }
 
-    const debouncedSearch = debounce((term: string) => {
-        setSearchTerm(term)
-        setPage(1)
-    }, 500)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const debouncedSearch = useCallback(
+        debounce((term: string) => {
+            setParams({
+                search: term || undefined,
+                page: undefined,
+            })
+        }, 500),
+        [setParams],
+    )
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInputValue(e.target.value)
         debouncedSearch(e.target.value)
     }
 
@@ -99,7 +119,7 @@ export default function ListsPage() {
     }
 
     const handlePageChange = (newPage: number) => {
-        setPage(newPage)
+        setParams({ page: newPage <= 1 ? undefined : String(newPage) })
     }
 
     const handleRefresh = () => {
@@ -146,6 +166,7 @@ export default function ListsPage() {
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Buscar listas por nome..."
+                                    value={inputValue}
                                     onChange={handleSearchChange}
                                     className="pl-10"
                                 />
@@ -154,7 +175,10 @@ export default function ListsPage() {
                                 value={`${sortBy.field}:${sortBy.order}`}
                                 onValueChange={(v) => {
                                     const [field, order] = v.split(':')
-                                    setSortBy({ field, order: order as 'asc' | 'desc' })
+                                    setParams({
+                                        sort_field: field === 'created_date' ? undefined : field,
+                                        sort_order: order === 'desc' ? undefined : order,
+                                    })
                                 }}
                             >
                                 <SelectTrigger className="w-auto min-w-[160px] gap-2">
