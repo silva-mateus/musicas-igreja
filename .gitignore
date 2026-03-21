@@ -75,6 +75,9 @@ frontend/coverage/
 frontend/.eslintcache
 frontend/test-results/
 frontend/e2e-results/
+frontend/e2e-results.json
+frontend/playwright-report/
+frontend/playwright/.auth/
 
 # Environment
 .env
