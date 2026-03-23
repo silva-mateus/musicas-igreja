@@ -61,3 +61,9 @@ public class ReplaceDuplicateRequest
     [JsonPropertyName("remove_file_ids")]
     public List<int> RemoveFileIds { get; set; } = new();
 }
+
+public class ApplyNormalizedTitlesRequest
+{
+    [JsonPropertyName("file_ids")]
+    public List<int>? FileIds { get; set; }
+}

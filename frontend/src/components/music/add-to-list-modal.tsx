@@ -135,15 +135,19 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <SimpleTooltip label="Adicionar à lista">
+            {trigger ? (
+                <DialogTrigger asChild>
+                    {trigger}
+                </DialogTrigger>
+            ) : (
+                <SimpleTooltip label="Adicionar à lista">
+                    <DialogTrigger asChild>
                         <Button variant="ghost" size="icon">
                             <ListPlus className="h-4 w-4" />
                         </Button>
-                    </SimpleTooltip>
-                )}
-            </DialogTrigger>
+                    </DialogTrigger>
+                </SimpleTooltip>
+            )}
 
             <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
                 <DialogHeader>

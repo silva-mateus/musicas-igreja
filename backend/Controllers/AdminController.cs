@@ -192,6 +192,117 @@ public class AdminController : ControllerBase
         });
     }
 
+    [HttpGet("normalize-titles")]
+    public async Task<ActionResult> NormalizeTitles()
+    {
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.AccessAdmin))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        var files = await _context.PdfFiles
+            .Where(f => f.SongName != null && f.SongName != "")
+            .ToListAsync();
+
+        var changes = new List<object>();
+
+        foreach (var file in files)
+        {
+            var normalized = _fileService.NormalizeSongTitle(file.SongName);
+            if (normalized != null && normalized != file.SongName)
+            {
+                changes.Add(new
+                {
+                    id = file.Id,
+                    current_title = file.SongName,
+                    normalized_title = normalized
+                });
+            }
+        }
+
+        return Ok(new
+        {
+            total_files = files.Count,
+            changes_count = changes.Count,
+            changes
+        });
+    }
+
+    [HttpPost("apply-normalized-titles")]
+    public async Task<ActionResult> ApplyNormalizedTitles([FromBody] ApplyNormalizedTitlesRequest request)
+    {
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.AccessAdmin))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        if (request.FileIds == null || !request.FileIds.Any())
+            return BadRequest(new { error = "Nenhum arquivo selecionado" });
+
+        var updatedCount = 0;
+        var renamedCount = 0;
+        var errors = new List<string>();
+
+        foreach (var fileId in request.FileIds)
+        {
+            try
+            {
+                var file = await _context.PdfFiles
+                    .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
+                    .FirstOrDefaultAsync(f => f.Id == fileId);
+                if (file == null) continue;
+
+                var normalized = _fileService.NormalizeSongTitle(file.SongName);
+                if (normalized == null || normalized == file.SongName) continue;
+
+                file.SongName = normalized;
+                updatedCount++;
+
+                var artistName = file.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault();
+                var expectedFilename = _fileService.GenerateFilename(file.SongName, artistName, file.OriginalName, file.MusicalKey);
+
+                if (file.Filename == expectedFilename) continue;
+
+                var currentPath = _fileService.GetAbsolutePath(file.FilePath);
+                var directory = Path.GetDirectoryName(currentPath) ?? "";
+                var targetPath = Path.Combine(directory, expectedFilename);
+
+                if (string.Equals(currentPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    file.Filename = expectedFilename;
+                    file.FilePath = _fileService.NormalizeToRelativePath(targetPath);
+                    renamedCount++;
+                    continue;
+                }
+
+                if (System.IO.File.Exists(targetPath))
+                {
+                    _logger.LogWarning("Normalize title {FileId}: skipped rename - target already exists at {TargetPath}", fileId, targetPath);
+                    continue;
+                }
+
+                if (System.IO.File.Exists(currentPath))
+                {
+                    System.IO.File.Move(currentPath, targetPath);
+                    file.Filename = expectedFilename;
+                    file.FilePath = _fileService.NormalizeToRelativePath(targetPath);
+                    renamedCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao normalizar título do arquivo {FileId}", fileId);
+                errors.Add($"Erro no arquivo {fileId}: {ex.Message}");
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            updated_count = updatedCount,
+            renamed_count = renamedCount,
+            errors = errors.Any() ? errors : null
+        });
+    }
+
     [HttpGet("discover-entities")]
     public async Task<ActionResult> DiscoverEntities()
     {

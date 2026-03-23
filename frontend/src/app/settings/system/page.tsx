@@ -9,6 +9,8 @@ import { Label } from '@core/components/ui/label'
 import { Badge } from '@core/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@core/components/ui/tooltip'
 import { useAuth } from '@core/contexts/auth-context'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@core/components/ui/table'
+import { Checkbox } from '@core/components/ui/checkbox'
 import {
     Settings,
     Save,
@@ -23,6 +25,8 @@ import {
     Hash,
     Database,
     Lock,
+    Type,
+    ArrowRight,
 } from 'lucide-react'
 import { useToast } from '@core/hooks/use-toast'
 import { adminApi } from '@/lib/api'
@@ -65,6 +69,13 @@ export default function SystemSettingsPage() {
         artists: [],
         categories: []
     })
+
+    // Title Normalization
+    const [titleChanges, setTitleChanges] = useState<{ id: number; current_title: string; normalized_title: string }[]>([])
+    const [selectedTitleIds, setSelectedTitleIds] = useState<number[]>([])
+    const [isCheckingTitles, setIsCheckingTitles] = useState(false)
+    const [isApplyingTitles, setIsApplyingTitles] = useState(false)
+    const [titleTotalFiles, setTitleTotalFiles] = useState(0)
 
     const handleRunFullVerification = async () => {
         setIsRunning(true)
@@ -212,6 +223,81 @@ export default function SystemSettingsPage() {
             ...prev,
             [type]: prev[type].length === allEntities.length ? [] : allEntities
         }))
+    }
+
+    const handleCheckTitles = async () => {
+        setIsCheckingTitles(true)
+        try {
+            const data = await adminApi.normalizeTitles()
+            setTitleChanges(data.changes || [])
+            setTitleTotalFiles(data.total_files || 0)
+            setSelectedTitleIds((data.changes || []).map((c: { id: number }) => c.id))
+
+            if (data.changes_count === 0) {
+                toast({
+                    title: "Verificação concluída",
+                    description: `Todos os ${data.total_files} títulos já estão normalizados.`,
+                })
+            } else {
+                toast({
+                    title: "Títulos para normalizar",
+                    description: `Encontrados ${data.changes_count} títulos que podem ser normalizados.`,
+                })
+            }
+        } catch (error: any) {
+            toast({
+                title: "Erro na verificação",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsCheckingTitles(false)
+        }
+    }
+
+    const handleApplyTitles = async () => {
+        if (selectedTitleIds.length === 0) {
+            toast({
+                title: "Nenhum título selecionado",
+                description: "Selecione pelo menos um título para normalizar.",
+                variant: "destructive",
+            })
+            return
+        }
+
+        setIsApplyingTitles(true)
+        try {
+            const data = await adminApi.applyNormalizedTitles(selectedTitleIds)
+
+            if (data.success) {
+                toast({
+                    title: "Normalização concluída",
+                    description: `${data.updated_count} título(s) atualizado(s), ${data.renamed_count} arquivo(s) renomeado(s).`,
+                })
+                setTitleChanges(prev => prev.filter(c => !selectedTitleIds.includes(c.id)))
+                setSelectedTitleIds([])
+            }
+        } catch (error: any) {
+            toast({
+                title: "Erro na normalização",
+                description: error.message,
+                variant: "destructive",
+            })
+        } finally {
+            setIsApplyingTitles(false)
+        }
+    }
+
+    const handleToggleTitleId = (id: number) => {
+        setSelectedTitleIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        )
+    }
+
+    const handleToggleAllTitles = () => {
+        setSelectedTitleIds(prev =>
+            prev.length === titleChanges.length ? [] : titleChanges.map(c => c.id)
+        )
     }
 
     if (!isAuthenticated) {
@@ -449,6 +535,104 @@ export default function SystemSettingsPage() {
                                             <p>Todas as entidades já estão cadastradas!</p>
                                         </div>
                                     )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Title Normalization */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Type className="h-5 w-5" />
+                            Normalização de Títulos
+                        </CardTitle>
+                        <CardDescription>
+                            Verifica e corrige os nomes das músicas para o formato padrão (Title Case), respeitando artigos e preposições em português.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleCheckTitles}
+                                disabled={isCheckingTitles}
+                                className="gap-2"
+                            >
+                                {isCheckingTitles ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Search className="h-4 w-4" />
+                                )}
+                                {isCheckingTitles ? 'Verificando...' : 'Verificar Títulos'}
+                            </Button>
+                        </div>
+
+                        {titleChanges.length > 0 && (
+                            <div className="space-y-4 border-t pt-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="outline" className="gap-1">
+                                            <Music className="h-3 w-3" />
+                                            {titleTotalFiles} arquivos analisados
+                                        </Badge>
+                                        <Badge variant="secondary" className="gap-1">
+                                            <Type className="h-3 w-3" />
+                                            {titleChanges.length} título(s) para normalizar
+                                        </Badge>
+                                    </div>
+
+                                    <Button
+                                        onClick={handleApplyTitles}
+                                        disabled={isApplyingTitles || selectedTitleIds.length === 0}
+                                        className="gap-2"
+                                    >
+                                        {isApplyingTitles ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Save className="h-4 w-4" />
+                                        )}
+                                        Aplicar Normalização ({selectedTitleIds.length})
+                                    </Button>
+                                </div>
+
+                                <div className="border rounded-md max-h-80 overflow-y-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-10">
+                                                    <Checkbox
+                                                        checked={selectedTitleIds.length === titleChanges.length}
+                                                        onCheckedChange={handleToggleAllTitles}
+                                                    />
+                                                </TableHead>
+                                                <TableHead>Título Atual</TableHead>
+                                                <TableHead className="w-8" />
+                                                <TableHead>Título Normalizado</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {titleChanges.map((change) => (
+                                                <TableRow key={change.id}>
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            checked={selectedTitleIds.includes(change.id)}
+                                                            onCheckedChange={() => handleToggleTitleId(change.id)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-sm text-muted-foreground">
+                                                        {change.current_title}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-sm font-medium">
+                                                        {change.normalized_title}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                             </div>
                         )}
                     </CardContent>

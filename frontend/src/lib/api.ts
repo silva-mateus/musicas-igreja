@@ -493,6 +493,15 @@ export const adminApi = {
     async cleanupLegacyFiles(): Promise<any> {
         return await request<any>('/admin/cleanup-legacy-files', { method: 'POST' })
     },
+    async normalizeTitles(): Promise<any> {
+        return await request<any>('/admin/normalize-titles', { method: 'GET' })
+    },
+    async applyNormalizedTitles(fileIds: number[]): Promise<any> {
+        return await request<any>('/admin/apply-normalized-titles', {
+            method: 'POST',
+            body: JSON.stringify({ file_ids: fileIds })
+        })
+    },
 }
 
 // Dashboard API

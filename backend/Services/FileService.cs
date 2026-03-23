@@ -278,6 +278,8 @@ public class FileService : IFileService
     /// except for small words (articles and connectors) that are not the first word.
     /// This matches the Portuguese language conventions.
     /// </summary>
+    public string? NormalizeSongTitle(string? title) => FormatTitleCase(title);
+
     private static string? FormatTitleCase(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

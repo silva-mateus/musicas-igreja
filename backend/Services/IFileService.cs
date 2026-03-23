@@ -13,4 +13,5 @@ public interface IFileService
     string GetUniqueFilename(string directory, string filename);
     string ComputeFileHash(Stream stream);
     int GetPdfPageCount(string filePath);
+    string? NormalizeSongTitle(string? title);
 }
