@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { Button } from '@core/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@core/components/ui/table'
 import { Badge } from '@core/components/ui/badge'
@@ -23,9 +22,9 @@ import {
     Calendar
 } from 'lucide-react'
 import { useAuth } from '@core/contexts/auth-context'
+import { useRouter } from 'next/navigation'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { AddToListModal } from './add-to-list-modal'
-import { useState } from 'react'
 
 interface MusicTableProps {
     musics: MusicFile[]
@@ -53,7 +52,12 @@ export function MusicTable({
     const canManageLists = hasPermission('lists:manage')
 
     const handleView = (music: MusicFile) => {
-        router.push(`/music/${music.id}`)
+        window.open(`/music/${music.id}`, '_blank')
+    }
+
+    const handleRowClick = (e: React.MouseEvent, music: MusicFile) => {
+        if ((e.target as HTMLElement).closest('button, a, [role="menuitem"], [data-radix-collection-item]')) return
+        window.open(`/music/${music.id}`, '_blank')
     }
 
     const handleEdit = (music: MusicFile) => {
@@ -176,7 +180,11 @@ export function MusicTable({
                 </TableHeader>
                 <TableBody>
                     {musics.map((music) => (
-                        <TableRow key={music.id} className="hover:bg-muted/50">
+                        <TableRow
+                            key={music.id}
+                            className="hover:bg-muted/50 cursor-pointer"
+                            onClick={(e) => handleRowClick(e, music)}
+                        >
                             <TableCell className="font-medium min-w-[180px] max-w-[320px] md:max-w-[420px]">
                                 <div>
                                     <div className="font-medium line-clamp-2">
@@ -263,48 +271,52 @@ export function MusicTable({
                             <TableCell className="text-right w-24">
                                 {/* Desktop Actions */}
                                 <div className="hidden sm:flex justify-end gap-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        title="Visualizar"
-                                        onClick={() => handleView(music)}
-                                    >
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        title="Download"
-                                        onClick={() => handleDownload(music)}
-                                    >
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                    {music.youtube_link ? (
+                                    <SimpleTooltip label="Visualizar">
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            asChild
-                                            title="Ver no YouTube"
-                                            className="text-destructive hover:text-destructive"
+                                            onClick={() => handleView(music)}
                                         >
-                                            <a
-                                                href={music.youtube_link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    </SimpleTooltip>
+                                    <SimpleTooltip label="Download">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDownload(music)}
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                    </SimpleTooltip>
+                                    {music.youtube_link ? (
+                                        <SimpleTooltip label="Ver no YouTube">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                asChild
+                                                className="text-destructive hover:text-destructive"
+                                            >
+                                                <a
+                                                    href={music.youtube_link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Youtube className="h-4 w-4" />
+                                                </a>
+                                            </Button>
+                                        </SimpleTooltip>
+                                    ) : (
+                                        <SimpleTooltip label="Sem link do YouTube">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled
+                                                className="text-muted-foreground"
                                             >
                                                 <Youtube className="h-4 w-4" />
-                                            </a>
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            disabled
-                                            title="Sem link do YouTube"
-                                            className="text-muted-foreground"
-                                        >
-                                            <Youtube className="h-4 w-4" />
-                                        </Button>
+                                            </Button>
+                                        </SimpleTooltip>
                                     )}
                                     {canManageLists && (
                                         <AddToListModal
@@ -314,14 +326,15 @@ export function MusicTable({
                                         />
                                     )}
                                     {canEdit && (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Editar"
-                                            onClick={() => handleEdit(music)}
-                                        >
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
+                                        <SimpleTooltip label="Editar">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleEdit(music)}
+                                            >
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        </SimpleTooltip>
                                     )}
                                 </div>
 

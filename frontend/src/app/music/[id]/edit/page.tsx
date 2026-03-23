@@ -20,6 +20,7 @@ import type { MusicFile as MusicType } from '@/types'
 import { musicApi, handleApiError, getActiveWorkspaceId } from '@/lib/api'
 import { UploadZone } from '@/components/upload/upload-zone'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
 const CATEGORIES = ['Adoração', 'Louvor', 'Comunhão', 'Entrada', 'Ofertório', 'Final', 'Santíssimo', 'Missa']
 const MUSICAL_KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm']
@@ -225,10 +226,7 @@ export default function EditMusicPage() {
         return (
             <MainLayout>
                 <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                        <p>Carregando...</p>
-                    </div>
+                    <LoadingSpinner />
                 </div>
             </MainLayout>
         )
@@ -351,6 +349,17 @@ export default function EditMusicPage() {
                                                         }
                                                         handleInputChange('custom_filters' as keyof FormData, newFilters as any)
                                                     }}
+                                                    onCreateNew={(newValue) => {
+                                                        setSuggestions(prev => ({
+                                                            ...prev,
+                                                            customFilterGroups: prev.customFilterGroups.map(g =>
+                                                                g.slug === group.slug
+                                                                    ? { ...g, values: [...g.values, { name: newValue, slug: newValue.toLowerCase().replace(/\s+/g, '-') }].sort((a, b) => a.name.localeCompare(b.name)) }
+                                                                    : g
+                                                            )
+                                                        }))
+                                                    }}
+                                                    createLabel={`Criar ${group.name.toLowerCase()}`}
                                                     placeholder={`Selecionar ${group.name.toLowerCase()}`}
                                                 />
                                             </div>

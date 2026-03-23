@@ -15,6 +15,7 @@ import { useToast } from '@core/hooks/use-toast'
 import { formatFileSize } from '@/lib/utils'
 import { getActiveWorkspaceId } from '@/lib/api'
 import { MultiSelect } from '@/components/ui/multi-select'
+import { Autocomplete } from '@/components/ui/autocomplete'
 
 interface FileMetadata {
     file: File
@@ -67,8 +68,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         artists: [],
         musical_keys: DEFAULT_MUSICAL_KEYS
     })
-    const [newCategoryInputs, setNewCategoryInputs] = useState<{ [key: number]: string }>({})
-    const [showNewCategoryInput, setShowNewCategoryInput] = useState<Set<number>>(new Set())
 
     const [batchValues, setBatchValues] = useState<{
         categories: string[]
@@ -149,8 +148,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         // Only reset UI state if this is a completely new set of files
         if (files.length === 0) {
             setExpandedItems(new Set())
-            setNewCategoryInputs({})
-            setShowNewCategoryInput(new Set())
         }
     }, [files])
 
@@ -211,36 +208,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
         setMetadata(prev => prev.map((item, i) =>
             i === index ? { ...item, [field]: value } : item
         ))
-    }
-
-    const addNewCategory = (index: number) => {
-        const newCategory = newCategoryInputs[index]?.trim()
-        if (!newCategory || suggestions.categories.includes(newCategory)) return
-
-        // Adicionar à lista de sugestões localmente
-        setSuggestions(prev => ({
-            ...prev,
-            categories: [...prev.categories, newCategory].sort()
-        }))
-
-        // Adicionar à lista de categorias do item
-        setMetadata(prev => prev.map((item, i) =>
-            i === index
-                ? {
-                    ...item,
-                    categories: [...item.categories, newCategory],
-                    new_categories: [...(item.new_categories || []), newCategory]
-                }
-                : item
-        ))
-
-        // Limpar input e esconder
-        setNewCategoryInputs(prev => ({ ...prev, [index]: '' }))
-        setShowNewCategoryInput(prev => {
-            const newSet = new Set(prev)
-            newSet.delete(index)
-            return newSet
-        })
     }
 
     const toggleExpanded = (index: number) => {
@@ -329,7 +296,6 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                            batchValues.artist.trim() !== '' || 
                            batchValues.musical_key !== ''
 
-    // Criar nova categoria nas sugestões
     const handleCreateCategory = (newCategory: string) => {
         if (!suggestions.categories.includes(newCategory)) {
             setSuggestions(prev => ({
@@ -337,6 +303,26 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                 categories: [...prev.categories, newCategory].sort()
             }))
         }
+    }
+
+    const handleCreateArtist = (newArtist: string) => {
+        if (!suggestions.artists.includes(newArtist)) {
+            setSuggestions(prev => ({
+                ...prev,
+                artists: [...prev.artists, newArtist].sort()
+            }))
+        }
+    }
+
+    const handleCreateCustomFilterValue = (groupSlug: string, newValue: string) => {
+        setSuggestions(prev => ({
+            ...prev,
+            customFilterGroups: prev.customFilterGroups.map(g =>
+                g.slug === groupSlug
+                    ? { ...g, values: [...g.values, { name: newValue, slug: newValue.toLowerCase().replace(/\s+/g, '-') }].sort((a, b) => a.name.localeCompare(b.name)) }
+                    : g
+            )
+        }))
     }
 
     if (files.length === 0) return null
@@ -439,6 +425,8 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                         }
                                         return { ...prev, custom_filters: newFilters }
                                     })}
+                                    onCreateNew={(newValue) => handleCreateCustomFilterValue(group.slug, newValue)}
+                                    createLabel={`Criar ${group.name.toLowerCase()}`}
                                     placeholder={`Selecionar ${group.name.toLowerCase()}...`}
                                 />
                             </div>
@@ -452,18 +440,14 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                     </Badge>
                                 )}
                             </Label>
-                            <Input
-                                list="batch-artists-list"
-                                placeholder="Selecione ou digite..."
+                            <Autocomplete
+                                options={suggestions.artists}
                                 value={batchValues.artist}
-                                onChange={(e) => setBatchValues(prev => ({ ...prev, artist: e.target.value }))}
-                                className="h-9"
+                                onChange={(value) => setBatchValues(prev => ({ ...prev, artist: value }))}
+                                onCreateNew={handleCreateArtist}
+                                placeholder="Selecione ou digite..."
+                                createLabel="Criar artista"
                             />
-                            <datalist id="batch-artists-list">
-                                {suggestions.artists.map((a) => (
-                                    <option key={a} value={a} />
-                                ))}
-                            </datalist>
                         </div>
                         <div className="space-y-2">
                             <Label className="flex items-center gap-1 text-xs">
@@ -657,86 +641,26 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
 
                                     <div className="space-y-2">
                                         <Label htmlFor={`artist-${index}`}>Artista</Label>
-                                        <Input
-                                            id={`artist-${index}`}
-                                            list={`artists-list-${index}`}
+                                        <Autocomplete
+                                            options={suggestions.artists}
                                             value={item.artist}
-                                            onChange={(e) => updateMetadata(index, 'artist', e.target.value)}
-                                            placeholder="Digite para usar um novo artista ou selecione um existente"
+                                            onChange={(value) => updateMetadata(index, 'artist', value)}
+                                            onCreateNew={handleCreateArtist}
+                                            placeholder="Digite o nome do artista ou compositor"
+                                            createLabel="Criar artista"
                                         />
-                                        <datalist id={`artists-list-${index}`}>
-                                            {suggestions.artists.map((a) => (
-                                                <option key={a} value={a} />
-                                            ))}
-                                        </datalist>
                                     </div>
 
                                     <div className="space-y-2">
                                         <Label htmlFor={`category-${index}`}>Categorias *</Label>
-                                        <div className="flex gap-2">
-                                            <MultiSelect
-                                                options={suggestions.categories}
-                                                value={item.categories}
-                                                onChange={(value) => updateMetadata(index, 'categories', value)}
-                                                placeholder="Selecionar categorias"
-                                                className="flex-1"
-                                            />
-                                            <SimpleTooltip label="Adicionar nova categoria">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setShowNewCategoryInput(prev => {
-                                                            const newSet = new Set(prev)
-                                                            newSet.add(index)
-                                                            return newSet
-                                                        })
-                                                    }}
-                                                    className="px-2"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </SimpleTooltip>
-                                        </div>
-                                        {showNewCategoryInput.has(index) && (
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    placeholder="Nova categoria"
-                                                    value={newCategoryInputs[index] || ''}
-                                                    onChange={(e) => setNewCategoryInputs(prev => ({ ...prev, [index]: e.target.value }))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault()
-                                                            addNewCategory(index)
-                                                        }
-                                                    }}
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    onClick={() => addNewCategory(index)}
-                                                    disabled={!newCategoryInputs[index]?.trim()}
-                                                >
-                                                    <Check className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setShowNewCategoryInput(prev => {
-                                                            const newSet = new Set(prev)
-                                                            newSet.delete(index)
-                                                            return newSet
-                                                        })
-                                                        setNewCategoryInputs(prev => ({ ...prev, [index]: '' }))
-                                                    }}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <MultiSelect
+                                            options={suggestions.categories}
+                                            value={item.categories}
+                                            onChange={(value) => updateMetadata(index, 'categories', value)}
+                                            onCreateNew={handleCreateCategory}
+                                            placeholder="Selecionar categorias"
+                                            createLabel="Criar categoria"
+                                        />
                                     </div>
 
                                     {suggestions.customFilterGroups.map(group => (
@@ -754,6 +678,8 @@ export function UploadMetadataEditor({ files, onMetadataChange, onRemoveFile }: 
                                                     }
                                                     updateMetadata(index, 'custom_filters' as any, newFilters as any)
                                                 }}
+                                                onCreateNew={(newValue) => handleCreateCustomFilterValue(group.slug, newValue)}
+                                                createLabel={`Criar ${group.name.toLowerCase()}`}
                                                 placeholder={`Selecionar ${group.name.toLowerCase()}`}
                                                 className="flex-1"
                                             />

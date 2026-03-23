@@ -17,6 +17,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useToast } from '@core/hooks/use-toast'
 import { useAuth } from '@core/contexts/auth-context'
+import { useWorkspace } from '@/contexts/workspace-context'
 import { request, customFiltersApi, handleApiError } from '@/lib/api'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
@@ -75,6 +76,7 @@ interface DeleteDialogState {
 export default function ManagePage() {
     const { toast } = useToast()
     const { hasPermission, isAuthenticated } = useAuth()
+    const { activeWorkspace } = useWorkspace()
     const canEdit = hasPermission('music:edit_metadata') || hasPermission('lists:manage')
     const canDelete = hasPermission('music:delete')
 
@@ -495,7 +497,7 @@ export default function ManagePage() {
             <div className="space-y-6">
                 <PageHeader
                     icon={Settings}
-                    title="Gerenciar Entidades"
+                    title={`Gerenciar Entidades${activeWorkspace ? ` — ${activeWorkspace.name}` : ''}`}
                     description="Edite, consolide e gerencie categorias e artistas"
                 >
                     <InstructionsModal

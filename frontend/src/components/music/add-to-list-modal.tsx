@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@core/components/ui/dialog'
+import { useState, useMemo } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@core/components/ui/dialog'
 import { Button } from '@core/components/ui/button'
 import { Input } from '@core/components/ui/input'
 import { Skeleton } from '@core/components/ui/skeleton'
@@ -11,18 +11,15 @@ import {
     ListPlus,
     Search,
     Calendar,
-    Music,
     Plus,
     ChevronDown,
     ChevronUp,
     Loader2
 } from 'lucide-react'
-import { listsApi } from '@/lib/api'
-import { listsKeys } from '@/hooks/use-lists'
+import { useLists, useAddMusicToList, useCreateList } from '@/hooks/use-lists'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useToast } from '@core/hooks/use-toast'
-import { useQueryClient } from '@tanstack/react-query'
-import type { MusicList } from '@/types'
 
 interface AddToListModalProps {
     musicId: number
@@ -33,57 +30,34 @@ interface AddToListModalProps {
 
 export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddToListModalProps) {
     const { toast } = useToast()
-    const queryClient = useQueryClient()
     const [open, setOpen] = useState(false)
-    const [lists, setLists] = useState<MusicList[]>([])
-    const [filteredLists, setFilteredLists] = useState<MusicList[]>([])
-    const [isLoading, setIsLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
-    const [addingToList, setAddingToList] = useState<number | null>(null)
     const [expanded, setExpanded] = useState(false)
+    const [newListName, setNewListName] = useState('')
 
-    useEffect(() => {
-        if (open) {
-            loadLists()
-        }
-    }, [open])
+    const { data: listsData, isLoading } = useLists({ page: 1, limit: 1000 }, undefined)
+    const addMutation = useAddMusicToList()
+    const createMutation = useCreateList()
 
-    useEffect(() => {
-        if (searchTerm.trim()) {
-            const filtered = lists.filter(list =>
-                list.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            setFilteredLists(filtered)
-        } else {
-            setFilteredLists(lists)
-        }
-    }, [lists, searchTerm])
+    const sortedLists = useMemo(() => {
+        const items = listsData?.data || []
+        return [...items].sort((a, b) =>
+            new Date(b.created_date || '').getTime() - new Date(a.created_date || '').getTime()
+        )
+    }, [listsData])
 
-    const loadLists = async () => {
-        setIsLoading(true)
-        try {
-            const response = await listsApi.getLists({ page: 1, limit: 1000 })
+    const filteredLists = useMemo(() => {
+        if (!searchTerm.trim()) return sortedLists
+        return sortedLists.filter(list =>
+            list.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    }, [sortedLists, searchTerm])
 
-            const sortedLists = (response.data || []).sort((a, b) =>
-                new Date(b.created_date || '').getTime() - new Date(a.created_date || '').getTime()
-            )
-            setLists(sortedLists)
-            setFilteredLists(sortedLists)
-        } catch (error) {
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar as listas.",
-                variant: "destructive"
-            })
-        } finally {
-            setIsLoading(false)
-        }
-    }
+    const displayedLists = expanded ? filteredLists : filteredLists.slice(0, 5)
 
     const handleAddToList = async (listId: number, listName: string) => {
-        setAddingToList(listId)
         try {
-            const response = await listsApi.addMusicToList(listId, musicId)
+            const response = await addMutation.mutateAsync({ listId, musicId })
 
             if (!response.added || response.added === 0) {
                 toast({
@@ -94,23 +68,52 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                 return
             }
 
-            queryClient.invalidateQueries({ queryKey: listsKeys.detail(listId) })
-            queryClient.invalidateQueries({ queryKey: listsKeys.lists() })
-
             toast({
                 title: "Música adicionada!",
                 description: `"${musicTitle}" foi adicionada à lista "${listName}".`
             })
             setOpen(false)
             onSuccess?.()
-        } catch (error) {
+        } catch {
             toast({
                 title: "Erro",
                 description: "Não foi possível adicionar a música à lista.",
                 variant: "destructive"
             })
-        } finally {
-            setAddingToList(null)
+        }
+    }
+
+    const handleCreateAndAdd = async () => {
+        const name = newListName.trim()
+        if (!name) return
+
+        try {
+            const result = await createMutation.mutateAsync({ name })
+            setNewListName('')
+
+            const response = await addMutation.mutateAsync({ listId: result.list_id, musicId })
+
+            if (response.added && response.added > 0) {
+                toast({
+                    title: "Lista criada e música adicionada!",
+                    description: `"${musicTitle}" foi adicionada à nova lista "${name}".`
+                })
+            } else {
+                toast({
+                    title: "Lista criada!",
+                    description: `A lista "${name}" foi criada, mas a música não pôde ser adicionada.`,
+                    variant: "destructive"
+                })
+            }
+
+            setOpen(false)
+            onSuccess?.()
+        } catch {
+            toast({
+                title: "Erro",
+                description: "Não foi possível criar a lista.",
+                variant: "destructive"
+            })
         }
     }
 
@@ -127,7 +130,8 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
         }
     }
 
-    const displayedLists = expanded ? filteredLists : filteredLists.slice(0, 5)
+    const isAdding = addMutation.isPending
+    const isCreating = createMutation.isPending
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -147,12 +151,43 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                         <ListPlus className="h-5 w-5" />
                         Adicionar à Lista
                     </DialogTitle>
-                    <p className="text-sm text-muted-foreground">
+                    <DialogDescription>
                         Selecione uma lista para adicionar &quot;<span className="font-medium">{musicTitle}</span>&quot;
-                    </p>
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-hidden flex flex-col gap-4">
+                    {/* Create new list */}
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="Nome da nova lista..."
+                            value={newListName}
+                            onChange={(e) => setNewListName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleCreateAndAdd()
+                                }
+                            }}
+                            disabled={isCreating}
+                        />
+                        <Button
+                            size="sm"
+                            onClick={handleCreateAndAdd}
+                            disabled={!newListName.trim() || isCreating}
+                            className="gap-1 shrink-0"
+                        >
+                            {isCreating ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                <Plus className="h-3 w-3" />
+                            )}
+                            Criar
+                        </Button>
+                    </div>
+
+                    <Separator />
+
                     {/* Search */}
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -181,12 +216,11 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                                 ))}
                             </div>
                         ) : filteredLists.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Music className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                                <p className="text-sm text-muted-foreground">
-                                    {searchTerm ? 'Nenhuma lista encontrada' : 'Nenhuma lista criada ainda'}
-                                </p>
-                            </div>
+                            <EmptyState
+                                title={searchTerm ? 'Nenhuma lista encontrada' : 'Nenhuma lista criada ainda'}
+                                description="Crie uma nova lista usando o campo acima"
+                                className="py-8"
+                            />
                         ) : (
                             <div className="space-y-2">
                                 {displayedLists.map((list) => (
@@ -208,10 +242,10 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                                             <Button
                                                 size="sm"
                                                 onClick={() => handleAddToList(list.id, list.name)}
-                                                disabled={addingToList !== null}
+                                                disabled={isAdding}
                                                 className="gap-2"
                                             >
-                                                {addingToList === list.id ? (
+                                                {addMutation.isPending && addMutation.variables?.listId === list.id ? (
                                                     <Loader2 className="h-3 w-3 animate-spin" />
                                                 ) : (
                                                     <Plus className="h-3 w-3" />
@@ -222,7 +256,6 @@ export function AddToListModal({ musicId, musicTitle, trigger, onSuccess }: AddT
                                     </Card>
                                 ))}
 
-                                {/* Show More/Less Button */}
                                 {filteredLists.length > 5 && (
                                     <>
                                         <Separator className="my-2" />

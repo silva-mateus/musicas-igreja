@@ -81,6 +81,7 @@ export function useAddMusicToList() {
             listsApi.addMusicToList(listId, musicId),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: listsKeys.detail(variables.listId) })
+            queryClient.invalidateQueries({ queryKey: listsKeys.lists() })
         },
     })
 }

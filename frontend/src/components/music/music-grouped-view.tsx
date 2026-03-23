@@ -307,6 +307,7 @@ export function MusicGroupedView({
                                                         <div className="flex-1 min-w-0">
                                                             <Link 
                                                                 href={`/music/${file.id}`}
+                                                                target="_blank"
                                                                 className="font-medium hover:text-primary transition-colors line-clamp-1"
                                                             >
                                                                 {file.song_name || file.filename}
@@ -362,7 +363,7 @@ export function MusicGroupedView({
                                                                             className="h-8 w-8"
                                                                             asChild
                                                                         >
-                                                                            <Link href={`/music/${file.id}`}>
+                                                                            <Link href={`/music/${file.id}`} target="_blank">
                                                                                 <Eye className="h-4 w-4" />
                                                                             </Link>
                                                                         </Button>
@@ -464,7 +465,7 @@ export function MusicGroupedView({
                                                                 </SimpleTooltip>
                                                                 <DropdownMenuContent align="end" className="w-48">
                                                                     <DropdownMenuItem asChild>
-                                                                        <Link href={`/music/${file.id}`} className="flex items-center">
+                                                                        <Link href={`/music/${file.id}`} target="_blank" className="flex items-center">
                                                                             <Eye className="mr-2 h-4 w-4" />
                                                                             Visualizar
                                                                         </Link>

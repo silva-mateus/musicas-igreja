@@ -43,7 +43,7 @@ const navigation: NavigationItem[] = [
         requiresEdit: true,
         children: [
             { title: 'Gerenciar Entidades', href: '/settings/manage', icon: FolderOpen, requiresEdit: true, group: 'workspace' },
-            { title: 'Filtros Personalizados', href: '/settings/workspaces', icon: Filter, requiresAdmin: true, group: 'workspace' },
+            { title: 'Workspaces', href: '/settings/workspaces', icon: Filter, requiresAdmin: true, group: 'workspace' },
             { title: 'Monitoramento', href: '/settings/monitoring', icon: Bell, requiresAdmin: true, group: 'admin' },
             { title: 'Config. de Alertas', href: '/settings/alert-configs', icon: Settings, requiresAdmin: true, group: 'admin' },
             { title: 'Usuários', href: '/settings/users', icon: Users, requiresAdmin: true, group: 'admin' },

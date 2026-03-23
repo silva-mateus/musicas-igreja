@@ -223,27 +223,19 @@ function MusicPageContent() {
 
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${totalTabCols}, minmax(0, 1fr))` }}>
-                        <SimpleTooltip label="Ver todas as músicas em lista">
-                            <TabsTrigger value="all" className="text-xs sm:text-sm">
-                                Todas
-                            </TabsTrigger>
-                        </SimpleTooltip>
-                        <SimpleTooltip label="Agrupar músicas por artista">
-                            <TabsTrigger value="by-artist" className="text-xs sm:text-sm">
-                                <span className="hidden sm:inline">Por&nbsp;</span>Artista
-                            </TabsTrigger>
-                        </SimpleTooltip>
-                        <SimpleTooltip label="Agrupar músicas por categoria">
-                            <TabsTrigger value="by-category" className="text-xs sm:text-sm">
-                                <span className="hidden sm:inline">Por&nbsp;</span>Categoria
-                            </TabsTrigger>
-                        </SimpleTooltip>
+                        <TabsTrigger value="all" className="text-xs sm:text-sm">
+                            Todas
+                        </TabsTrigger>
+                        <TabsTrigger value="by-artist" className="text-xs sm:text-sm">
+                            <span className="hidden sm:inline">Por&nbsp;</span>Artista
+                        </TabsTrigger>
+                        <TabsTrigger value="by-category" className="text-xs sm:text-sm">
+                            <span className="hidden sm:inline">Por&nbsp;</span>Categoria
+                        </TabsTrigger>
                         {tabGroups.map(group => (
-                            <SimpleTooltip key={group.slug} label={`Agrupar músicas por ${group.name.toLowerCase()}`}>
-                                <TabsTrigger value={`custom-${group.slug}`} className="text-xs sm:text-sm">
-                                    <span className="hidden sm:inline">Por&nbsp;</span>{group.name}
-                                </TabsTrigger>
-                            </SimpleTooltip>
+                            <TabsTrigger key={group.slug} value={`custom-${group.slug}`} className="text-xs sm:text-sm">
+                                <span className="hidden sm:inline">Por&nbsp;</span>{group.name}
+                            </TabsTrigger>
                         ))}
                     </TabsList>
 
