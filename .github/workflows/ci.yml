@@ -15,8 +15,8 @@ env:
   FRONTEND_DIR: frontend
   DOTNET_VERSION: '9.0.x'
   NODE_VERSION: '20'
-  API_IMAGE: ghcr.io/silva-mateus/musicas-igreja-api
-  WEB_IMAGE: ghcr.io/silva-mateus/musicas-igreja-web
+  API_IMAGE: ghcr.io/silva-mateus-org/musicas-igreja-api
+  WEB_IMAGE: ghcr.io/silva-mateus-org/musicas-igreja-web
 
 permissions:
   contents: read
@@ -29,10 +29,10 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       # Injeta credencial para clonar submodulo privado (core-system).
-      # CORE_SYSTEM_PAT = classic PAT com escopo 'repo' na conta silva-mateus.
+      # CORE_SYSTEM_PAT = classic PAT com escopo 'repo' na conta silva-mateus-org.
       - name: Configure git credentials for private submodule
         run: |
-          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus-org/core-system".insteadOf "https://github.com/silva-mateus-org/core-system"
 
       - uses: actions/checkout@v4
         with:
@@ -79,7 +79,7 @@ jobs:
     steps:
       - name: Configure git credentials for private submodule
         run: |
-          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus-org/core-system".insteadOf "https://github.com/silva-mateus-org/core-system"
 
       - uses: actions/checkout@v4
         with:
@@ -117,7 +117,7 @@ jobs:
     steps:
       - name: Configure git credentials for private submodule
         run: |
-          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus-org/core-system".insteadOf "https://github.com/silva-mateus-org/core-system"
 
       - uses: actions/checkout@v4
         with:
