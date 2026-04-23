@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# ── Customizar por app ────────────────────────────────────────────────────────
+# Para replicar este template em outro projeto, ajuste as variáveis abaixo.
+# Veja .github/workflows/SETUP.md para instruções detalhadas.
+env:
+  BACKEND_DIR: backend
+  BACKEND_TESTS_DIR: backend.tests
+  FRONTEND_DIR: frontend
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '20'
+  API_IMAGE: ghcr.io/silva-mateus/musicas-igreja-api
+  WEB_IMAGE: ghcr.io/silva-mateus/musicas-igreja-web
+
+permissions:
+  contents: read
+  packages: write  # necessário para push no GHCR
+
+jobs:
+  # ── Backend: restore → build → xUnit ─────────────────────────────────────
+  test-backend:
+    name: Backend Tests
+    runs-on: [self-hosted, linux]
+    steps:
+      # Autenticação SSH para clonar submodulo privado (core-system)
+      - name: Setup SSH for private submodule
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_SYSTEM_SSH_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore backend
+        run: dotnet restore
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Restore tests
+        run: dotnet restore
+        working-directory: ${{ env.BACKEND_TESTS_DIR }}
+
+      - name: Build backend
+        run: dotnet build --no-restore --configuration Release
+        working-directory: ${{ env.BACKEND_DIR }}
+
+      - name: Build tests
+        run: dotnet build --no-restore --configuration Release
+        working-directory: ${{ env.BACKEND_TESTS_DIR }}
+
+      - name: Run xUnit tests
+        run: |
+          dotnet test --no-build --configuration Release \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage"
+        working-directory: ${{ env.BACKEND_TESTS_DIR }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: ${{ env.BACKEND_TESTS_DIR }}/TestResults
+
+  # ── Frontend: install → build → test → lint (paralelo com backend) ────────
+  test-frontend:
+    name: Frontend Tests
+    runs-on: [self-hosted, linux]
+    steps:
+      - name: Setup SSH for private submodule
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_SYSTEM_SSH_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Test
+        run: npm test
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+      - name: Lint
+        run: npm run lint
+        working-directory: ${{ env.FRONTEND_DIR }}
+
+  # ── Build + push para GHCR (apenas push para main) ───────────────────────
+  # Watchtower detecta a nova imagem :latest e reinicia os containers.
+  build-and-push:
+    name: Build and Push Images
+    runs-on: [self-hosted, linux]
+    needs: [test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Setup SSH for private submodule
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CORE_SYSTEM_SSH_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.BACKEND_DIR }}/Dockerfile
+          push: true
+          tags: ${{ env.API_IMAGE }}:latest
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.FRONTEND_DIR }}/Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:latest

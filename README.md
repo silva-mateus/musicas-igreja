@@ -37,7 +37,8 @@ Acesse a aplicação em produção: **[https://cifras.networkmat.uk/](https://ci
 
 ### Infraestrutura
 - **Docker / Docker Compose** - Containerizacao
-- **GitHub Actions** - CI/CD com workflow reutilizavel (homelab-infra)
+- **GitHub Actions + Self-hosted Runner** - CI/CD com testes paralelos e push para GHCR
+- **Watchtower** - CD automatico: detecta nova imagem no GHCR e reinicia containers
 - **MySQL 8.0** - Banco de dados (compartilhado via homelab)
 - **Cloudflare Tunnel** - Acesso externo
 - **core-system** - Submodule com codigo compartilhado (auth, file management, UI)
@@ -75,17 +76,15 @@ npm run dev
 
 ### Deploy (Servidor / homelab-infra)
 
-O deploy e automatizado via GitHub Actions usando o workflow reutilizavel do `homelab-infra`.
+O deploy e automatizado: GitHub Actions builda a imagem e faz push para GHCR; Watchtower detecta a nova imagem e reinicia os containers automaticamente.
 
-**Setup inicial do servidor:**
+**Setup inicial:**
 
-1. Clonar homelab-infra em `/opt/homelab/docker`
-2. Criar `.env` com: `GITHUB_USER`, `MUSICAS_DB_USER`, `MUSICAS_DB_PASSWORD`, `MYSQL_ROOT_PASSWORD`, `CLOUDFLARE_TUNNEL_TOKEN`
-3. Criar network: `docker network create homelab`
-4. Iniciar infra base: `docker compose up -d` (MySQL + Cloudflare Tunnel)
-5. Configurar secrets no repositorio GitHub: `DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_USER`
+1. Configurar secret `CORE_SYSTEM_SSH_KEY` no repositorio (ver `.github/workflows/SETUP.md`)
+2. Configurar Watchtower no homelab com credenciais GHCR (ver `.github/workflows/SETUP.md`)
+3. Atualizar `docker-compose.yml` do homelab para usar imagens `ghcr.io/silva-mateus/musicas-igreja-*:latest`
 
-O push para `main` aciona automaticamente o build e deploy.
+O push para `main` aciona automaticamente testes + build + push para GHCR.
 
 ## 🔐 Acesso Padrão
 
@@ -111,6 +110,28 @@ npm run build  # Inclui type-checking
 ```
 
 Os testes são executados automaticamente no CI/CD antes de cada deploy.
+
+## CI/CD
+
+### Fluxo
+
+| Evento | Jobs executados |
+|---|---|
+| PR / push para `develop` | `test-backend` + `test-frontend` em paralelo |
+| Push para `main` | testes → build → push para GHCR → Watchtower reinicia containers |
+
+Build e deploy são separados: Actions builda a imagem Docker e faz push para o GHCR; Watchtower (homelab) detecta o novo digest em até 5 minutos e reinicia os containers automaticamente.
+
+### Debugar falhas
+
+- Aba **Actions** no GitHub → selecionar o job com falha
+- Backend: baixar artefato `backend-test-results` (`.trx` + coverage XML)
+- Self-hosted runner offline: `sudo systemctl status actions.runner.*` na VM do homelab
+- Watchtower nao atualiza: `docker logs watchtower | grep musicas`
+
+### Adaptar para outro app
+
+Ver [`.github/workflows/SETUP.md`](.github/workflows/SETUP.md).
 
 ## 📁 Estrutura do Projeto
 
