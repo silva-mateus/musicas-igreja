@@ -28,11 +28,15 @@ jobs:
     name: Backend Tests
     runs-on: [self-hosted, linux]
     steps:
-      # CORE_SYSTEM_PAT = fine-grained PAT com contents:read no repo core-system
+      # Injeta credencial para clonar submodulo privado (core-system).
+      # CORE_SYSTEM_PAT = classic PAT com escopo 'repo' na conta silva-mateus.
+      - name: Configure git credentials for private submodule
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.CORE_SYSTEM_PAT }}
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -73,10 +77,13 @@ jobs:
     name: Frontend Tests
     runs-on: [self-hosted, linux]
     steps:
+      - name: Configure git credentials for private submodule
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.CORE_SYSTEM_PAT }}
 
       - uses: actions/setup-node@v4
         with:
@@ -108,10 +115,13 @@ jobs:
     needs: [test-backend, test-frontend]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
+      - name: Configure git credentials for private submodule
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.CORE_SYSTEM_PAT }}@github.com/silva-mateus/core-system".insteadOf "https://github.com/silva-mateus/core-system"
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.CORE_SYSTEM_PAT }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
