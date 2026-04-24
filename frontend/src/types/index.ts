@@ -313,6 +313,8 @@ export interface CreateChordSongDto {
 export interface UpdateChordContentDto {
     chord_content: string
     musical_key?: string
+    song_name?: string
+    artist?: string
 }
 
 export interface UpdateMergeListItemDto {

@@ -100,6 +100,8 @@ public record UpdateChordContentDto
 {
     public string ChordContent { get; init; } = string.Empty;
     public string? MusicalKey { get; init; }
+    public string? SongName { get; init; }
+    public string? Artist { get; init; }
 }
 
 public record ChordPdfExportDto

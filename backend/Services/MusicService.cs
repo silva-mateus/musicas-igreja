@@ -444,12 +444,26 @@ public class MusicService : IMusicService
 
     public async Task<bool> UpdateChordContentAsync(int id, UpdateChordContentDto dto)
     {
-        var file = await _context.PdfFiles.FindAsync(id);
+        var file = await _context.PdfFiles
+            .Include(f => f.FileArtists)
+            .FirstOrDefaultAsync(f => f.Id == id);
+            
         if (file == null) return false;
 
         file.ChordContent = dto.ChordContent;
         if (dto.MusicalKey != null)
             file.MusicalKey = dto.MusicalKey;
+            
+        if (dto.SongName != null)
+            file.SongName = dto.SongName;
+            
+        if (dto.Artist != null)
+        {
+            _context.FileArtists.RemoveRange(file.FileArtists);
+            var artist = await ResolveArtistAsync(dto.Artist);
+            if (artist != null)
+                _context.FileArtists.Add(new FileArtist { FileId = file.Id, ArtistId = artist.Id });
+        }
 
         await _context.SaveChangesAsync();
         return true;

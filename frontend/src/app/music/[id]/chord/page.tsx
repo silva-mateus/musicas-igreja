@@ -9,6 +9,8 @@ import { Label } from '@core/components/ui/label'
 import { Input } from '@core/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@core/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@core/components/ui/tabs'
+import { Badge } from '@core/components/ui/badge'
+import { Separator } from '@core/components/ui/separator'
 import { ArrowLeft, Loader2, Save, Download } from 'lucide-react'
 import { useToast } from '@core/hooks/use-toast'
 import { useAuth } from '@core/contexts/auth-context'
@@ -19,6 +21,8 @@ import type { MusicFile, UpdateChordContentDto } from '@/types'
 import { musicApi, downloadFile } from '@/lib/api'
 import { useMusicDetail } from '@/hooks/use-music'
 import { LoadingOverlay } from '@/components/ui/loading-spinner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { RadioGroup, RadioGroupItem } from '@core/components/ui/radio-group'
 import Link from 'next/link'
 
 const MUSICAL_KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -36,12 +40,17 @@ export default function ChordEditorPage() {
     const [loading, setLoading] = useState(false)
     const [isDirty, setIsDirty] = useState(false)
     const [chordContent, setChordContent] = useState('')
+    const [title, setTitle] = useState('')
+    const [artist, setArtist] = useState('')
     const [musicalKey, setMusicalKey] = useState('C')
     const [previewKey, setPreviewKey] = useState('C')
+    const [editorMode, setEditorMode] = useState<'chordpro' | 'visual'>('chordpro')
+    const [showConfirmExit, setShowConfirmExit] = useState(false)
+    const [pendingUrl, setPendingUrl] = useState<string | null>(null)
 
     useEffect(() => {
         if (music) {
-            if (!music.chord_content) {
+            if (!music.chord_content && music.content_type !== 'chord_converting') {
                 toast({
                     title: 'Erro',
                     description: 'Esta música não é do tipo cifra',
@@ -50,7 +59,9 @@ export default function ChordEditorPage() {
                 router.push(`/music/${musicId}`)
                 return
             }
-            setChordContent(music.chord_content)
+            setChordContent(music.chord_content || '')
+            setTitle(music.title || '')
+            setArtist(music.artist || '')
             setMusicalKey(music.musical_key || 'C')
             setPreviewKey(music.musical_key || 'C')
         }
@@ -111,6 +122,8 @@ export default function ChordEditorPage() {
             const dto: UpdateChordContentDto = {
                 chord_content: chordContent,
                 musical_key: musicalKey,
+                song_name: title,
+                artist: artist
             }
 
             await musicApi.updateChord(musicId, dto)
@@ -131,6 +144,15 @@ export default function ChordEditorPage() {
             })
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleCancel = () => {
+        if (isDirty) {
+            setShowConfirmExit(true)
+            setPendingUrl(`/music/${musicId}`)
+        } else {
+            router.push(`/music/${musicId}`)
         }
     }
 
@@ -188,110 +210,160 @@ export default function ChordEditorPage() {
 
     return (
         <MainLayout>
-            <div className="space-y-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/music/${musicId}`}>
-                        <Button variant="ghost" size="sm">
+            <div className="h-[calc(100vh-64px)] flex flex-col overflow-hidden">
+                {/* Header */}
+                <div className="border-b border-border bg-card px-6 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="sm" onClick={handleCancel}>
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             Voltar
                         </Button>
-                    </Link>
-                    <div className="flex-1">
-                        <h1 className="text-2xl font-bold">Editar Cifra</h1>
-                        <p className="text-sm text-muted-foreground">{music.filename || music.original_name}</p>
+                        <div>
+                            <h1 className="text-lg font-bold">Editar Cifra</h1>
+                            <p className="text-xs text-muted-foreground">{music.original_name}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={handleCancel} disabled={loading}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSave} disabled={loading || !isDirty} className="gap-2">
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            Salvar Alterações
+                        </Button>
                     </div>
                 </div>
 
-                <Tabs defaultValue="editor" className="space-y-4">
-                    <TabsList>
-                        <TabsTrigger value="editor">Editor</TabsTrigger>
-                        <TabsTrigger value="preview">Visualização</TabsTrigger>
-                    </TabsList>
+                {/* Split Content */}
+                <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2">
+                    {/* Left Panel: Editor */}
+                    <div className="flex flex-col border-r border-border bg-muted/10 overflow-auto">
+                        <Tabs defaultValue="geral" className="flex-1 flex flex-col">
+                            <div className="px-6 pt-4">
+                                <TabsList className="bg-muted/50">
+                                    <TabsTrigger value="geral">Geral</TabsTrigger>
+                                    <TabsTrigger value="editor">Conteúdo</TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                    <TabsContent value="editor" className="space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Tom Padrão</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="default-key">Tom da música:</Label>
-                                    <Select value={musicalKey} onValueChange={setMusicalKey}>
-                                        <SelectTrigger className="w-24">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {MUSICAL_KEYS.map((key) => (
-                                                <SelectItem key={key} value={key}>
-                                                    {key}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                            <TabsContent value="geral" className="flex-1 p-6 space-y-6">
+                                <div className="space-y-4 max-w-md">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="title">Título</Label>
+                                        <Input 
+                                            id="title" 
+                                            value={title} 
+                                            onChange={(e) => { setTitle(e.target.value); setIsDirty(true); }} 
+                                            placeholder="Título da música"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="artist">Artista</Label>
+                                        <Input 
+                                            id="artist" 
+                                            value={artist} 
+                                            onChange={(e) => { setArtist(e.target.value); setIsDirty(true); }} 
+                                            placeholder="Nome do artista"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="musicalKey">Tom Original</Label>
+                                            <Select value={musicalKey} onValueChange={(val) => { setMusicalKey(val); setIsDirty(true); }}>
+                                                <SelectTrigger id="musicalKey">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {MUSICAL_KEYS.map((key) => (
+                                                        <SelectItem key={key} value={key}>{key}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+
+                                    <Separator className="my-6" />
+
+                                    <div className="space-y-3">
+                                        <Label>Formato do Editor</Label>
+                                        <RadioGroup 
+                                            value={editorMode} 
+                                            onValueChange={(val: 'chordpro' | 'visual') => setEditorMode(val)}
+                                            className="flex gap-4"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="visual" id="r1" />
+                                                <Label htmlFor="r1" className="cursor-pointer">Acorde sobre Letra</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="chordpro" id="r2" />
+                                                <Label htmlFor="r2" className="cursor-pointer">ChordPro</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </TabsContent>
 
-                        <ChordEditor
-                            value={chordContent}
-                            onChange={(content) => {
-                                setChordContent(content)
-                                setIsDirty(true)
-                            }}
-                        />
-                    </TabsContent>
+                            <TabsContent value="editor" className="flex-1 flex flex-col p-6 m-0">
+                                <ChordEditor
+                                    value={chordContent}
+                                    onChange={(content) => {
+                                        setChordContent(content)
+                                        setIsDirty(true)
+                                    }}
+                                    // We can pass the mode to the existing component if we want, 
+                                    // but currently ChordEditor handles its own mode.
+                                    // I'll update it later to sync.
+                                />
+                            </TabsContent>
+                        </Tabs>
+                    </div>
 
-                    <TabsContent value="preview" className="space-y-4">
-                        <TranspositionControls
-                            originalKey={musicalKey}
-                            transposedKey={previewKey}
-                            onKeyChange={setPreviewKey}
-                            onCapoChange={() => {}}
-                            showCapoIndicator={true}
-                        />
-                        <ChordPreview
-                            chordContent={chordContent}
-                            transposedKey={previewKey}
-                            capoFret={previewKey !== musicalKey ? ((MUSICAL_KEYS.indexOf(previewKey) - MUSICAL_KEYS.indexOf(musicalKey) + 12) % 12) : undefined}
-                        />
-                    </TabsContent>
-                </Tabs>
+                    {/* Right Panel: Preview */}
+                    <div className="hidden lg:flex flex-col bg-background overflow-auto p-8 relative">
+                        <div className="max-w-2xl mx-auto w-full space-y-6">
+                            <div className="flex items-center justify-between border-b border-border pb-4">
+                                <div>
+                                    <h2 className="text-3xl font-bold">{title || 'Título'}</h2>
+                                    <p className="text-lg text-muted-foreground">{artist || 'Artista'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <Badge variant="outline" className="text-sm border-primary/20 bg-primary/5">
+                                        Tom: {musicalKey}
+                                    </Badge>
+                                </div>
+                            </div>
 
-                <div className="flex flex-wrap justify-end gap-2">
-                    <Link href={`/music/${musicId}`}>
-                        <Button variant="outline" disabled={loading}>
-                            Cancelar
-                        </Button>
-                    </Link>
+                            <ChordPreview
+                                chordContent={chordContent}
+                                transposedKey={musicalKey}
+                                fontSize={16}
+                                showChords={true}
+                                chordColor="text-primary"
+                            />
+                        </div>
 
-                    <Button variant="outline" onClick={() => handleExport(true)} disabled={loading}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Exportar com Capo
-                    </Button>
-
-                    <Button variant="outline" onClick={() => handleExport(false)} disabled={loading}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Exportar Convertido
-                    </Button>
-
-                    {previewKey !== musicalKey && (
-                        <Button
-                            variant="secondary"
-                            onClick={handleSaveAsDefaultKey}
-                            disabled={loading}
-                        >
-                            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Salvar Tom {previewKey} como Padrão
-                        </Button>
-                    )}
-
-                    <Button onClick={handleSave} disabled={loading || !isDirty}>
-                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        <Save className="w-4 h-4 mr-2" />
-                        Salvar Cifra
-                    </Button>
+                        {/* Floating Indicator */}
+                        <div className="fixed bottom-6 right-6 px-3 py-1 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg">
+                            Live Preview
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={showConfirmExit}
+                onOpenChange={setShowConfirmExit}
+                title="Alterações não salvas"
+                description="Você tem alterações que não foram salvas. Deseja realmente sair?"
+                confirmText="Sair sem salvar"
+                cancelText="Continuar editando"
+                variant="destructive"
+                onConfirm={() => {
+                    setShowConfirmExit(false)
+                    if (pendingUrl) router.push(pendingUrl)
+                }}
+            />
         </MainLayout>
     )
 }

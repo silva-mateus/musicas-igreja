@@ -280,6 +280,17 @@ export const musicApi = {
         }
         return await res.blob()
     },
+
+    async getPreferences(id: number): Promise<{ success: boolean; preferences: { transpose_amount: number; capo_fret: number; arrangement_json?: string } }> {
+        return await request(`/files/${id}/preferences`)
+    },
+
+    async updatePreferences(id: number, data: { transpose_amount?: number; capo_fret?: number; arrangement_json?: string }): Promise<ApiResponse> {
+        return await request(`/files/${id}/preferences`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    },
 }
 
 // ============ LISTS (merge_lists) ============
