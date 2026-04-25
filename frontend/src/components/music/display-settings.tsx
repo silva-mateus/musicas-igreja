@@ -79,7 +79,7 @@ export function MusicDisplaySettings({
                   <MusicIcon className={`h-4 w-4 ${showChords ? 'text-primary' : 'text-muted-foreground opacity-50'}`} />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">Mostrar Cifras</span>
-                    <span className="text-[10px] text-muted-foreground">Desative para modo "Somente Letra"</span>
+                    <span className="text-[10px] text-muted-foreground">Desative para modo &quot;Somente Letra&quot;</span>
                   </div>
                 </Label>
                 <Switch

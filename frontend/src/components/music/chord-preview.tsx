@@ -59,7 +59,7 @@ export function ChordPreview({
     }
     
     return (
-        <div className="chord-preview-container bg-card rounded-lg border border-border p-4 sm:p-6 lg:p-8">
+        <div className="chord-preview-container">
             <ChordViewer 
                 content={chordContent} 
                 transposeAmount={transposeSteps} 

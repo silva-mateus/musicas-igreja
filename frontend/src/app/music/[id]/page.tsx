@@ -57,6 +57,7 @@ import { TranspositionControls } from '@/components/music/transposition-controls
 import { parseChordProDocument } from '@/lib/chordpro'
 import { MusicDisplaySettings } from '@/components/music/display-settings'
 import { useMusicDisplayPrefs } from '@/hooks/use-music-display-prefs'
+import { FloatingZoomControls } from '@/components/music/floating-zoom-controls'
 
 function isValidYouTube(url?: string) {
     if (!url) return false
@@ -86,14 +87,13 @@ export default function MusicDetailsPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
     const [showFileInfo, setShowFileInfo] = useState(false)
-    
+
     // User Preferences State
     const [userPrefKey, setUserPrefKey] = useState<string | null>(null)
     const [userPrefCapo, setUserPrefCapo] = useState<number>(0)
     const [userArrangement, setUserArrangement] = useState<string | null>(null)
     const [isSavingPref, setIsSavingPref] = useState(false)
     const [isEditArrangement, setIsEditArrangement] = useState(false)
-    const [showFileInfo, setShowFileInfo] = useState(false)
 
     // Display Settings State — persisted in localStorage
     const [displayPrefs, updateDisplayPrefs] = useMusicDisplayPrefs()

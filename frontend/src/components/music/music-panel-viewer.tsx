@@ -8,17 +8,21 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@core/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@core/components/ui/popover'
 import {
   Download,
   Edit,
   ExternalLink,
   Eye,
+  Info,
   Loader2,
   MoreVertical,
-  Music2,
   Plus,
   RefreshCw,
 } from 'lucide-react'
@@ -27,12 +31,11 @@ import { musicApi, handleApiError } from '@/lib/api'
 import { useMusicDetail } from '@/hooks/use-music'
 import { useMusicDisplayPrefs } from '@/hooks/use-music-display-prefs'
 import { ChordPreview } from '@/components/music/chord-preview'
-import { TranspositionControls } from '@/components/music/transposition-controls'
 import { MusicDisplaySettings } from '@/components/music/display-settings'
 import { AddToListModal } from '@/components/music/add-to-list-modal'
 import { OcrConvertCard } from '@/components/music/ocr-convert-card'
-import { parseChordProDocument } from '@/lib/chordpro'
 import { useToast } from '@core/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 const MUSICAL_KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
@@ -50,18 +53,15 @@ export function MusicPanelViewer({ musicId }: MusicPanelViewerProps) {
 
   const [prefs, updatePrefs] = useMusicDisplayPrefs()
 
-  // Per-song server preferences (transpose/capo/arrangement)
   const [transposedKey, setTransposedKey] = useState<string | null>(null)
   const [capoFret, setCapoFret] = useState(0)
   const [arrangementJson, setArrangementJson] = useState<string | null>(null)
   const [isSavingPref, setIsSavingPref] = useState(false)
 
-  // PDF state
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [loadingPdf, setLoadingPdf] = useState(true)
   const [pdfError, setPdfError] = useState(false)
 
-  // Load per-song preferences from server when music changes
   useEffect(() => {
     if (!music || music.content_type !== 'chord') {
       setTransposedKey(null)
@@ -132,7 +132,12 @@ export function MusicPanelViewer({ musicId }: MusicPanelViewerProps) {
     }
   }
 
-  // PDF loading
+  const transposeSemitones = (delta: number) => {
+    const idx = MUSICAL_KEYS.indexOf(effectiveKey)
+    const newKey = MUSICAL_KEYS[(idx + delta + 12) % 12]
+    savePreferences(newKey, capoFret, arrangementJson)
+  }
+
   useEffect(() => {
     if (music?.id && music.content_type !== 'chord') {
       loadPdf(music.id)
@@ -143,9 +148,7 @@ export function MusicPanelViewer({ musicId }: MusicPanelViewerProps) {
   }, [music?.id, music?.content_type])
 
   useEffect(() => {
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-    }
+    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl) }
   }, [pdfUrl])
 
   const loadPdf = async (fileId: number) => {
@@ -185,17 +188,21 @@ export function MusicPanelViewer({ musicId }: MusicPanelViewerProps) {
 
   const effectiveKey = transposedKey || music?.musical_key || 'C'
 
-  // Loading state
+  const hasCategories =
+    (music?.categories && music.categories.length > 0) ||
+    !!music?.category ||
+    (music?.custom_filters && Object.keys(music.custom_filters).length > 0)
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        {/* Skeleton command bar */}
-        <div className="border-b border-border px-4 py-3 flex items-center gap-3">
-          <div className="flex-1 space-y-1.5">
-            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
-            <div className="h-3 w-32 bg-muted rounded animate-pulse" />
+        <div className="border-b border-border px-6 pt-5 pb-4 space-y-3">
+          <div className="h-9 w-64 bg-muted rounded animate-pulse" />
+          <div className="h-3.5 w-40 bg-muted rounded animate-pulse" />
+          <div className="flex gap-2 mt-3">
+            <div className="h-7 w-28 bg-muted rounded-full animate-pulse" />
+            <div className="h-7 w-28 bg-muted rounded-full animate-pulse" />
           </div>
-          <div className="h-6 w-16 bg-muted rounded animate-pulse" />
         </div>
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -213,147 +220,263 @@ export function MusicPanelViewer({ musicId }: MusicPanelViewerProps) {
     )
   }
 
+  const editHref = music.content_type === 'chord'
+    ? `/music/${music.id}/chord`
+    : `/music/${music.id}/edit`
+
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Command Bar */}
-      <div className="shrink-0 border-b border-border bg-card px-4 py-2.5 flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Music2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <div className="text-sm font-semibold truncate leading-tight">
-              {music.title || music.original_name}
-            </div>
-            {music.artist && (
-              <div className="text-xs text-muted-foreground truncate">{music.artist}</div>
+      {/* Viewer head — title left, key block right */}
+      <div className="shrink-0 border-b border-border bg-card px-6 pt-5 pb-4 grid grid-cols-[1fr_auto] gap-4 items-start">
+        {/* Left: title + artist + pill actions */}
+        <div className="min-w-0">
+          <h1
+            className="text-[2.5rem] leading-[1.1] font-normal break-words"
+            style={{ fontFamily: 'var(--font-serif, Georgia, serif)' }}
+          >
+            {music.title || music.original_name}
+          </h1>
+          {music.artist && (
+            <p className="text-sm text-muted-foreground mt-1">{music.artist}</p>
+          )}
+
+          {/* Pill actions */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {/* Informações */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-border text-xs hover:bg-muted transition-colors">
+                  <Info className="h-3 w-3" />
+                  Informações
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Informações</p>
+                {music.artist && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Artista</p>
+                    <p className="text-sm">{music.artist}</p>
+                  </div>
+                )}
+                {music.musical_key && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Tom Original</p>
+                    <p className="text-sm font-mono font-bold">{music.musical_key}</p>
+                  </div>
+                )}
+                {hasCategories && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Categorias</p>
+                    <div className="flex flex-wrap gap-1">
+                      {music.categories && music.categories.length > 0
+                        ? music.categories.map((cat, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{cat}</Badge>
+                          ))
+                        : music.category
+                        ? <Badge variant="secondary" className="text-xs">{music.category}</Badge>
+                        : null}
+                      {music.custom_filters &&
+                        Object.entries(music.custom_filters).map(([slug, group]) =>
+                          group.values.map((val, i) => (
+                            <Badge key={`${slug}-${i}`} variant="outline" className="text-xs">{val}</Badge>
+                          ))
+                        )}
+                    </div>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* Adicionar à lista */}
+            {canManageLists && (
+              <AddToListModal
+                musicId={music.id}
+                musicTitle={music.title || music.original_name}
+                trigger={
+                  <button className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-border text-xs hover:bg-muted transition-colors">
+                    <Plus className="h-3 w-3" />
+                    Adicionar à lista
+                  </button>
+                }
+              />
             )}
+
+            {/* Edit */}
+            {canEdit && (
+              <Link
+                href={editHref}
+                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-border text-xs hover:bg-muted transition-colors"
+              >
+                <Edit className="h-3 w-3" />
+                Editar
+              </Link>
+            )}
+
+            {/* More */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center justify-center h-7 w-7 rounded-full border border-border hover:bg-muted transition-colors">
+                  <MoreVertical className="h-3.5 w-3.5" />
+                  <span className="sr-only">Mais ações</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href={`/music/${music.id}`} target="_blank">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir em nova aba
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownload}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
-        {music.musical_key && (
-          <Badge variant="secondary" className="shrink-0 font-mono">
-            {music.musical_key}
-          </Badge>
-        )}
-
-        {/* Display settings (chord only) */}
+        {/* Right: key block — chord only */}
         {music.content_type === 'chord' && (
-          <MusicDisplaySettings
-            fontSize={prefs.fontSize}
-            setFontSize={(v) => updatePrefs({ fontSize: v })}
-            showChords={prefs.showChords}
-            setShowChords={(v) => updatePrefs({ showChords: v })}
-            chordColor={prefs.chordColor}
-            setChordColor={(v) => updatePrefs({ chordColor: v })}
-            columnView={prefs.columnView}
-            setColumnView={(v) => updatePrefs({ columnView: v })}
-          />
+          <div className="text-right shrink-0 pt-1">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Tom</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="text-[1.375rem] font-bold leading-none hover:opacity-70 transition-opacity"
+                  style={{ fontFamily: 'var(--font-mono, monospace)' }}
+                >
+                  {effectiveKey}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="p-2 w-auto">
+                <div className="grid grid-cols-4 gap-1">
+                  {MUSICAL_KEYS.map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => savePreferences(k, capoFret, arrangementJson)}
+                      className={cn(
+                        'h-8 w-8 rounded text-xs font-mono font-bold hover:bg-muted transition-colors',
+                        k === effectiveKey && 'bg-foreground text-background'
+                      )}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {capoFret > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1">Capo {capoFret}</p>
+            )}
+          </div>
         )}
-
-        {/* Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <MoreVertical className="h-4 w-4" />
-              <span className="sr-only">Mais ações</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem asChild>
-              <Link href={`/music/${music.id}`} target="_blank">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Abrir em nova aba
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Download
-            </DropdownMenuItem>
-            {canEdit && (
-              <DropdownMenuItem asChild>
-                <Link href={music.content_type === 'chord' ? `/music/${music.id}/chord` : `/music/${music.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  {music.content_type === 'chord' ? 'Editar Cifra' : 'Editar'}
-                </Link>
-              </DropdownMenuItem>
-            )}
-            {canManageLists && (
-              <>
-                <DropdownMenuSeparator />
-                <AddToListModal
-                  musicId={music.id}
-                  musicTitle={music.title || music.original_name}
-                  trigger={
-                    <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Adicionar à lista
-                    </DropdownMenuItem>
-                  }
-                />
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      {/* Transposition bar — chord only */}
-      {music.content_type === 'chord' && (
-        <div className="shrink-0 border-b border-border/60 px-4 py-2">
-          <TranspositionControls
-            originalKey={music.musical_key || 'C'}
-            transposedKey={effectiveKey}
-            capoFret={capoFret}
-            showCapoIndicator={true}
-            onKeyChange={(k) => savePreferences(k, capoFret, arrangementJson)}
-            onCapoChange={(c) => savePreferences(effectiveKey, c ?? 0, arrangementJson)}
-          />
-        </div>
-      )}
-
-      {/* Tags */}
-      {((music.categories && music.categories.length > 0) || music.category ||
-        (music.custom_filters && Object.keys(music.custom_filters).length > 0)) && (
-        <div className="shrink-0 flex flex-wrap gap-1.5 px-4 py-2 border-b border-border/40">
-          {music.categories && music.categories.length > 0
-            ? music.categories.map((cat, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">
-                  {cat}
-                </Badge>
-              ))
-            : music.category
-            ? <Badge variant="secondary" className="text-xs">{music.category}</Badge>
-            : null}
-          {music.custom_filters &&
-            Object.entries(music.custom_filters).map(([slug, group]) =>
-              group.values.map((val, i) => (
-                <Badge key={`${slug}-${i}`} variant="outline" className="text-xs">
-                  {val}
-                </Badge>
-              ))
-            )}
-        </div>
-      )}
-
       {/* Content area */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto relative">
         {music.content_type === 'chord' && music.chord_content ? (
-          <div className="p-4">
+          <>
             {isSavingPref && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-6 py-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Salvando preferências…
+                Salvando…
               </div>
             )}
-            <ChordPreview
-              chordContent={music.chord_content}
-              transposedKey={effectiveKey}
-              capoFret={capoFret}
-              arrangementJson={arrangementJson || undefined}
-              fontSize={prefs.fontSize}
-              showChords={prefs.showChords}
-              chordColor={prefs.chordColor}
-              columnView={prefs.columnView}
-            />
-          </div>
+            <div className="px-6 py-4">
+              <ChordPreview
+                chordContent={music.chord_content}
+                transposedKey={effectiveKey}
+                capoFret={capoFret}
+                arrangementJson={arrangementJson || undefined}
+                fontSize={prefs.fontSize}
+                showChords={prefs.showChords}
+                chordColor={prefs.chordColor}
+                columnView={prefs.columnView}
+              />
+            </div>
+
+            {/* Floating sticky toolbar */}
+            <div className="sticky bottom-4 flex justify-center pointer-events-none px-4 pb-1">
+              <div className="pointer-events-auto inline-flex items-center gap-0.5 px-3 py-1.5 bg-card/90 backdrop-blur-sm border border-border rounded-full shadow-lg">
+                {/* Key stepper */}
+                <button
+                  onClick={() => transposeSemitones(-1)}
+                  className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-sm leading-none transition-colors"
+                  aria-label="Semitom abaixo"
+                >
+                  −
+                </button>
+                <span
+                  className="text-xs font-bold w-8 text-center"
+                  style={{ fontFamily: 'var(--font-mono, monospace)' }}
+                >
+                  {effectiveKey}
+                </span>
+                <button
+                  onClick={() => transposeSemitones(1)}
+                  className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-sm leading-none transition-colors"
+                  aria-label="Semitom acima"
+                >
+                  +
+                </button>
+
+                <div className="w-px h-3.5 bg-border mx-1.5" />
+
+                {/* Capo popover */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="h-6 px-2 rounded-full hover:bg-muted text-xs transition-colors text-muted-foreground hover:text-foreground whitespace-nowrap">
+                      {capoFret > 0 ? `Capo ${capoFret}` : 'Capo'}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="center" side="top" className="w-auto p-2">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => savePreferences(effectiveKey, 0, arrangementJson)}
+                        className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-sm transition-colors"
+                        title="Remover capo"
+                      >
+                        ×
+                      </button>
+                      <button
+                        onClick={() => savePreferences(effectiveKey, Math.max(0, capoFret - 1), arrangementJson)}
+                        className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-base leading-none transition-colors"
+                      >
+                        −
+                      </button>
+                      <span
+                        className="text-sm font-bold w-5 text-center"
+                        style={{ fontFamily: 'var(--font-mono, monospace)' }}
+                      >
+                        {capoFret}
+                      </span>
+                      <button
+                        onClick={() => savePreferences(effectiveKey, Math.min(9, capoFret + 1), arrangementJson)}
+                        className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted text-base leading-none transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <div className="w-px h-3.5 bg-border mx-1.5" />
+
+                {/* Display settings */}
+                <MusicDisplaySettings
+                  fontSize={prefs.fontSize}
+                  setFontSize={(v) => updatePrefs({ fontSize: v })}
+                  showChords={prefs.showChords}
+                  setShowChords={(v) => updatePrefs({ showChords: v })}
+                  chordColor={prefs.chordColor}
+                  setChordColor={(v) => updatePrefs({ chordColor: v })}
+                  columnView={prefs.columnView}
+                  setColumnView={(v) => updatePrefs({ columnView: v })}
+                />
+              </div>
+            </div>
+          </>
         ) : (
           <div className="h-full">
             {loadingPdf ? (

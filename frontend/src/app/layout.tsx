@@ -1,10 +1,20 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 import '@/globals.css'
 import { ClientWrapper } from '@/components/client-wrapper'
 import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
+const instrumentSerif = Instrument_Serif({
+    subsets: ['latin'],
+    weight: '400',
+    style: ['normal', 'italic'],
+    variable: '--font-serif',
+})
+const jetbrainsMono = JetBrains_Mono({
+    subsets: ['latin'],
+    variable: '--font-mono',
+})
 
 export const metadata: Metadata = {
     title: 'Cifras Networkmat',
@@ -24,8 +34,8 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="pt-BR" className="dark">
-            <body className={`${inter.className} dark`} suppressHydrationWarning>
+        <html lang="pt-BR" className={`${instrumentSerif.variable} ${jetbrainsMono.variable}`}>
+            <body className={inter.className} suppressHydrationWarning>
                 <ClientWrapper>
                     <div className="min-h-screen bg-background text-foreground">
                         {children}
