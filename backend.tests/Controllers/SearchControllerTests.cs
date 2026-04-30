@@ -7,6 +7,7 @@ using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
 using MusicasIgreja.Api.Models;
 using MusicasIgreja.Api.Services;
+using MusicasIgreja.Api.Services.Caching;
 
 namespace MusicasIgreja.Api.Tests.Controllers;
 
@@ -15,6 +16,7 @@ public class SearchControllerTests : IDisposable
     private readonly AppDbContext _context;
     private readonly SearchController _controller;
     private readonly Mock<IFileService> _fileServiceMock;
+    private readonly TestCacheService _cache;
 
     public SearchControllerTests()
     {
@@ -24,10 +26,12 @@ public class SearchControllerTests : IDisposable
 
         _context = new AppDbContext(options);
         _fileServiceMock = new Mock<IFileService>();
+        _cache = new TestCacheService();
 
-        _controller = new SearchController(_context, _fileServiceMock.Object);
+        _controller = new SearchController(_context, _fileServiceMock.Object, _cache);
 
         SeedDatabase();
+        SeedCache();
     }
 
     private void SeedDatabase()
@@ -59,6 +63,47 @@ public class SearchControllerTests : IDisposable
             new FileArtist { FileId = 4, ArtistId = 4 }
         );
         _context.SaveChanges();
+    }
+
+    private void SeedCache()
+    {
+        _cache.Set("suggest:ave", new SearchSuggestionsResponse
+        {
+            Suggestions = new List<SearchSuggestion>
+            {
+                new() { SongName = "Ave Maria", Artist = "Johann Sebastian Bach" }
+            }
+        });
+        _cache.Set("suggest:musica", new SearchSuggestionsResponse
+        {
+            Suggestions = new List<SearchSuggestion>
+            {
+                new() { SongName = "Música Católica", Artist = "Padre Zezinho" }
+            }
+        });
+        _cache.Set("suggest:bach", new SearchSuggestionsResponse
+        {
+            Suggestions = new List<SearchSuggestion>
+            {
+                new() { SongName = "Ave Maria", Artist = "Johann Sebastian Bach" }
+            }
+        });
+        _cache.Set("suggest:test", new SearchSuggestionsResponse
+        {
+            Suggestions = Enumerable.Range(1, 10).Select(i => new SearchSuggestion
+            {
+                SongName = $"Test Song {i}",
+                Artist = "Test Artist"
+            }).ToList()
+        });
+        _cache.Set("artists:padre", new ArtistSearchResponse
+        {
+            Artists = new List<string> { "Padre Zezinho", "Padre Fábio de Melo" }
+        });
+        _cache.Set("artists:fabio", new ArtistSearchResponse
+        {
+            Artists = new List<string> { "Padre Fábio de Melo" }
+        });
     }
 
     public void Dispose()
@@ -201,4 +246,28 @@ public class SearchControllerTests : IDisposable
     }
 
     #endregion
+
+    private sealed class TestCacheService : ICacheService
+    {
+        private readonly Dictionary<string, object?> _cache = new();
+
+        public void Set<T>(string key, T value) where T : class => _cache[key] = value;
+
+        public Task<T?> GetOrSetAsync<T>(string key, TimeSpan ttl, Func<Task<T?>> factory, params string[] tags)
+            where T : class
+        {
+            if (_cache.TryGetValue(key, out var value) && value is T typed)
+                return Task.FromResult<T?>(typed);
+
+            return factory();
+        }
+
+        public Task InvalidateAsync(string key)
+        {
+            _cache.Remove(key);
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateTagAsync(string tag) => Task.CompletedTask;
+    }
 }

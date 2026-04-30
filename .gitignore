@@ -140,3 +140,5 @@ frontend/.cursorrules
 # Frontend build output and backups
 frontend/dist/
 frontend_backup/
+
+.musica_zip

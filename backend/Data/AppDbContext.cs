@@ -87,6 +87,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.ContentType).HasColumnName("content_type").HasDefaultValue("pdf_only");
             entity.Property(e => e.ChordContent).HasColumnName("chord_content");
+            entity.Property(e => e.ChordContentDraft).HasColumnName("chord_content_draft");
             entity.Property(e => e.OcrStatus).HasColumnName("ocr_status");
             entity.Property(e => e.OcrStartedAt).HasColumnName("ocr_started_at");
             entity.Property(e => e.OcrError).HasColumnName("ocr_error");

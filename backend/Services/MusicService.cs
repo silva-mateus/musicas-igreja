@@ -1,8 +1,12 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.DTOs;
 using MusicasIgreja.Api.Models;
+using MusicasIgreja.Api.Services.Caching;
 using MusicasIgreja.Api.Services.Interfaces;
 
 namespace MusicasIgreja.Api.Services;
@@ -12,12 +16,34 @@ public class MusicService : IMusicService
     private readonly AppDbContext _context;
     private readonly IFileService _fileService;
     private readonly ILogger<MusicService> _logger;
+    private readonly ICacheService _cache;
 
-    public MusicService(AppDbContext context, IFileService fileService, ILogger<MusicService> logger)
+    private static readonly TimeSpan ListTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DetailTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan GroupedTtl = TimeSpan.FromMinutes(5);
+
+    public MusicService(AppDbContext context, IFileService fileService, ILogger<MusicService> logger, ICacheService cache)
     {
         _context = context;
         _fileService = fileService;
         _logger = logger;
+        _cache = cache;
+    }
+
+    private static string MusicTag(int workspaceId) => $"music:{workspaceId}";
+
+    private static string HashKey(params object?[] parts)
+    {
+        var json = JsonSerializer.Serialize(parts);
+        var hash = SHA1.HashData(Encoding.UTF8.GetBytes(json));
+        return Convert.ToHexString(hash)[..12].ToLowerInvariant();
+    }
+
+    private async Task InvalidateMusicCacheAsync(int workspaceId, int? fileId = null)
+    {
+        await _cache.InvalidateTagAsync(MusicTag(workspaceId));
+        await _cache.InvalidateTagAsync("music:any");  // global suggestions/artist autocomplete
+        if (fileId.HasValue) await _cache.InvalidateAsync($"music:{fileId.Value}");
     }
 
     public async Task<FileListResponseDto> GetMusicsAsync(int workspaceId, string? query,
@@ -25,7 +51,21 @@ public class MusicService : IMusicService
         List<string>? artistSlugs, string? musicalKey,
         int page, int perPage, string? sortBy, string? sortOrder, bool? hasYoutube = null)
     {
+        var keyHash = HashKey(workspaceId, query, categorySlugs, customFilterSlugs, artistSlugs, musicalKey, page, perPage, sortBy, sortOrder, hasYoutube);
+        var cacheKey = $"search:{workspaceId}:{keyHash}";
+        return (await _cache.GetOrSetAsync<FileListResponseDto>(cacheKey, ListTtl, async () =>
+        {
+            return (FileListResponseDto?)await GetMusicsCoreAsync(workspaceId, query, categorySlugs, customFilterSlugs, artistSlugs, musicalKey, page, perPage, sortBy, sortOrder, hasYoutube);
+        }, MusicTag(workspaceId)))!;
+    }
+
+    private async Task<FileListResponseDto> GetMusicsCoreAsync(int workspaceId, string? query,
+        List<string>? categorySlugs, Dictionary<string, List<string>>? customFilterSlugs,
+        List<string>? artistSlugs, string? musicalKey,
+        int page, int perPage, string? sortBy, string? sortOrder, bool? hasYoutube)
+    {
         var q = _context.PdfFiles
+            .AsNoTracking()
             .Where(f => f.WorkspaceId == workspaceId)
             .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
             .Include(f => f.FileCustomFilters).ThenInclude(fcf => fcf.FilterValue).ThenInclude(v => v.FilterGroup)
@@ -105,12 +145,16 @@ public class MusicService : IMusicService
 
     public async Task<FileDto?> GetMusicByIdAsync(int id)
     {
-        var file = await _context.PdfFiles
-            .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
-            .Include(f => f.FileCustomFilters).ThenInclude(fcf => fcf.FilterValue).ThenInclude(v => v.FilterGroup)
-            .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
-            .FirstOrDefaultAsync(f => f.Id == id);
-        return file != null ? MapToFileDto(file) : null;
+        return await _cache.GetOrSetAsync<FileDto>($"music:{id}", DetailTtl, async () =>
+        {
+            var file = await _context.PdfFiles
+                .AsNoTracking()
+                .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
+                .Include(f => f.FileCustomFilters).ThenInclude(fcf => fcf.FilterValue).ThenInclude(v => v.FilterGroup)
+                .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
+                .FirstOrDefaultAsync(f => f.Id == id);
+            return file != null ? MapToFileDto(file) : null;
+        });
     }
 
     public async Task<PdfFile?> GetFileRecordByIdAsync(int id)
@@ -173,6 +217,7 @@ public class MusicService : IMusicService
         await ResolveAndSaveCustomFiltersAsync(workspaceId, pdfFile.Id, metadata.CustomFilters);
 
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(workspaceId, pdfFile.Id);
         return pdfFile;
     }
 
@@ -232,6 +277,7 @@ public class MusicService : IMusicService
         }
 
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(file.WorkspaceId, file.Id);
         return true;
     }
 
@@ -266,6 +312,7 @@ public class MusicService : IMusicService
         file.PageCount = _fileService.GetPdfPageCount(currentPath);
 
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(file.WorkspaceId, file.Id);
         return file;
     }
 
@@ -273,24 +320,42 @@ public class MusicService : IMusicService
     {
         var file = await _context.PdfFiles.FindAsync(id);
         if (file == null) return false;
+        var wsId = file.WorkspaceId;
         _fileService.DeleteFile(file.FilePath);
         _context.PdfFiles.Remove(file);
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(wsId, id);
         return true;
     }
 
     public async Task<List<GroupedFilesDto>> GetGroupedByArtistAsync(int workspaceId) =>
-        await GetGroupedAsync(workspaceId, f => f.FileArtists.Any(),
-            f => f.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault() ?? "Sem Artista");
+        (await _cache.GetOrSetAsync<List<GroupedFilesDto>>(
+            $"grouped:artist:{workspaceId}", GroupedTtl,
+            async () => (List<GroupedFilesDto>?)await GetGroupedAsync(workspaceId, f => f.FileArtists.Any(),
+                f => f.FileArtists.Select(fa => fa.Artist.Name).FirstOrDefault() ?? "Sem Artista"),
+            MusicTag(workspaceId))) ?? new();
 
     public async Task<List<GroupedFilesDto>> GetGroupedByCategoryAsync(int workspaceId) =>
-        await GetGroupedAsync(workspaceId, _ => true,
-            f => f.FileCategories.Select(fc => fc.Category.Name).FirstOrDefault() ?? "Diversos");
+        (await _cache.GetOrSetAsync<List<GroupedFilesDto>>(
+            $"grouped:category:{workspaceId}", GroupedTtl,
+            async () => (List<GroupedFilesDto>?)await GetGroupedAsync(workspaceId, _ => true,
+                f => f.FileCategories.Select(fc => fc.Category.Name).FirstOrDefault() ?? "Diversos"),
+            MusicTag(workspaceId))) ?? new();
 
     public async Task<List<GroupedFilesDto>> GetGroupedByCustomFilterAsync(int workspaceId, string groupSlug)
     {
+        return (await _cache.GetOrSetAsync<List<GroupedFilesDto>>(
+            $"grouped:cf:{workspaceId}:{groupSlug}", GroupedTtl,
+            async () => (List<GroupedFilesDto>?)await GetGroupedByCustomFilterCoreAsync(workspaceId, groupSlug),
+            MusicTag(workspaceId))) ?? new();
+    }
+
+    private async Task<List<GroupedFilesDto>> GetGroupedByCustomFilterCoreAsync(int workspaceId, string groupSlug)
+    {
         var files = await _context.PdfFiles
-            .Where(f => f.WorkspaceId == workspaceId)
+            .AsNoTracking()
+            .Where(f => f.WorkspaceId == workspaceId
+                && f.FileCustomFilters.Any(fcf => fcf.FilterValue.FilterGroup.Slug == groupSlug))
             .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
             .Include(f => f.FileCustomFilters).ThenInclude(fcf => fcf.FilterValue).ThenInclude(v => v.FilterGroup)
             .Include(f => f.FileArtists).ThenInclude(fa => fa.Artist)
@@ -311,6 +376,7 @@ public class MusicService : IMusicService
         Func<PdfFile, bool> filter, Func<PdfFile, string> groupKey)
     {
         var files = await _context.PdfFiles
+            .AsNoTracking()
             .Where(f => f.WorkspaceId == workspaceId)
             .Include(f => f.FileCategories).ThenInclude(fc => fc.Category)
             .Include(f => f.FileCustomFilters).ThenInclude(fcf => fcf.FilterValue).ThenInclude(v => v.FilterGroup)
@@ -326,7 +392,7 @@ public class MusicService : IMusicService
         f.FileCategories.Select(fc => fc.Category.Name).ToList(),
         MapCustomFilters(f),
         f.MusicalKey, f.YoutubeLink, f.FileSize, f.PageCount, f.UploadDate, f.Description,
-        f.ContentType, f.ChordContent, f.OcrStatus);
+        f.ContentType, f.ChordContent, f.ChordContentDraft, f.OcrStatus, f.OcrError);
 
     private static GroupedFileItemDto MapToGroupedItem(PdfFile f) => new(
         f.Id, f.Filename, f.SongName,
@@ -339,13 +405,13 @@ public class MusicService : IMusicService
     private static Dictionary<string, FileCustomFilterGroupDto> MapCustomFilters(PdfFile f)
     {
         return f.FileCustomFilters
-            .GroupBy(fcf => fcf.FilterValue.FilterGroup)
+            .GroupBy(fcf => fcf.FilterValue.FilterGroup.Slug)
             .ToDictionary(
-                g => g.Key.Slug,
+                g => g.Key,
                 g => new FileCustomFilterGroupDto
                 {
-                    GroupName = g.Key.Name,
-                    Values = g.Select(fcf => fcf.FilterValue.Name).OrderBy(n => n).ToList()
+                    GroupName = g.First().FilterValue.FilterGroup.Name,
+                    Values = g.Select(fcf => fcf.FilterValue.Name).Distinct().OrderBy(n => n).ToList()
                 });
     }
 
@@ -439,6 +505,7 @@ public class MusicService : IMusicService
 
         await ResolveAndSaveCustomFiltersAsync(workspaceId, pdfFile.Id, dto.CustomFilters);
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(workspaceId, pdfFile.Id);
         return pdfFile;
     }
 
@@ -451,6 +518,9 @@ public class MusicService : IMusicService
         if (file == null) return false;
 
         file.ChordContent = dto.ChordContent;
+        file.ChordContentDraft = null;
+        if (file.ContentType != "chord")
+            file.ContentType = "chord";
         if (dto.MusicalKey != null)
             file.MusicalKey = dto.MusicalKey;
             
@@ -466,14 +536,33 @@ public class MusicService : IMusicService
         }
 
         await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(file.WorkspaceId, file.Id);
+        return true;
+    }
+
+    public async Task<bool> DiscardChordDraftAsync(int id)
+    {
+        var file = await _context.PdfFiles.FirstOrDefaultAsync(f => f.Id == id);
+        if (file == null) return false;
+
+        file.ChordContentDraft = null;
+        if (file.OcrStatus is "done" or "done_low_confidence" or "failed")
+        {
+            file.OcrStatus = null;
+            file.OcrError = null;
+        }
+
+        await _context.SaveChangesAsync();
+        await InvalidateMusicCacheAsync(file.WorkspaceId, file.Id);
         return true;
     }
 
     public async Task<UserSongPreferenceDto?> GetUserPreferenceAsync(int fileId, string userId)
     {
         var pref = await _context.UserSongPreferences
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.PdfFileId == fileId && p.UserId == userId);
-        
+
         if (pref == null) return null;
 
         return new UserSongPreferenceDto(pref.TransposeAmount, pref.CapoFret, pref.ArrangementJson);
@@ -509,6 +598,18 @@ public class MusicService : IMusicService
 
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<List<PdfFile>> GetPdfOnlyFilesAsync(int workspaceId, int[]? ids)
+    {
+        var q = _context.PdfFiles
+            .AsNoTracking()
+            .Where(f => f.WorkspaceId == workspaceId && f.ContentType == "pdf_only" && f.FilePath != null);
+
+        if (ids is { Length: > 0 })
+            q = q.Where(f => ids.Contains(f.Id));
+
+        return await q.ToListAsync();
     }
 
     public async Task SaveChangesAsync()

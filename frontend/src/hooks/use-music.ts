@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { musicApi } from '@/lib/api'
 import type { SearchFilters, PaginationParams, MusicFile } from '@/types'
 
@@ -8,6 +8,8 @@ export const musicKeys = {
     lists: () => [...musicKeys.all, 'list'] as const,
     list: (filters: SearchFilters, pagination: PaginationParams) => 
         [...musicKeys.lists(), { filters, pagination }] as const,
+    infiniteList: (filters: SearchFilters, pagination: PaginationParams) =>
+        [...musicKeys.lists(), 'infinite', { filters, pagination }] as const,
     details: () => [...musicKeys.all, 'detail'] as const,
     detail: (id: number) => [...musicKeys.details(), id] as const,
 }
@@ -21,6 +23,28 @@ export function useMusic(
         queryKey: musicKeys.list(filters, pagination),
         queryFn: () => musicApi.search(filters, pagination),
         placeholderData: keepPreviousData,
+    })
+}
+
+// Hook for infinite music list with filters and sorting
+export function useInfiniteMusic(
+    filters: SearchFilters = {},
+    pagination: PaginationParams = { limit: 20 }
+) {
+    const basePagination: PaginationParams = {
+        limit: pagination.limit ?? 20,
+        sort_by: pagination.sort_by,
+        sort_order: pagination.sort_order,
+    }
+
+    return useInfiniteQuery({
+        queryKey: musicKeys.infiniteList(filters, basePagination),
+        initialPageParam: 1,
+        queryFn: ({ pageParam }) => musicApi.search(filters, { ...basePagination, page: pageParam }),
+        getNextPageParam: (lastPage) => {
+            const { page, pages } = lastPage.pagination
+            return page < pages ? page + 1 : undefined
+        },
     })
 }
 

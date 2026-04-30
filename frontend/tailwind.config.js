@@ -15,7 +15,21 @@ module.exports = {
     			'2xl': '1400px'
     		}
     	},
+    	screens: {
+    		'xs': '380px',  // Novo breakpoint para small mobile
+    		'sm': '640px',  // Manter padrão Tailwind
+    		'md': '768px',
+    		'lg': '1024px',
+    		'xl': '1280px',
+    		'2xl': '1536px'
+    	},
     	extend: {
+    		spacing: {
+    			'safe-top': 'env(safe-area-inset-top)',
+    			'safe-bottom': 'env(safe-area-inset-bottom)',
+    			'safe-left': 'env(safe-area-inset-left)',
+    			'safe-right': 'env(safe-area-inset-right)',
+    		},
     		colors: {
     			border: 'hsl(var(--border))',
     			input: 'hsl(var(--input))',
@@ -118,5 +132,20 @@ module.exports = {
     		}
     	}
     },
-    plugins: [require("tailwindcss-animate")],
+    plugins: [
+        require("tailwindcss-animate"),
+        // Plugin para classes utilitárias safe-area
+        function({ addUtilities }) {
+            addUtilities({
+                '.pt-safe': { 'padding-top': 'env(safe-area-inset-top)' },
+                '.pb-safe': { 'padding-bottom': 'env(safe-area-inset-bottom)' },
+                '.pl-safe': { 'padding-left': 'env(safe-area-inset-left)' },
+                '.pr-safe': { 'padding-right': 'env(safe-area-inset-right)' },
+                '.mt-safe': { 'margin-top': 'env(safe-area-inset-top)' },
+                '.mb-safe': { 'margin-bottom': 'env(safe-area-inset-bottom)' },
+                '.ml-safe': { 'margin-left': 'env(safe-area-inset-left)' },
+                '.mr-safe': { 'margin-right': 'env(safe-area-inset-right)' }
+            })
+        }
+    ],
 }

@@ -19,6 +19,13 @@ describe('musicKeys', () => {
     expect(key).toEqual(['music', 'list', { filters, pagination }])
   })
 
+  it('infiniteList should include infinite marker', () => {
+    const filters = { query: 'test' }
+    const pagination = { limit: 20, sort_by: 'upload_date', sort_order: 'desc' }
+    const key = musicKeys.infiniteList(filters, pagination)
+    expect(key).toEqual(['music', 'list', 'infinite', { filters, pagination }])
+  })
+
   it('detail should include id', () => {
     expect(musicKeys.detail(42)).toEqual(['music', 'detail', 42])
   })

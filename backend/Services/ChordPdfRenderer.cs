@@ -25,7 +25,6 @@ public class ChordPdfRenderer : IChordPdfRenderer
         var boldFont = new XFont("Courier New", FontSize, XFontStyle.Bold);
 
         float y = MarginTop;
-        float pageWidth = (float)page.Width - MarginLeft - MarginRight;
 
         // Parse ChordPro header
         var (title, artist, songKey, capo) = ParseChordProHeader(chordContent);
@@ -40,9 +39,10 @@ public class ChordPdfRenderer : IChordPdfRenderer
         }
 
         // Draw header
-        gfx.DrawString($"{title} — {artist}", boldFont, XBrushes.Black, new XRect(MarginLeft, y, pageWidth, 20));
+        var headerText = string.IsNullOrEmpty(artist) ? title : $"{title} — {artist}";
+        gfx.DrawString(headerText, boldFont, XBrushes.Black, new XPoint(MarginLeft, y + boldFont.GetHeight()));
         y += 20;
-        gfx.DrawString($"Tom: {key}" + (displayCapo.HasValue ? $" | Capo {displayCapo}" : ""), font, XBrushes.Black, new XRect(MarginLeft, y, pageWidth, 15));
+        gfx.DrawString($"Tom: {key}" + (displayCapo.HasValue ? $" | Capo {displayCapo}" : ""), font, XBrushes.Black, new XPoint(MarginLeft, y + font.GetHeight()));
         y += 25;
 
         // Parse and render lyrics with chords
@@ -70,13 +70,13 @@ public class ChordPdfRenderer : IChordPdfRenderer
             // Draw chord line
             if (!string.IsNullOrEmpty(chordLine))
             {
-                gfx.DrawString(chordLine, font, XBrushes.Black, new XRect(MarginLeft, y, pageWidth, LineSpacing));
+                gfx.DrawString(chordLine, font, XBrushes.Black, new XPoint(MarginLeft, y + font.GetHeight()));
             }
 
             y += LineSpacing;
 
             // Draw lyric line
-            gfx.DrawString(lyricLine, font, XBrushes.Black, new XRect(MarginLeft, y, pageWidth, LineSpacing));
+            gfx.DrawString(lyricLine, font, XBrushes.Black, new XPoint(MarginLeft, y + font.GetHeight()));
             y += LineSpacing;
         }
 

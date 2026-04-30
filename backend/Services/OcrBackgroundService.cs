@@ -97,13 +97,13 @@ public class OcrBackgroundService : BackgroundService
 
             if (string.IsNullOrWhiteSpace(extractedText) || extractedText.Length < 100)
             {
+                file.ChordContentDraft = string.IsNullOrWhiteSpace(extractedText) ? null : extractedText;
                 file.OcrStatus = "done_low_confidence";
                 file.OcrError = "Extração baixa confiança: texto muito curto ou ilegível";
             }
             else
             {
-                file.ChordContent = extractedText;
-                file.ContentType = "chord";
+                file.ChordContentDraft = extractedText;
                 file.OcrStatus = "done";
                 file.OcrError = null;
             }

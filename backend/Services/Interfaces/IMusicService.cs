@@ -31,9 +31,13 @@ public interface IMusicService
 
     Task<bool> UpdateChordContentAsync(int id, UpdateChordContentDto dto);
 
+    Task<bool> DiscardChordDraftAsync(int id);
+
     Task<UserSongPreferenceDto?> GetUserPreferenceAsync(int fileId, string userId);
 
     Task<bool> UpdateUserPreferenceAsync(int fileId, string userId, UpdateUserSongPreferenceDto dto);
+
+    Task<List<PdfFile>> GetPdfOnlyFilesAsync(int workspaceId, int[]? ids);
 
     Task SaveChangesAsync();
 }

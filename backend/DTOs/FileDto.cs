@@ -16,7 +16,9 @@ public record FileDto(
     string? Description,
     string ContentType,
     string? ChordContent,
-    string? OcrStatus
+    string? ChordContentDraft,
+    string? OcrStatus,
+    string? OcrError
 );
 
 public class FileCustomFilterGroupDto
@@ -112,6 +114,11 @@ public record ChordPdfExportDto
 }
 
 public record OcrStatusDto(string Status, string? Error);
+
+public record BatchOcrDto
+{
+    public int[]? Ids { get; init; }
+}
 
 public record EntityDto
 {

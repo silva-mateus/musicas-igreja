@@ -2,13 +2,18 @@ using Microsoft.EntityFrameworkCore;
 using MusicasIgreja.Api;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.Services;
+using MusicasIgreja.Api.Services.Auth;
+using MusicasIgreja.Api.Services.Caching;
+using MusicasIgreja.Api.Services.Events;
 using MusicasIgreja.Api.Services.Interfaces;
+using Core.Auth.Services;
 using System.Threading.Channels;
 using Core.Auth.Extensions;
 using Core.Auth.Models;
 using Core.FileManagement.Extensions;
 using Core.Infrastructure.Extensions;
 using Core.Infrastructure.Events;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +22,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddCoreDatabase<AppDbContext>(connectionString);
 
 // Core.Auth (session, RBAC, rate limiting)
+// Registers AddDistributedMemoryCache internally; the Redis block below overrides
+// IDistributedCache (last registration wins) when Redis is configured.
 builder.Services.AddCoreAuth(options =>
 {
     options.CookieName = ".MusicasIgreja.Session";
@@ -28,6 +35,40 @@ builder.Services.AddCoreAuth(options =>
         ["admin"]    = [Permissions.ViewMusic, Permissions.DownloadMusic, Permissions.EditMetadata, Permissions.UploadMusic, Permissions.DeleteMusic, Permissions.ManageLists, Permissions.ManageCategories, Permissions.ManageUsers, Permissions.ManageRoles, Permissions.AccessAdmin]
     };
 });
+
+// Redis cache (optional). Empty/missing connection string → NullCacheService + memory IDistributedCache.
+// When configured, AddStackExchangeRedisCache overrides AddDistributedMemoryCache from AddCoreAuth,
+// so sessions transparently move to Redis.
+var redisConn = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConn))
+{
+    try
+    {
+        var mux = ConnectionMultiplexer.Connect(redisConn);
+        builder.Services.AddSingleton<IConnectionMultiplexer>(mux);
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+        builder.Services.AddStackExchangeRedisCache(o =>
+        {
+            o.Configuration = redisConn;
+            o.InstanceName = builder.Configuration["Cache:InstanceName"] ?? "musicas:";
+        });
+        // Override Core.Auth's in-memory rate limiter with the Redis-backed variant.
+        // Last registration wins for IRateLimitService.
+        builder.Services.AddSingleton<IRateLimitService, RedisRateLimitService>();
+        // Multi-instance SSE fanout via Redis pub/sub.
+        builder.Services.AddSingleton<Core.Infrastructure.Events.ISseService, RedisSseService>();
+        Console.WriteLine($"[Redis] Connected to {redisConn}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Redis] Connection failed ({ex.Message}); using in-memory fallback");
+        builder.Services.AddSingleton<ICacheService, NullCacheService>();
+    }
+}
+else
+{
+    builder.Services.AddSingleton<ICacheService, NullCacheService>();
+}
 
 // Core.FileManagement
 builder.Services.AddCoreFileManagement(options =>

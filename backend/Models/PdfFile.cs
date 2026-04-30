@@ -16,6 +16,7 @@ public class PdfFile
     public string? Description { get; set; }
     public string ContentType { get; set; } = "pdf_only";
     public string? ChordContent { get; set; }
+    public string? ChordContentDraft { get; set; }
     public string? OcrStatus { get; set; }
     public DateTime? OcrStartedAt { get; set; }
     public string? OcrError { get; set; }

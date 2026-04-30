@@ -78,3 +78,39 @@ describe('request function', () => {
     expect(result).toBe('plain text')
   })
 })
+
+describe('musicApi.search', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('should include category and custom filter params', async () => {
+    const { musicApi, setActiveWorkspaceId } = await import('@/lib/api')
+    setActiveWorkspaceId(7)
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ files: [], pagination: { page: 2, per_page: 10, total: 0, total_pages: 1 } }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await musicApi.search(
+      {
+        category: ['entrada', 'comunhao'],
+        custom_filters: { 'tempo-liturgico': ['advento', 'pascoa'] },
+      },
+      { page: 2, limit: 10, sort_by: 'title', sort_order: 'asc' }
+    )
+
+    const url = new URL(fetchMock.mock.calls[0][0], 'http://localhost')
+    expect(url.pathname).toBe('/api/files')
+    expect(url.searchParams.getAll('category')).toEqual(['entrada', 'comunhao'])
+    expect(url.searchParams.getAll('custom_filter_tempo-liturgico')).toEqual(['advento', 'pascoa'])
+    expect(url.searchParams.get('workspace_id')).toBe('7')
+    expect(url.searchParams.get('sort_by')).toBe('song_name')
+    expect(url.searchParams.get('sort_order')).toBe('asc')
+    expect(url.searchParams.get('page')).toBe('2')
+    expect(url.searchParams.get('per_page')).toBe('10')
+  })
+})

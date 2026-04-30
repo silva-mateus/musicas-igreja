@@ -4,6 +4,7 @@ using Moq;
 using MusicasIgreja.Api.Data;
 using MusicasIgreja.Api.Models;
 using MusicasIgreja.Api.Services;
+using MusicasIgreja.Api.Services.Caching;
 
 namespace MusicasIgreja.Api.Tests.Services;
 
@@ -12,6 +13,7 @@ public class MusicServiceTests : IDisposable
     private readonly AppDbContext _context;
     private readonly MusicService _service;
     private readonly Mock<IFileService> _fileServiceMock;
+    private readonly ICacheService _cache;
 
     public MusicServiceTests()
     {
@@ -20,8 +22,9 @@ public class MusicServiceTests : IDisposable
             .Options;
         _context = new AppDbContext(options);
         _fileServiceMock = new Mock<IFileService>();
+        _cache = new NullCacheService();
 
-        _service = new MusicService(_context, _fileServiceMock.Object, Mock.Of<ILogger<MusicService>>());
+        _service = new MusicService(_context, _fileServiceMock.Object, Mock.Of<ILogger<MusicService>>(), _cache);
 
         SeedData();
     }

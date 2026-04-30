@@ -7,6 +7,8 @@ import { Badge } from '@core/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@core/components/ui/tooltip'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { TouchTarget } from '@/components/ui/touch-target'
+import { useBreakpoint } from '@/hooks/use-breakpoint'
 import type { SearchFilters } from '@/types'
 import { 
     ChevronDown, 
@@ -79,6 +81,8 @@ export function MusicGroupedView({
 }: MusicGroupedViewProps) {
     const router = useRouter()
     const { hasPermission } = useAuth()
+    const breakpoint = useBreakpoint()
+    const isMobile = breakpoint === 'mobile'
     const canDownloadMusic = hasPermission('music:download')
     const canEdit = hasPermission('music:edit_metadata') || hasPermission('lists:manage')
     const canManageLists = hasPermission('lists:manage')
@@ -246,14 +250,14 @@ export function MusicGroupedView({
                 </div>
                 <div className="flex gap-2">
                     <SimpleTooltip label="Expandir todos os grupos">
-                        <Button variant="outline" size="sm" onClick={expandAll}>
+                        <TouchTarget variant="outline" size="sm" onClick={expandAll}>
                             Expandir todos
-                        </Button>
+                        </TouchTarget>
                     </SimpleTooltip>
                     <SimpleTooltip label="Recolher todos os grupos">
-                        <Button variant="outline" size="sm" onClick={collapseAll}>
+                        <TouchTarget variant="outline" size="sm" onClick={collapseAll}>
                             Recolher todos
-                        </Button>
+                        </TouchTarget>
                     </SimpleTooltip>
                 </div>
             </div>
@@ -298,7 +302,7 @@ export function MusicGroupedView({
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <CardContent className="pt-0 pb-4">
-                                            <div className="space-y-2">
+                                            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                                                 {group.files.map((file) => (
                                                     <div
                                                         key={file.id}
@@ -370,16 +374,15 @@ export function MusicGroupedView({
                                                             <>
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8"
+                                                                        <TouchTarget
+                                                                            variant="icon"
+                                                                            size="sm"
                                                                             asChild
                                                                         >
                                                                             <Link href={`/music/${file.id}`} target="_blank">
                                                                                 <Eye className="h-4 w-4" />
                                                                             </Link>
-                                                                        </Button>
+                                                                        </TouchTarget>
                                                                     </TooltipTrigger>
                                                                     <TooltipContent>Visualizar</TooltipContent>
                                                                 </Tooltip>
@@ -387,10 +390,9 @@ export function MusicGroupedView({
                                                                 {canDownloadMusic && (
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8"
+                                                                            <TouchTarget
+                                                                                variant="icon"
+                                                                                size="sm"
                                                                                 onClick={() => handleDownload(file)}
                                                                                 disabled={downloadingId === file.id}
                                                                             >
@@ -399,7 +401,7 @@ export function MusicGroupedView({
                                                                                 ) : (
                                                                                     <Download className="h-4 w-4" />
                                                                                 )}
-                                                                            </Button>
+                                                                            </TouchTarget>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>Baixar PDF</TooltipContent>
                                                                     </Tooltip>
@@ -408,10 +410,10 @@ export function MusicGroupedView({
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
                                                                         {file.youtube_link ? (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                            <TouchTarget
+                                                                                variant="icon"
+                                                                                size="sm"
+                                                                                className="text-destructive hover:text-destructive"
                                                                                 asChild
                                                                             >
                                                                                 <a 
@@ -421,16 +423,15 @@ export function MusicGroupedView({
                                                                                 >
                                                                                     <Youtube className="h-4 w-4" />
                                                                                 </a>
-                                                                            </Button>
+                                                                            </TouchTarget>
                                                                         ) : (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8"
+                                                                            <TouchTarget
+                                                                                variant="icon"
+                                                                                size="sm"
                                                                                 disabled
                                                                             >
                                                                                 <Youtube className="h-4 w-4" />
-                                                                            </Button>
+                                                                            </TouchTarget>
                                                                         )}
                                                                     </TooltipTrigger>
                                                                     <TooltipContent>
@@ -449,16 +450,15 @@ export function MusicGroupedView({
                                                                 {canEdit && (
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8"
+                                                                            <TouchTarget
+                                                                                variant="icon"
+                                                                                size="sm"
                                                                                 asChild
                                                                             >
                                                                                 <Link href={`/music/${file.id}/edit`}>
                                                                                     <Edit className="h-4 w-4" />
                                                                                 </Link>
-                                                                            </Button>
+                                                                            </TouchTarget>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>Editar</TooltipContent>
                                                                     </Tooltip>
@@ -471,9 +471,10 @@ export function MusicGroupedView({
                                                             <DropdownMenu>
                                                                 <SimpleTooltip label="Mais ações">
                                                                     <DropdownMenuTrigger asChild>
-                                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                                        <TouchTarget variant="icon" size="sm">
                                                                             <MoreHorizontal className="h-4 w-4" />
-                                                                        </Button>
+                                                                            <span className="sr-only">Abrir menu</span>
+                                                                        </TouchTarget>
                                                                     </DropdownMenuTrigger>
                                                                 </SimpleTooltip>
                                                                 <DropdownMenuContent align="end" className="w-48">

@@ -64,7 +64,7 @@ public class FilesControllerTests
         var files = Enumerable.Range(1, count).Select(i => new FileDto(
             i, $"file{i}.pdf", $"original{i}.pdf", $"Song {i}", "Artist",
             new List<string> { "Entrada" }, new Dictionary<string, FileCustomFilterGroupDto>(),
-            "C", null, 1024, 2, DateTime.UtcNow, null, "pdf_only", null, null
+            "C", null, 1024, 2, DateTime.UtcNow, null, "pdf_only", null, null, null, null
         )).ToList();
 
         return new FileListResponseDto(files,
@@ -104,6 +104,57 @@ public class FilesControllerTests
         Assert.Equal(2, response.Files.Count);
     }
 
+    [Fact]
+    public async Task GetFiles_WithCategoryAndArtist_ShouldPassFilters()
+    {
+        _musicServiceMock.Setup(m => m.GetMusicsAsync(
+                It.IsAny<int>(),
+                "gloria",
+                It.Is<List<string>>(c => c.Count == 1 && c[0] == "entrada"),
+                null,
+                It.Is<List<string>>(a => a.Count == 1 && a[0] == "bach"),
+                "C",
+                1, 20, "upload_date", "desc", null))
+            .ReturnsAsync(MakeFileListResponse(1));
+
+        var result = await _controller.GetFiles(
+            workspace_id: 1,
+            q: "gloria",
+            category: new List<string> { "entrada" },
+            artist: new List<string> { "bach" },
+            musical_key: "C");
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<FileListResponseDto>(okResult.Value);
+        Assert.Single(response.Files);
+    }
+
+    [Fact]
+    public async Task GetFiles_WithCustomFilters_ShouldParseQuery()
+    {
+        var httpContext = _controller.ControllerContext.HttpContext;
+        httpContext.Request.QueryString = new QueryString("?custom_filter_tempo-liturgico=advento&custom_filter_tempo-liturgico=pascoa");
+
+        _musicServiceMock.Setup(m => m.GetMusicsAsync(
+                It.IsAny<int>(),
+                null,
+                null,
+                It.Is<Dictionary<string, List<string>>>(cf =>
+                    cf.ContainsKey("tempo-liturgico") &&
+                    cf["tempo-liturgico"].Contains("advento") &&
+                    cf["tempo-liturgico"].Contains("pascoa")),
+                null,
+                null,
+                1, 20, "upload_date", "desc", null))
+            .ReturnsAsync(MakeFileListResponse(1));
+
+        var result = await _controller.GetFiles();
+
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = Assert.IsType<FileListResponseDto>(okResult.Value);
+        Assert.Single(response.Files);
+    }
+
     #endregion
 
     #region GetFile Tests
@@ -114,7 +165,7 @@ public class FilesControllerTests
         _musicServiceMock.Setup(m => m.GetMusicByIdAsync(1))
             .ReturnsAsync(new FileDto(1, "file.pdf", "orig.pdf", "Song", "Artist",
                 new List<string>(), new Dictionary<string, FileCustomFilterGroupDto>(),
-                "C", null, 1024, 2, DateTime.UtcNow, null, "pdf_only", null, null));
+                "C", null, 1024, 2, DateTime.UtcNow, null, "pdf_only", null, null, null, null));
 
         var result = await _controller.GetFile(1);
 

@@ -11,19 +11,25 @@ interface ChordPreviewProps {
     showChords?: boolean
     chordColor?: string
     columnView?: boolean
+    columnCount?: number
+    originalKey?: string
+    hideHeaders?: boolean
 }
 
 const MUSICAL_KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
-export function ChordPreview({ 
-    chordContent, 
-    transposedKey, 
-    capoFret, 
+export function ChordPreview({
+    chordContent,
+    transposedKey,
+    capoFret,
     arrangementJson,
     fontSize,
     showChords,
     chordColor,
-    columnView
+    columnView,
+    columnCount,
+    originalKey,
+    hideHeaders,
 }: ChordPreviewProps) {
     if (!chordContent) {
         return (
@@ -35,11 +41,10 @@ export function ChordPreview({
 
     let transposeSteps = 0;
     if (transposedKey) {
-        // We need the original key from metadata to calculate the delta
-        const originalKeyMatch = chordContent.match(/^\{key:\s*([A-G][#b]?)\}/m) || chordContent.match(/^\{k:\s*([A-G][#b]?)\}/m);
-        const originalKey = originalKeyMatch ? originalKeyMatch[1] : 'C'; // fallback to C
-        
-        const originalIndex = MUSICAL_KEYS.indexOf(originalKey);
+        const directiveMatch = chordContent.match(/^\{key:\s*([A-G][#b]?)\}/m) || chordContent.match(/^\{k:\s*([A-G][#b]?)\}/m);
+        const baseKey = directiveMatch?.[1] || originalKey || 'C';
+
+        const originalIndex = MUSICAL_KEYS.indexOf(baseKey);
         const transposedIndex = MUSICAL_KEYS.indexOf(transposedKey);
         
         if (originalIndex !== -1 && transposedIndex !== -1) {
@@ -60,15 +65,17 @@ export function ChordPreview({
     
     return (
         <div className="chord-preview-container">
-            <ChordViewer 
-                content={chordContent} 
-                transposeAmount={transposeSteps} 
+            <ChordViewer
+                content={chordContent}
+                transposeAmount={transposeSteps}
                 capoFret={capoFret}
                 arrangementJson={arrangementJson}
                 fontSize={fontSize}
                 showChords={showChords}
                 chordColor={chordColor}
                 columnView={columnView}
+                columnCount={columnCount}
+                hideHeaders={hideHeaders}
             />
         </div>
     )

@@ -1,31 +1,73 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AppTopBar } from './app-topbar'
+import { ResponsiveDrawer } from '@/components/ui/responsive-drawer'
+import { useBreakpoint } from '@/hooks/use-breakpoint'
 
 interface MusicShellProps {
-  /** Rendered rail (only shown on desktop) */
   rail: React.ReactNode
   children: React.ReactNode
+  mode: 'read' | 'edit'
+  onModeChange: (mode: 'read' | 'edit') => void
+  railOpen: boolean
+  onRailOpenChange: (open: boolean) => void
+  railCollapsed: boolean
+  onRailCollapse: (v: boolean) => void
+  /**
+   * Se há conteúdo selecionado (música ou lista)
+   * No mobile, isso controla navegação stacked
+   */
+  hasSelectedContent?: boolean
 }
 
-/**
- * Primary layout for the music experience.
- * Top: slim AppTopBar.
- * Body: 240px library rail (desktop only) + main content.
- */
-export function MusicShell({ rail, children }: MusicShellProps) {
+export function MusicShell({
+  rail,
+  children,
+  mode,
+  onModeChange,
+  railOpen,
+  onRailOpenChange,
+  railCollapsed,
+  onRailCollapse,
+  hasSelectedContent = false,
+}: MusicShellProps) {
+  const breakpoint = useBreakpoint()
+  const isMobile = breakpoint === 'mobile'
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
-      <AppTopBar />
+      <AppTopBar
+        mode={mode}
+        onModeChange={onModeChange}
+        onMenuClick={() => onRailOpenChange(true)}
+        railCollapsed={railCollapsed}
+        onRailCollapseToggle={() => onRailCollapse(!railCollapsed)}
+        hasSelectedContent={hasSelectedContent}
+        isMobile={isMobile}
+      />
 
-      {/* Body */}
+      {/* Mobile drawer */}
+      <ResponsiveDrawer
+        open={railOpen}
+        onOpenChange={onRailOpenChange}
+        side="left"
+      >
+        {rail}
+      </ResponsiveDrawer>
+
       <div className="flex flex-1 min-h-0">
-        {/* Rail — desktop only */}
-        <aside className="hidden lg:flex w-[280px] shrink-0 flex-col border-r border-border overflow-hidden">
+        {/* Desktop rail - hidden on mobile when content is selected */}
+        <aside
+          className={`shrink-0 flex-col border-r border-border overflow-hidden transition-[width] duration-200 ${
+            isMobile && hasSelectedContent 
+              ? 'hidden' // Completamente oculto no mobile com conteúdo
+              : railCollapsed 
+                ? 'hidden md:flex w-0' 
+                : 'hidden md:flex w-[280px]'
+          }`}
+        >
           {rail}
         </aside>
-
-        {/* Main content */}
         <main className="flex-1 min-w-0 overflow-hidden">
           {children}
         </main>

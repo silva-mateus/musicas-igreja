@@ -13,22 +13,26 @@ interface ChordViewerProps {
   showChords?: boolean;
   chordColor?: string;
   columnView?: boolean;
+  columnCount?: number;
+  hideHeaders?: boolean;
 }
 
-export function ChordViewer({ 
-  content, 
-  transposeAmount = 0, 
+export function ChordViewer({
+  content,
+  transposeAmount = 0,
   capoFret = 0,
   arrangementJson,
   className = '',
   fontSize = 16,
   showChords = true,
-  chordColor = 'text-primary',
-  columnView = false
+  chordColor = 'oklch(0.62 0.18 50)',
+  columnView = false,
+  columnCount,
+  hideHeaders = false,
 }: ChordViewerProps) {
   
-  // Total transposition is the sum of transpose and capo
-  const totalSteps = transposeAmount + capoFret;
+  // capoFret already subtracted in ChordPreview — don't double-count
+  const totalSteps = transposeAmount;
 
   // Memoize the transposed content and parsing
   const document = useMemo(() => {
@@ -65,7 +69,7 @@ export function ChordViewer({
         return null;
       }
       if (dir.directiveName === 'comment' || dir.directiveName === 'c') {
-        return <div key={lineIdx} className={`font-semibold ${chordColor} mt-4 mb-1 text-[0.9em]`}>{dir.value}</div>;
+        return <div key={lineIdx} className="font-semibold mt-4 mb-1 text-[0.9em]" style={{ color: chordColor }}>{dir.value}</div>;
       }
       return null;
     }
@@ -104,7 +108,10 @@ export function ChordViewer({
       <div key={lineIdx} className="flex flex-wrap items-end mb-1">
         {segments.map((seg, segIdx) => (
           <span key={segIdx} className="inline-flex flex-col align-bottom">
-            <span className={`text-[0.85em] font-bold ${chordColor} leading-tight min-h-[1.25em] ${seg.chord ? '' : 'invisible'}`}>
+            <span
+              className={`text-[0.85em] font-bold leading-tight min-h-[1.25em] ${seg.chord ? '' : 'invisible'}`}
+              style={{ color: chordColor }}
+            >
               {seg.chord || '\u00A0'}
             </span>
             <span className="whitespace-pre leading-normal">{seg.text}</span>
@@ -114,24 +121,76 @@ export function ChordViewer({
     );
   };
 
+  // Split sections into N balanced columns by line count
+  const columnGroups = useMemo(() => {
+    const n = columnCount && columnCount > 1 ? columnCount : 1;
+    if (n === 1) return [renderSections];
+    const weights = renderSections.map(s => Math.max(s.lines.length + (s.label ? 1 : 0), 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    const target = total / n;
+    const cols: ChordProSection[][] = Array.from({ length: n }, () => []);
+    let idx = 0;
+    let acc = 0;
+    for (let i = 0; i < renderSections.length; i++) {
+      cols[idx].push(renderSections[i]);
+      acc += weights[i];
+      if (idx < n - 1 && acc >= target) { idx++; acc = 0; }
+    }
+    return cols.filter(c => c.length > 0);
+  }, [renderSections, columnCount]);
+
+  const renderSectionBlock = (section: ChordProSection) => (
+    <div
+      key={section.id}
+      className={`mb-4 ${section.type === 'chorus' ? 'border-l-4 border-primary/30 pl-4 bg-muted/30 py-2 rounded-r-md' : ''}`}
+    >
+      {!hideHeaders && section.label && section.type !== 'other' && (
+        <div
+          className="font-semibold mb-2 text-[0.8em] uppercase tracking-wider"
+          style={{ color: chordColor }}
+        >
+          {section.label}
+        </div>
+      )}
+      {section.lines.map((line, idx) => renderLine(line, idx))}
+    </div>
+  );
+
+  // Legacy column-view (Tailwind responsive) when columnCount not specified
+  if (columnCount === undefined && columnView) {
+    return (
+      <div
+        className={`font-sans leading-relaxed whitespace-pre-wrap ${className}`}
+        style={{ fontSize: `${fontSize}px` }}
+      >
+        <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-0">
+          {renderSections.map(s => (
+            <div key={s.id} className="break-inside-avoid-column">
+              {renderSectionBlock(s)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div 
+    <div
       className={`font-sans leading-relaxed whitespace-pre-wrap ${className}`}
       style={{ fontSize: `${fontSize}px` }}
     >
-      {/* Sections Rendering */}
-      <div className={columnView ? 'columns-1 md:columns-2 lg:columns-3 gap-8 space-y-0' : 'space-y-0'}>
-        {renderSections.map((section) => (
-          <div 
-            key={section.id} 
-            className={`mb-6 break-inside-avoid-column ${section.type === 'chorus' ? 'border-l-4 border-primary/30 pl-4 bg-muted/30 py-2 rounded-r-md' : ''}`}
-          >
-            {section.label && section.type !== 'other' && (
-              <div className={`font-semibold ${chordColor} mb-2 text-[0.8em] uppercase tracking-wider`}>
-                {section.label}
-              </div>
-            )}
-            {section.lines.map((line, idx) => renderLine(line, idx))}
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${columnGroups.length}, 1fr)`,
+          gap: '0 1.5rem',
+        }}
+      >
+        {columnGroups.map((sectionsInCol, i) => (
+          <div key={i} className="flex justify-center">
+            <div className="space-y-0">
+              {sectionsInCol.map(renderSectionBlock)}
+            </div>
           </div>
         ))}
       </div>

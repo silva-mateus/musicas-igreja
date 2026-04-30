@@ -11,6 +11,7 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@core': path.resolve(__dirname, '../core/frontend'),

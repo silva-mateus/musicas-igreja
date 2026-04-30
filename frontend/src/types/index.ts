@@ -97,7 +97,9 @@ export interface MusicFile {
     is_duplicate: boolean
     content_type?: 'pdf_only' | 'chord' | 'chord_converting'
     chord_content?: string
+    chord_content_draft?: string
     ocr_status?: string
+    ocr_error?: string
 }
 
 export interface MusicList {

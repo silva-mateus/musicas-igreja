@@ -1,15 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Search,
   Music2,
   FileText,
   Loader2,
   SlidersHorizontal,
-  RefreshCw,
   Plus,
   List,
   Settings,
@@ -21,12 +19,38 @@ import { Input } from '@core/components/ui/input'
 import { Badge } from '@core/components/ui/badge'
 import { Skeleton } from '@core/components/ui/skeleton'
 import { ScrollArea } from '@core/components/ui/scroll-area'
-import { Pagination } from '@/components/ui/pagination'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
-import type { MusicFile, MusicList } from '@/types'
+import type { FilterOption, MusicFile, MusicList, SearchFilters } from '@/types'
 import { useAuth } from '@core/contexts/auth-context'
 import { useWorkspace } from '@/contexts/workspace-context'
+import { getActiveWorkspaceId } from '@/lib/api'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { PullToRefreshIndicator } from '@/components/ui/pull-to-refresh-indicator'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+
+type ThemeMode = 'light' | 'dark' | 'system'
+
+const THEME_STORAGE_KEY = 'musicas_theme'
 
 function MusicTypeIcon({ contentType }: { contentType?: string }) {
   if (contentType === 'chord') return <Music2 className="w-3 h-3 shrink-0 text-[hsl(var(--chord-accent))]" />
@@ -38,15 +62,18 @@ interface LibraryRailProps {
   // Music data
   musics: MusicFile[]
   isLoadingMusics: boolean
+  isFetchingMore?: boolean
+  hasMore?: boolean
   selectedMusicId: number | null
   onSelectMusic: (id: number) => void
   musicPagination?: { page: number; limit: number; total: number; pages: number }
-  onMusicPageChange: (page: number) => void
+  onLoadMore?: () => void
   // Search / filter
   searchValue: string
   onSearchChange: (value: string) => void
   onOpenFilters: () => void
-  onRefresh: () => void
+  filters: SearchFilters
+  onFiltersChange: (filters: SearchFilters) => void
   // Sort chips
   sortBy?: { field: string; order: 'asc' | 'desc' }
   onSortChange?: (sort: { field: string; order: 'asc' | 'desc' }) => void
@@ -55,6 +82,9 @@ interface LibraryRailProps {
   isLoadingLists: boolean
   selectedListId: number | null
   onSelectList: (id: number) => void
+  // Rail tab (controlled from parent for URL sync)
+  activeRailTab: RailTab
+  onRailTabChange: (tab: RailTab) => void
   // Auth gate for login button
   onOpenLogin: () => void
 }
@@ -70,24 +100,45 @@ const SORT_CHIPS = [
 export function LibraryRail({
   musics,
   isLoadingMusics,
+  isFetchingMore,
+  hasMore,
   selectedMusicId,
   onSelectMusic,
   musicPagination,
-  onMusicPageChange,
+  onLoadMore,
   searchValue,
   onSearchChange,
   onOpenFilters,
-  onRefresh,
+  filters,
+  onFiltersChange,
   sortBy,
   onSortChange,
   lists,
   isLoadingLists,
   selectedListId,
   onSelectList,
+  activeRailTab,
+  onRailTabChange,
   onOpenLogin,
 }: LibraryRailProps) {
-  const [activeTab, setActiveTab] = useState<RailTab>('musicas')
+  const activeTab = activeRailTab
+  const setActiveTab = onRailTabChange
   const [listSearch, setListSearch] = useState('')
+  const [isFilterLoading, setIsFilterLoading] = useState(false)
+  const [filterOptions, setFilterOptions] = useState<{
+    categories: FilterOption[]
+    tempoLiturgico: FilterOption[]
+    tempoLabel: string
+  }>({
+    categories: [],
+    tempoLiturgico: [],
+    tempoLabel: 'Tempo litúrgico',
+  })
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'system'
+    const stored = localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null
+    return stored || 'system'
+  })
   const { isAuthenticated } = useAuth()
   const { activeWorkspace } = useWorkspace()
 
@@ -96,6 +147,117 @@ export function LibraryRail({
     const lower = listSearch.toLowerCase()
     return lists.filter((l) => l.name.toLowerCase().includes(lower))
   }, [lists, listSearch])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const root = document.documentElement
+    const applyTheme = (isDark: boolean) => {
+      root.classList.toggle('dark', isDark)
+    }
+
+    localStorage.setItem(THEME_STORAGE_KEY, themeMode)
+
+    if (themeMode === 'system') {
+      const media = window.matchMedia('(prefers-color-scheme: dark)')
+      applyTheme(media.matches)
+      const handler = (event: MediaQueryListEvent) => applyTheme(event.matches)
+      if (media.addEventListener) {
+        media.addEventListener('change', handler)
+        return () => media.removeEventListener('change', handler)
+      }
+      media.addListener(handler)
+      return () => media.removeListener(handler)
+    }
+
+    applyTheme(themeMode === 'dark')
+  }, [themeMode])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadFilterOptions = async () => {
+      setIsFilterLoading(true)
+      try {
+        const params = new URLSearchParams()
+        params.append('workspace_id', String(getActiveWorkspaceId()))
+        const response = await fetch(`/api/filters/suggestions?${params.toString()}`)
+        const data = await response.json()
+
+        const toFilterOptions = (values: unknown): FilterOption[] =>
+          (Array.isArray(values) ? values : [])
+            .filter((v: any) => v && v.slug && v.label)
+            .map((v: any) => ({ slug: v.slug, label: v.label }))
+
+        const groups = Array.isArray(data.custom_filter_groups) ? data.custom_filter_groups : []
+        const tempoGroup = groups.find((g: any) => g.slug === 'tempo-liturgico')
+        const tempoValues = Array.isArray(tempoGroup?.values)
+          ? tempoGroup.values
+              .filter((v: any) => v && v.slug)
+              .map((v: any) => ({ slug: v.slug, label: v.name ?? v.label ?? v.slug }))
+          : []
+
+        if (!isMounted) return
+        setFilterOptions({
+          categories: toFilterOptions(data.categories),
+          tempoLiturgico: tempoValues,
+          tempoLabel: tempoGroup?.name ?? 'Tempo litúrgico',
+        })
+      } catch {
+        if (!isMounted) return
+        setFilterOptions({
+          categories: [],
+          tempoLiturgico: [],
+          tempoLabel: 'Tempo litúrgico',
+        })
+      } finally {
+        if (isMounted) setIsFilterLoading(false)
+      }
+    }
+
+    loadFilterOptions()
+    return () => {
+      isMounted = false
+    }
+  }, [activeWorkspace?.id])
+
+  const selectedCategories = Array.isArray(filters.category)
+    ? filters.category
+    : filters.category
+    ? [filters.category]
+    : []
+  const selectedTempo = filters.custom_filters?.['tempo-liturgico'] || []
+
+  const toggleCategory = (slug: string) => {
+    const next = selectedCategories.includes(slug)
+      ? selectedCategories.filter((item) => item !== slug)
+      : [...selectedCategories, slug]
+    const nextFilters = { ...filters }
+    if (next.length === 0) {
+      delete nextFilters.category
+    } else {
+      nextFilters.category = next
+    }
+    onFiltersChange(nextFilters)
+  }
+
+  const toggleTempo = (slug: string) => {
+    const next = selectedTempo.includes(slug)
+      ? selectedTempo.filter((item) => item !== slug)
+      : [...selectedTempo, slug]
+    const nextFilters = { ...filters }
+    const customFilters = { ...(nextFilters.custom_filters || {}) }
+    if (next.length === 0) {
+      delete customFilters['tempo-liturgico']
+    } else {
+      customFilters['tempo-liturgico'] = next
+    }
+    if (Object.keys(customFilters).length === 0) {
+      delete nextFilters.custom_filters
+    } else {
+      nextFilters.custom_filters = customFilters
+    }
+    onFiltersChange(nextFilters)
+  }
 
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
@@ -141,11 +303,61 @@ export function LibraryRail({
           )}
           {activeTab === 'musicas' && (
             <>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onOpenFilters}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hidden md:flex h-8 gap-2 px-2.5 shrink-0">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <span className="text-xs">Filtros</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Filtros rápidos
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Categoria</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56 max-h-64 overflow-y-auto">
+                      {isFilterLoading && <DropdownMenuItem disabled>Carregando…</DropdownMenuItem>}
+                      {!isFilterLoading && filterOptions.categories.length === 0 && (
+                        <DropdownMenuItem disabled>Nenhuma categoria</DropdownMenuItem>
+                      )}
+                      {filterOptions.categories.map((category) => (
+                        <DropdownMenuCheckboxItem
+                          key={category.slug}
+                          checked={selectedCategories.includes(category.slug)}
+                          onCheckedChange={() => toggleCategory(category.slug)}
+                        >
+                          {category.label}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  {filterOptions.tempoLiturgico.length > 0 && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>{filterOptions.tempoLabel}</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-56 max-h-64 overflow-y-auto">
+                        {filterOptions.tempoLiturgico.map((tempo) => (
+                          <DropdownMenuCheckboxItem
+                            key={tempo.slug}
+                            checked={selectedTempo.includes(tempo.slug)}
+                            onCheckedChange={() => toggleTempo(tempo.slug)}
+                          >
+                            {tempo.label}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 md:hidden"
+                onClick={onOpenFilters}
+              >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onRefresh}>
-                <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </>
           )}
@@ -196,7 +408,9 @@ export function LibraryRail({
             selectedId={selectedMusicId}
             onSelect={onSelectMusic}
             pagination={musicPagination}
-            onPageChange={onMusicPageChange}
+            hasMore={hasMore}
+            isFetchingMore={isFetchingMore}
+            onLoadMore={onLoadMore}
           />
         ) : (
           <ListsList
@@ -211,44 +425,81 @@ export function LibraryRail({
       {/* Footer */}
       <div className="shrink-0 border-t border-border">
         {/* Músicas / Listas toggle */}
-        <div className="flex p-1.5 gap-1">
-          <button
-            onClick={() => setActiveTab('musicas')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 h-7 rounded text-xs font-medium transition-colors',
-              activeTab === 'musicas'
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-          >
-            <Music2 className="h-3 w-3" />
-            Músicas
-          </button>
-          <button
-            onClick={() => setActiveTab('listas')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 h-7 rounded text-xs font-medium transition-colors',
-              activeTab === 'listas'
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-          >
-            <List className="h-3 w-3" />
-            Listas
-          </button>
+        <div className="px-2 py-2">
+          <div className="flex items-center bg-muted rounded-full p-1 gap-1">
+            <button
+              onClick={() => onRailTabChange('musicas')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 h-7 rounded-full text-xs font-medium transition-colors',
+                activeTab === 'musicas'
+                  ? 'bg-card text-foreground border border-border shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Music2 className="h-3 w-3" />
+              Músicas
+            </button>
+            <button
+              onClick={() => onRailTabChange('listas')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 h-7 rounded-full text-xs font-medium transition-colors',
+                activeTab === 'listas'
+                  ? 'bg-card text-foreground border border-border shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <List className="h-3 w-3" />
+              Listas
+            </button>
+          </div>
         </div>
 
         {/* Actions row */}
-        <div className="flex items-center px-1.5 pb-1.5 gap-1">
-          <Button variant="ghost" size="sm" className="flex-1 gap-1.5 h-7 text-xs justify-start" asChild>
-            <Link href="/settings">
-              <Settings className="h-3 w-3" />
-              Configurações
-            </Link>
-          </Button>
+        <div className="flex items-center gap-2 px-2 pb-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="flex-1 gap-2 h-8 text-xs">
+                <Settings className="h-3.5 w-3.5" />
+                Configurações
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Configurações</DialogTitle>
+                <DialogDescription>Personalize o tema da interface.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Tema</p>
+                  <p className="text-xs text-muted-foreground">
+                    Escolha o modo claro, escuro ou siga o sistema.
+                  </p>
+                  <div className="flex items-center bg-muted rounded-full p-1 gap-1">
+                    {(['light', 'dark', 'system'] as ThemeMode[]).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={themeMode === value}
+                        onClick={() => setThemeMode(value)}
+                        className={cn(
+                          'flex-1 h-8 rounded-full text-xs font-medium transition-colors',
+                          themeMode === value
+                            ? 'bg-card text-foreground border border-border shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        {value === 'light' ? 'Claro' : value === 'dark' ? 'Escuro' : 'Sistema'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           {!isAuthenticated && (
-            <Button variant="ghost" size="sm" className="gap-1.5 h-7 text-xs" onClick={onOpenLogin}>
-              <LogIn className="h-3 w-3" />
+            <Button size="sm" className="flex-1 gap-2 h-8 text-xs" onClick={onOpenLogin}>
+              <LogIn className="h-3.5 w-3.5" />
               Entrar
             </Button>
           )}
@@ -266,15 +517,49 @@ function MusicList({
   selectedId,
   onSelect,
   pagination,
-  onPageChange,
+  hasMore,
+  isFetchingMore,
+  onLoadMore,
 }: {
   musics: MusicFile[]
   isLoading: boolean
   selectedId: number | null
   onSelect: (id: number) => void
   pagination?: { page: number; limit: number; total: number; pages: number }
-  onPageChange: (page: number) => void
+  hasMore?: boolean
+  isFetchingMore?: boolean
+  onLoadMore?: () => void
 }) {
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  
+  // Pull to refresh functionality
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: async () => {
+      // Trigger a refresh by calling onLoadMore and resetting the list
+      // In practice, this would trigger a refetch of the first page
+      window.location.reload()
+    },
+    disabled: isLoading || isFetchingMore
+  })
+
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return
+    const element = loadMoreRef.current
+    if (!element) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isFetchingMore) {
+          onLoadMore()
+        }
+      },
+      { root: null, rootMargin: '200px' }
+    )
+
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [hasMore, isFetchingMore, onLoadMore])
+
   if (isLoading) {
     return (
       <ScrollArea className="h-full">
@@ -299,12 +584,23 @@ function MusicList({
   }
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea 
+      className="h-full" 
+      ref={(el) => pullToRefresh.attachToElement(el?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement)}
+    >
+      <PullToRefreshIndicator 
+        isPulling={pullToRefresh.isPulling}
+        canRefresh={pullToRefresh.canRefresh}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        style={pullToRefresh.pullIndicatorStyle}
+        className="border-b border-border/30"
+      />
       <div>
         {musics.map((music, index) => {
           const isSelected = music.id === selectedId
           const title = music.title || music.original_name
-          const num = (pagination ? (pagination.page - 1) * pagination.limit : 0) + index + 1
+          const num = index + 1
 
           return (
             <button
@@ -312,7 +608,7 @@ function MusicList({
               onClick={() => onSelect(music.id)}
               className={cn(
                 'w-full text-left px-3 py-2 flex items-start gap-2 border-b border-border/30 transition-colors',
-                'hover:bg-accent focus-visible:outline-none focus-visible:bg-accent',
+                'hover:bg-accent focus-visible:outline-none focus-visible:bg-accent focus-visible:ring-1 focus-visible:ring-border/80',
                 isSelected && 'border-l-2 pl-[10px]'
               )}
               style={isSelected ? {
@@ -355,17 +651,16 @@ function MusicList({
           )
         })}
       </div>
-
-      {pagination && pagination.pages > 1 && (
-        <div className="p-2 border-t border-border">
-          <Pagination
-            page={pagination.page}
-            pages={pagination.pages}
-            total={pagination.total}
-            limit={pagination.limit}
-            onPageChange={onPageChange}
-            itemLabel="música"
-          />
+      <div ref={loadMoreRef} className="h-10" />
+      {isFetchingMore && (
+        <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Carregando mais músicas…
+        </div>
+      )}
+      {!hasMore && musics.length > 0 && (
+        <div className="px-3 py-2 text-[11px] text-muted-foreground">
+          Fim da lista
         </div>
       )}
     </ScrollArea>
@@ -385,8 +680,14 @@ function ListsList({
   selectedId: number | null
   onSelect: (id: number) => void
 }) {
-  const router = useRouter()
-
+  // Pull to refresh functionality
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: async () => {
+      // Trigger a refresh of the lists
+      window.location.reload()
+    },
+    disabled: isLoading
+  })
   if (isLoading) {
     return (
       <ScrollArea className="h-full">
@@ -406,14 +707,25 @@ function ListsList({
         <EmptyState
           title="Nenhuma lista"
           description="Crie sua primeira lista"
-          action={{ label: 'Ir para Listas', onClick: () => router.push('/lists') }}
+          action={{ label: 'Ir para Listas', onClick: () => window.location.assign('/lists') }}
         />
       </div>
     )
   }
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea 
+      className="h-full" 
+      ref={(el) => pullToRefresh.attachToElement(el?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement)}
+    >
+      <PullToRefreshIndicator 
+        isPulling={pullToRefresh.isPulling}
+        canRefresh={pullToRefresh.canRefresh}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        style={pullToRefresh.pullIndicatorStyle}
+        className="border-b border-border/30"
+      />
       <div>
         {lists.map((list) => {
           const isSelected = list.id === selectedId
@@ -424,13 +736,10 @@ function ListsList({
           return (
             <button
               key={list.id}
-              onClick={() => {
-                onSelect(list.id)
-                router.push(`/lists/${list.id}`)
-              }}
+              onClick={() => onSelect(list.id)}
               className={cn(
                 'w-full text-left px-3 py-2.5 flex items-center gap-2 border-b border-border/30 transition-colors',
-                'hover:bg-accent focus-visible:outline-none',
+                'hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border/80',
                 isSelected && 'bg-muted border-l-2 border-l-foreground pl-[10px]'
               )}
             >

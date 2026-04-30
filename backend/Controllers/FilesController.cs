@@ -82,7 +82,8 @@ public class FilesController : ControllerBase
         [FromForm] string? description = null,
         [FromForm] List<string>? new_categories = null,
         [FromForm] string? new_artist = null,
-        [FromForm] string? custom_filters_json = null)
+        [FromForm] string? custom_filters_json = null,
+        [FromForm] bool auto_ocr = true)
     {
         if (!CoreAuthHelper.IsAuthenticated(HttpContext))
             return Unauthorized(new { error = "Não autenticado" });
@@ -144,6 +145,15 @@ public class FilesController : ControllerBase
 
             await _monitoringService.RecordMetricAsync("upload_size", file.Length / (1024.0 * 1024.0), "MB");
             await _monitoringService.LogAuditActionAsync("upload", "file", result.Id, userId, username, ipAddress);
+
+            if (auto_ocr && !string.IsNullOrEmpty(result.FilePath))
+            {
+                result.ContentType = "chord_converting";
+                result.OcrStatus = "queued";
+                await _musicService.SaveChangesAsync();
+                var absPath = _fileService.GetAbsolutePath(result.FilePath);
+                await _ocrWriter.WriteAsync(new OcrJob { FileId = result.Id, FilePath = absPath });
+            }
 
             return StatusCode(201, new FileUploadResultDto
             {
@@ -224,6 +234,9 @@ public class FilesController : ControllerBase
         if (file == null)
             return NotFound(new { success = false, error = "Arquivo não encontrado" });
 
+        if (file.ContentType == "chord_converting")
+            return StatusCode(202, new { status = file.OcrStatus, message = "Conversão em andamento" });
+
         if (file.ContentType == "chord")
         {
             if (string.IsNullOrEmpty(file.ChordContent))
@@ -259,6 +272,9 @@ public class FilesController : ControllerBase
         if (file == null)
             return NotFound(new { success = false, error = "Arquivo não encontrado" });
 
+        if (file.ContentType == "chord_converting")
+            return StatusCode(202, new { status = file.OcrStatus, message = "Conversão em andamento" });
+
         if (file.ContentType == "chord")
         {
             if (string.IsNullOrEmpty(file.ChordContent))
@@ -281,7 +297,17 @@ public class FilesController : ControllerBase
 
         var absolutePath = ResolveFilePath(file);
         if (absolutePath == null)
-            return NotFound(new { success = false, error = "Arquivo físico não encontrado" });
+        {
+            var storedRelative = file.FilePath ?? "(null)";
+            var resolvedAttempt = string.IsNullOrEmpty(file.FilePath)
+                ? "(no FilePath stored)"
+                : _fileService.GetAbsolutePath(file.FilePath);
+            var fileExists = !string.IsNullOrEmpty(resolvedAttempt) && System.IO.File.Exists(resolvedAttempt);
+            _logger.LogWarning(
+                "StreamFile: physical file not found for FileId={FileId} Filename={Filename} StoredPath={StoredPath} ResolvedPath={ResolvedPath} Exists={Exists} CWD={CWD}",
+                id, file.Filename, storedRelative, resolvedAttempt, fileExists, Directory.GetCurrentDirectory());
+            return NotFound(new { success = false, error = "Arquivo físico não encontrado", stored_path = storedRelative, resolved_path = resolvedAttempt });
+        }
 
         return PhysicalFile(absolutePath, "application/pdf");
     }
@@ -325,6 +351,39 @@ public class FilesController : ControllerBase
         {
             return Conflict(new { success = false, error = ex.Message });
         }
+    }
+
+    [HttpPost("batch-ocr")]
+    public async Task<ActionResult<object>> BatchOcr(
+        [FromBody] BatchOcrDto? dto,
+        [FromQuery] int workspace_id = 1)
+    {
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.EditMetadata))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        var files = await _musicService.GetPdfOnlyFilesAsync(workspace_id, dto?.Ids);
+        if (files.Count == 0)
+            return Ok(new { queued = 0, message = "Nenhum arquivo PDF encontrado para converter" });
+
+        foreach (var file in files)
+        {
+            file.ContentType = "chord_converting";
+            file.OcrStatus = "queued";
+        }
+        await _musicService.SaveChangesAsync();
+
+        var queued = 0;
+        foreach (var file in files)
+        {
+            var absPath = _fileService.GetAbsolutePath(file.FilePath!);
+            await _ocrWriter.WriteAsync(new OcrJob { FileId = file.Id, FilePath = absPath });
+            queued++;
+        }
+
+        return Ok(new { queued, message = $"{queued} arquivo(s) enfileirado(s) para conversão" });
     }
 
     [HttpGet("grouped/by-artist")]
@@ -418,6 +477,30 @@ public class FilesController : ControllerBase
         }
     }
 
+    [HttpDelete("{id}/chord/draft")]
+    public async Task<ActionResult<object>> DiscardChordDraft(int id)
+    {
+        if (!CoreAuthHelper.IsAuthenticated(HttpContext))
+            return Unauthorized(new { error = "Não autenticado" });
+
+        if (!await CoreAuthHelper.HasPermissionAsync(HttpContext, _authService, Permissions.EditMetadata))
+            return StatusCode(403, new { error = "Sem permissão" });
+
+        try
+        {
+            var success = await _musicService.DiscardChordDraftAsync(id);
+            if (!success)
+                return NotFound(new { error = "Arquivo não encontrado" });
+
+            return Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao descartar rascunho de cifra");
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
     [HttpGet("{id}/preferences")]
     public async Task<ActionResult<object>> GetUserPreference(int id)
     {
@@ -481,8 +564,8 @@ public class FilesController : ControllerBase
 
         try
         {
-            file.ContentType = "chord_converting";
             file.OcrStatus = "queued";
+            file.OcrError = null;
             await _musicService.SaveChangesAsync();
 
             var absPath = _fileService.GetAbsolutePath(file.FilePath);

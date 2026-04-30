@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 import '@/globals.css'
 import { ClientWrapper } from '@/components/client-wrapper'
@@ -26,6 +26,17 @@ export const metadata: Metadata = {
         ],
         shortcut: ['/favicon.ico'],
     },
+}
+
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover', // Para safe-area
+    maximumScale: 5, // Acessibilidade
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#f8f6f2' },
+        { media: '(prefers-color-scheme: dark)', color: '#1a1611' }
+    ]
 }
 
 export default function RootLayout({

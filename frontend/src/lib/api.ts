@@ -263,6 +263,10 @@ export const musicApi = {
         return await request(`/files/${id}/ocr-status`)
     },
 
+    async discardChordDraft(id: number): Promise<{ success: boolean }> {
+        return await request(`/files/${id}/chord/draft`, { method: 'DELETE' })
+    },
+
     async exportChordPdf(id: number, dto: ChordPdfExportDto): Promise<Blob> {
         const res = await fetch(`${BASE}/files/${id}/export-chord-pdf`, {
             method: 'POST',
@@ -882,7 +886,9 @@ function mapBackendToMusicFile(f: any): MusicFile {
         is_duplicate: false,
         content_type: f.content_type,
         chord_content: f.chord_content,
+        chord_content_draft: f.chord_content_draft,
         ocr_status: f.ocr_status,
+        ocr_error: f.ocr_error,
     }
 }
 

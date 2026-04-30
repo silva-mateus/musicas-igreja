@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardHeader, CardTitle } from '@core/components/ui/card'
 import { Button } from '@core/components/ui/button'
-import { Loader2, Wand2, AlertTriangle, RefreshCw, FileText } from 'lucide-react'
+import { Loader2, Wand2, AlertTriangle, RefreshCw, FileText, CheckCircle2, Trash2 } from 'lucide-react'
 import { useToast } from '@core/hooks/use-toast'
 import { musicApi } from '@/lib/api'
 import { musicKeys } from '@/hooks/use-music'
@@ -17,24 +16,33 @@ interface Props {
     musicId: number
     contentType: 'pdf_only' | 'chord' | 'chord_converting' | undefined
     ocrStatus?: string
+    hasDraft?: boolean
     canConvert: boolean
+    onReviewDraft?: () => void
 }
 
-export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: Props) {
-    const router = useRouter()
+export function OcrConvertCard({ musicId, contentType, ocrStatus, hasDraft, canConvert, onReviewDraft }: Props) {
     const queryClient = useQueryClient()
     const { toast } = useToast()
 
     const [confirmOpen, setConfirmOpen] = useState(false)
+    const [discardOpen, setDiscardOpen] = useState(false)
     const [triggering, setTriggering] = useState(false)
+    const [discarding, setDiscarding] = useState(false)
     const [polledStatus, setPolledStatus] = useState<OcrStatus>((ocrStatus as OcrStatus) || 'none')
     const [polledError, setPolledError] = useState<string | undefined>(undefined)
 
-    const isConverting = contentType === 'chord_converting'
+    const isProcessing = polledStatus === 'queued' || polledStatus === 'processing'
     const isFailed = polledStatus === 'failed'
+    const draftReady = hasDraft && (polledStatus === 'done' || polledStatus === 'done_low_confidence')
+    const lowConfidence = polledStatus === 'done_low_confidence'
 
     useEffect(() => {
-        if (!isConverting) return
+        setPolledStatus((ocrStatus as OcrStatus) || 'none')
+    }, [ocrStatus])
+
+    useEffect(() => {
+        if (!isProcessing) return
 
         let cancelled = false
         const poll = async () => {
@@ -44,19 +52,17 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
                 setPolledStatus(res.status as OcrStatus)
                 setPolledError(res.error)
 
-                if (res.status === 'done' || res.status === 'done_low_confidence') {
+                if (res.status === 'done' || res.status === 'done_low_confidence' || res.status === 'failed') {
                     await queryClient.invalidateQueries({ queryKey: musicKeys.detail(musicId) })
-                    const lowConfidence = res.status === 'done_low_confidence'
-                    toast({
-                        title: 'Cifra extraída',
-                        description: lowConfidence
-                            ? 'Extração concluída com baixa confiança. Revise o conteúdo antes de usar.'
-                            : 'Revise o conteúdo e ajuste se necessário.',
-                        variant: lowConfidence ? 'destructive' : 'default',
-                    })
-                    router.push(`/music/${musicId}/chord`)
-                } else if (res.status === 'failed') {
-                    await queryClient.invalidateQueries({ queryKey: musicKeys.detail(musicId) })
+                    if (res.status !== 'failed') {
+                        toast({
+                            title: 'Cifra extraída',
+                            description: res.status === 'done_low_confidence'
+                                ? 'Extração com baixa confiança. Revise antes de salvar.'
+                                : 'Revise o conteúdo e clique em Salvar para confirmar.',
+                            variant: res.status === 'done_low_confidence' ? 'destructive' : 'default',
+                        })
+                    }
                 }
             } catch {
                 // ignore transient poll errors
@@ -69,7 +75,26 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
             cancelled = true
             clearInterval(id)
         }
-    }, [isConverting, musicId, queryClient, router, toast])
+    }, [isProcessing, musicId, queryClient, toast])
+
+    const handleDiscard = async () => {
+        setDiscardOpen(false)
+        try {
+            setDiscarding(true)
+            await musicApi.discardChordDraft(musicId)
+            await queryClient.invalidateQueries({ queryKey: musicKeys.detail(musicId) })
+            setPolledStatus('none')
+            toast({ title: 'Rascunho descartado', description: 'PDF original mantido.' })
+        } catch (error) {
+            toast({
+                title: 'Erro',
+                description: error instanceof Error ? error.message : 'Falha ao descartar rascunho',
+                variant: 'destructive',
+            })
+        } finally {
+            setDiscarding(false)
+        }
+    }
 
     const handleConvert = async () => {
         setConfirmOpen(false)
@@ -90,7 +115,7 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
     }
 
     if (contentType === 'chord') return null
-    if (!canConvert && !isConverting) return null
+    if (!canConvert && !isProcessing && !draftReady) return null
 
     return (
         <>
@@ -98,17 +123,17 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                         <Wand2 className="h-5 w-5" />
-                        Converter PDF para Cifra Editável
+                        {draftReady ? 'Cifra Extraída — Revisar e Salvar' : 'Converter PDF para Cifra Editável'}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    {isConverting && !isFailed && (
+                    {isProcessing && (
                         <div className="flex items-start gap-3 rounded-md bg-muted/50 p-3">
                             <Loader2 className="h-5 w-5 animate-spin shrink-0 mt-0.5" />
                             <div className="text-sm">
                                 <p className="font-medium">Extraindo cifra…</p>
                                 <p className="text-muted-foreground">
-                                    Processando texto e acordes. Isso pode levar até 30 segundos.
+                                    Processando texto e acordes. PDF original permanece intacto.
                                 </p>
                             </div>
                         </div>
@@ -126,11 +151,47 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
                         </div>
                     )}
 
-                    {!isConverting && canConvert && (
+                    {draftReady && (
+                        <>
+                            <div className={`flex items-start gap-3 rounded-md p-3 ${lowConfidence ? 'border border-amber-500/30 bg-amber-500/5' : 'bg-muted/50'}`}>
+                                {lowConfidence
+                                    ? <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                                    : <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />}
+                                <div className="text-sm">
+                                    <p className="font-medium">
+                                        {lowConfidence ? 'Extração com baixa confiança' : 'Cifra extraída com sucesso'}
+                                    </p>
+                                    <p className="text-muted-foreground">
+                                        {lowConfidence
+                                            ? 'Revise cuidadosamente antes de salvar — a extração pode estar incompleta.'
+                                            : 'Revise o conteúdo no editor e clique em Salvar para substituir o PDF pela cifra.'}
+                                        {' '}O PDF original será preservado até você salvar.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={onReviewDraft} className="gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Revisar e Salvar
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setDiscardOpen(true)}
+                                    disabled={discarding}
+                                    className="gap-2"
+                                >
+                                    {discarding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    Descartar
+                                </Button>
+                            </div>
+                        </>
+                    )}
+
+                    {!isProcessing && !draftReady && canConvert && (
                         <>
                             <p className="text-sm text-muted-foreground">
-                                Extraímos texto e acordes automaticamente. Você poderá editar, transpor e
-                                exportar em outros tons. O PDF original é mantido.
+                                Extraímos texto e acordes automaticamente. Você revisa antes de salvar.
+                                O PDF original é mantido até você confirmar a nova versão.
                             </p>
                             <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                                 <FileText className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -159,10 +220,20 @@ export function OcrConvertCard({ musicId, contentType, ocrStatus, canConvert }: 
                 open={confirmOpen}
                 onOpenChange={setConfirmOpen}
                 title="Converter PDF para cifra?"
-                description="A conversão pode levar até 30 segundos. A qualidade depende do PDF — PDFs digitais funcionam melhor que escaneados. O PDF original é preservado e você poderá revisar e ajustar o conteúdo extraído."
+                description="A extração leva até 30 segundos. O PDF original permanece intacto — após a extração você revisa e só então salva a versão em cifra."
                 confirmText="Converter"
                 cancelText="Cancelar"
                 onConfirm={handleConvert}
+            />
+
+            <ConfirmDialog
+                open={discardOpen}
+                onOpenChange={setDiscardOpen}
+                title="Descartar rascunho da cifra?"
+                description="O texto extraído será apagado. O PDF original continuará disponível. Você pode tentar a conversão novamente depois."
+                confirmText="Descartar"
+                cancelText="Cancelar"
+                onConfirm={handleDiscard}
             />
         </>
     )
